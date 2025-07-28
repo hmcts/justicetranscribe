@@ -1,0 +1,194 @@
+/* eslint-disable react/button-has-type */
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/click-events-have-key-events */
+
+"use client";
+
+import React from "react";
+import { Plus, ChevronLeft, Mic, MonitorPlay } from "lucide-react";
+import { useTranscripts } from "@/providers/transcripts";
+import { useUserSettings } from "@/providers/user-settings";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { getFirstName } from "@/lib/utils";
+import { AudioBackup } from "@/lib/indexeddb-backup";
+import AudioUploader from "./audio/audio-uploader";
+import MeetingsList from "./meetings-list";
+import BackupRecovery from "./audio/backup-recovery";
+import BackupUploader from "./audio/backup-uploader";
+
+function WelcomePage() {
+  const {
+    newTranscription,
+    isLoading,
+    selectedRecordingMode,
+    setSelectedRecordingMode,
+  } = useTranscripts();
+
+  const { user } = useUserSettings();
+
+  const [showAllMeetings, setShowAllMeetings] = React.useState(false);
+  const [retryingBackup, setRetryingBackup] =
+    React.useState<AudioBackup | null>(null);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+
+  const firstName = user?.email
+    ? getFirstName(user.email).charAt(0).toUpperCase() +
+      getFirstName(user.email).slice(1).toLowerCase()
+    : "";
+  const heading = firstName
+    ? `Welcome back ${firstName} 👋`
+    : "Welcome back 👋";
+
+  const handleNewMeeting = () => {
+    if (isMobile) {
+      setSelectedRecordingMode("mic");
+      newTranscription();
+    }
+  };
+
+  const handleCloseRecorder = () => {
+    setSelectedRecordingMode(null);
+  };
+
+  const handleRetryUpload = async (backup: AudioBackup) => {
+    setRetryingBackup(backup);
+  };
+
+  const handleCloseBackupUploader = () => {
+    setRetryingBackup(null);
+  };
+
+  const handleBackupUploadSuccess = () => {
+    setRetryingBackup(null);
+    // Optionally refresh the backup list or show a success message
+  };
+
+  if (retryingBackup) {
+    return (
+      <BackupUploader
+        backup={retryingBackup}
+        onClose={handleCloseBackupUploader}
+        onUploadSuccess={handleBackupUploadSuccess}
+      />
+    );
+  }
+
+  if (selectedRecordingMode) {
+    return (
+      <AudioUploader
+        initialRecordingMode={selectedRecordingMode}
+        onClose={handleCloseRecorder}
+      />
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-8">
+      <div className="mb-8 text-center">
+        {showAllMeetings ? (
+          <div className="mb-4 flex items-center justify-center">
+            <Button
+              variant="ghost"
+              className="flex items-center gap-1"
+              onClick={() => setShowAllMeetings(false)}
+            >
+              <ChevronLeft className="size-4" />
+              Back to Welcome
+            </Button>
+          </div>
+        ) : (
+          <>
+            <h1 className="mb-2 text-3xl font-bold">{heading}</h1>
+            <p className="text-gray-600">
+              Create a new meeting or continue with a recent one
+            </p>
+          </>
+        )}
+      </div>
+
+      {!showAllMeetings && (
+        <div className="mb-8">
+          {isMobile ? (
+            <Button
+              onClick={handleNewMeeting}
+              className="flex w-full items-center justify-center gap-2 bg-blue-500 py-6 text-lg hover:bg-blue-600"
+            >
+              <Plus className="size-5" />
+              Start New Meeting
+            </Button>
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button className="flex w-full items-center justify-center gap-2 bg-blue-500 py-6 text-lg hover:bg-blue-600">
+                  <Plus className="size-5" />
+                  Start New Meeting
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[--radix-popover-trigger-width] p-3"
+                sideOffset={4}
+              >
+                <div className="grid gap-3">
+                  <button
+                    className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50"
+                    onClick={() => {
+                      setSelectedRecordingMode("mic");
+                      newTranscription();
+                    }}
+                  >
+                    <div className="rounded-lg bg-blue-100 p-2">
+                      <Mic className="size-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium">
+                        Record in Person Meeting
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Use your device&apos;s microphone
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50"
+                    onClick={() => {
+                      setSelectedRecordingMode("screen");
+                      newTranscription();
+                    }}
+                  >
+                    <div className="rounded-lg bg-blue-100 p-2">
+                      <MonitorPlay className="size-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium">Record Virtual Meeting</div>
+                      <div className="text-sm text-gray-500">
+                        Record your screen and audio
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+      )}
+
+      <BackupRecovery onRetryUpload={handleRetryUpload} />
+
+      <MeetingsList
+        showAllMeetings={showAllMeetings}
+        setShowAllMeetings={setShowAllMeetings}
+        handleNewMeeting={handleNewMeeting}
+        isLoading={isLoading}
+      />
+    </div>
+  );
+}
+
+export default WelcomePage;
