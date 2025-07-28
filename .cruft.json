@@ -1,0 +1,29 @@
+{
+  "template": "https://github.com/JusticeAIUnit/cookiecutter.git",
+  "commit": "71ab42c2d270d0c6364058424331a03befdb8d79",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "justicetranscribe",
+      "project_slug": "justicetranscribe",
+      "project_description": "A Next.js application deployed to Azure with Terraform",
+      "author_email": "sam.lhuillier@justice.gov.uk",
+      "github_org": "JusticeAIUnit",
+      "custom_domain_url": "https://transcribe.justice.gov.uk",
+      "azure_subscription_id": "ef9f1e98-5f6a-481c-b6b6-c632e4998827",
+      "azure_location": "uksouth",
+      "terraform_state_storage_account": "tfstatejusticeaiunitjust",
+      "terraform_state_resource_group": "terraform-state-rg",
+      "terraform_state_container": "tfstate",
+      "postgres_version": "16",
+      "postgres_sku_name": "B_Standard_B1ms",
+      "_copy_without_render": [
+        "frontend/node_modules",
+        "infrastructure/.terraform"
+      ],
+      "_template": "https://github.com/JusticeAIUnit/cookiecutter.git",
+      "_commit": "71ab42c2d270d0c6364058424331a03befdb8d79"
+    }
+  },
+  "directory": null
+}

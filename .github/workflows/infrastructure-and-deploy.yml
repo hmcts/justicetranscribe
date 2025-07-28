@@ -1,0 +1,165 @@
+name: Infrastructure and Deploy
+
+on:
+  push:
+    branches: [main, dev, preprod]
+  pull_request:
+    branches: [main, dev, preprod]
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      acr_login_server: ${{ steps.terraform.outputs.acr_login_server }}
+      frontend_service_name: ${{ steps.terraform.outputs.frontend_service_name }}
+      backend_service_name: ${{ steps.terraform.outputs.backend_service_name }}
+      backend_hostname: ${{ steps.terraform.outputs.backend_hostname }}
+      environment: ${{ steps.set-env.outputs.environment }}
+      client_id_secret: ${{ steps.set-env.outputs.client_id_secret }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set environment based on branch
+        id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "tfvars_file=prod.tfvars" >> $GITHUB_OUTPUT
+            echo "client_id_secret=AZURE_CLIENT_ID_PROD" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "tfvars_file=dev.tfvars" >> $GITHUB_OUTPUT
+            echo "client_id_secret=AZURE_CLIENT_ID_DEV" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/preprod" ]]; then
+            echo "environment=preprod" >> $GITHUB_OUTPUT
+            echo "tfvars_file=preprod.tfvars" >> $GITHUB_OUTPUT
+            echo "client_id_secret=AZURE_CLIENT_ID_PREPROD" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "tfvars_file=dev.tfvars" >> $GITHUB_OUTPUT
+            echo "client_id_secret=AZURE_CLIENT_ID_DEV" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets[steps.set-env.outputs.client_id_secret] }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        working-directory: ./infrastructure
+        run: terraform init -backend-config="key=terraform-${{ steps.set-env.outputs.environment }}.tfstate"
+
+      # - name: Terraform Plan
+      #   working-directory: ./infrastructure
+      #   run: terraform plan -var-file="${{ steps.set-env.outputs.tfvars_file }}"
+
+      - name: Terraform Apply
+        if: github.event_name == 'push'
+        working-directory: ./infrastructure
+        run: terraform apply -auto-approve -var-file="${{ steps.set-env.outputs.tfvars_file }}"
+
+      - name: Get Terraform Outputs
+        id: terraform
+        working-directory: ./infrastructure
+        run: |
+          echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
+          echo "frontend_service_name=$(terraform output -raw frontend_service_name)" >> $GITHUB_OUTPUT
+          echo "backend_service_name=$(terraform output -raw backend_service_name)" >> $GITHUB_OUTPUT
+          echo "backend_hostname=$(terraform output -raw backend_hostname)" >> $GITHUB_OUTPUT
+
+  build-and-deploy:
+    needs: terraform
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets[needs.terraform.outputs.client_id_secret] }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login --name ${{ needs.terraform.outputs.acr_login_server }}
+
+      # Frontend build and deploy
+      - name: Extract frontend metadata
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ needs.terraform.outputs.acr_login_server }}/justiceaiunit/justicetranscribe-frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=raw,value=preprod,enable=${{ github.ref == 'refs/heads/preprod' }}
+
+      - name: Build and push frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://${{ needs.terraform.outputs.backend_hostname }}
+            ENVIRONMENT=${{ needs.terraform.outputs.environment }}
+
+      # Backend build and deploy
+      - name: Extract backend metadata
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ needs.terraform.outputs.acr_login_server }}/justiceaiunit/justicetranscribe-backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=raw,value=preprod,enable=${{ github.ref == 'refs/heads/preprod' }}
+
+      - name: Build and push backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+
+      - name: Deploy frontend to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ needs.terraform.outputs.frontend_service_name }}
+          images: ${{ fromJSON(steps.frontend-meta.outputs.json).tags[0] }}
+
+      - name: Deploy backend to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ needs.terraform.outputs.backend_service_name }}
+          images: ${{ fromJSON(steps.backend-meta.outputs.json).tags[0] }}
