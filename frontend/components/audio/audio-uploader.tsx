@@ -129,7 +129,7 @@ function ContentDisplay({
             />
           ) : (
             <ScreenRecorder
-              onAudioReady={onRecordingStop}
+              onRecordingStop={onRecordingStop}
               onRecordingStart={onRecordingStart}
             />
           )}
