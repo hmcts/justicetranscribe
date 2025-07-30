@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { TemplateMetadata } from "@/src/api/generated";
 import useTemplates from "@/hooks/use-templates";
+import { apiClient } from "@/lib/api-client";
 import {
   findExistingMinuteVersionForTemplate,
   langfuseWeb,
@@ -81,25 +82,16 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           style: template.name,
         });
 
-        const initiateResponse = await fetch(
-          `/api/proxy/generate-or-edit-minutes`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              transcription_id: currentTranscription.id,
-              template,
-              action_type: "generate",
-            }),
-          },
-        );
-        if (!initiateResponse.ok) {
+        const result = await apiClient.generateOrEditMinutes({
+          transcription_id: currentTranscription.id,
+          template,
+          action_type: "generate",
+        });
+        if (result.error) {
           throw new Error("Failed to initiate AI minutes generation");
         }
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { minute_version_id } = await initiateResponse.json();
+        const { minute_version_id } = result.data!;
 
         const minuteVersion = await pollMinuteVersion(
           currentTranscription.id,
@@ -138,29 +130,20 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           style: selectedTemplate.name,
         });
 
-        const initiateResponse = await fetch(
-          `/api/proxy/generate-or-edit-minutes`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              transcription_id: currentTranscription.id,
-              template: selectedTemplate,
-              current_minute_version_id: currentVersion.id,
-              edit_instructions: editInstructions,
-              action_type: "edit",
-            }),
-          },
-        );
+        const result = await apiClient.generateOrEditMinutes({
+          transcription_id: currentTranscription.id,
+          template: selectedTemplate,
+          current_minute_version_id: currentVersion.id,
+          edit_instructions: editInstructions,
+          action_type: "edit",
+        });
 
-        if (!initiateResponse.ok) {
+        if (result.error) {
           throw new Error("Failed to initiate AI edit");
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { minute_version_id } = await initiateResponse.json();
+        const { minute_version_id } = result.data!;
 
         const minuteVersion = await pollMinuteVersion(
           currentTranscription.id,
