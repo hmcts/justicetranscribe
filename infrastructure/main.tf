@@ -232,7 +232,6 @@ resource "azurerm_linux_web_app" "backend_api" {
     
     # FastAPI specific settings
     "PYTHONPATH"                         = "/app"
-    "FASTAPI_ENV"                        = var.environment
     
     # CORS allowed origins - include custom domain
     "CORS_ALLOWED_ORIGINS"               = "https://${local.frontend_hostname},${var.custom_domain_url},http://localhost:3000"    
@@ -247,17 +246,12 @@ resource "azurerm_linux_web_app" "backend_api" {
     "AUTH_ISSUER_URL"   = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0"
     
     # Application configuration
-    "DOCKER_BUILDER_CONTAINER"          = "justice-transcribe"
-    "APP_NAME"                          = "justice-transcribe"
     "APP_URL"                           = "https://${local.frontend_hostname}"
-    "BACKEND_URL"                       = "https://${local.backend_hostname}"
-    "BACKEND_HOST"                      = "https://${local.backend_hostname}"
     
     # AWS Configuration
     "AWS_REGION"                        = "eu-west-2"
     "AWS_ACCOUNT_ID"                    = "placeholder-aws-account-id"
     "DATA_S3_BUCKET"                    = "i-dot-ai-dev-justice-transcribe-data"
-    "USE_LOCALSTACK"                    = "false"
     
     # Azure AI Services
     "AZURE_OPENAI_API_KEY"              = "placeholder-azure-openai-api-key"

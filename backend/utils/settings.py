@@ -9,7 +9,6 @@ class Settings(BaseSettings):
 
     APP_URL: str
 
-    APP_NAME: str
     AWS_REGION: str
     ENVIRONMENT: str = "local"
 
