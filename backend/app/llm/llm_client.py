@@ -11,7 +11,7 @@ from langfuse.decorators import langfuse_context, observe
 from litellm import acompletion
 from pydantic import BaseModel
 
-from shared_utils.settings import settings_instance
+from utils.settings import settings_instance
 
 
 class LLMModel(str, Enum):

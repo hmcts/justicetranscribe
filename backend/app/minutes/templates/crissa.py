@@ -14,7 +14,7 @@ from app.llm.llm_client import (
 )
 from app.minutes.templates.utils import format_transcript_string_for_prompt
 from utils.markdown import html_to_markdown, markdown_to_html
-from shared_utils.database.postgres_models import DialogueEntry, TemplateName
+from app.database.postgres_models import DialogueEntry, TemplateName
 
 CRISSA_SECTIONS = [
     "Check in",

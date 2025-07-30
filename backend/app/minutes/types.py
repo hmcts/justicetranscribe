@@ -4,7 +4,7 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, Field
 
-from shared_utils.database.postgres_models import (
+from app.database.postgres_models import (
     TemplateMetadata,
 )
 

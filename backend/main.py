@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
-from shared_utils.settings import settings_instance
+from utils.settings import settings_instance
 
 log = logging.getLogger("uvicorn")
 

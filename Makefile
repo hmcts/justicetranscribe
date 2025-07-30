@@ -36,7 +36,7 @@ install: ## Install backend dependencies
 	cd frontend && npm install
 
 backend: ## Run development server
-	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	cd backend && uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 frontend: ## Run development server
 	cd frontend && npm run dev

@@ -1,4 +1,4 @@
-from shared_utils.database.postgres_models import DialogueEntry
+from app.database.postgres_models import DialogueEntry
 
 
 def format_transcript_string_for_prompt(dialogue_entries: list[DialogueEntry], include_index: bool = True) -> str:

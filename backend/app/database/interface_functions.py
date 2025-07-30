@@ -11,7 +11,7 @@ from app.database.postgres_database import engine
 from app.database.postgres_models import (
     BaseTable,
     DialogueEntry,
-    MeetingSummaryVersion,
+    MinuteVersion,
     Transcription,
     TranscriptionJob,
     User,
@@ -39,8 +39,8 @@ def save_transcription(
 
 
 def save_minute_version(
-    minute_data: MeetingSummaryVersion,
-) -> MeetingSummaryVersion:
+    minute_data: MinuteVersion,
+) -> MinuteVersion:
     with Session(engine) as session:
         minute_data.template = (
             minute_data.template.model_dump() if hasattr(minute_data.template, "model_dump") else minute_data.template
@@ -54,8 +54,8 @@ def save_minute_version(
 def _is_transcription_showable(transcription: Transcription, current_time: datetime) -> bool:
     try:
         # Has any minute versions with content or errors
-        if transcription.meeting_summary_versions and any(
-            version.html_content or version.error_message is not None for version in transcription.meeting_summary_versions
+        if transcription.minute_versions and any(
+            version.html_content or version.error_message is not None for version in transcription.minute_versions
         ):
             return True
 
@@ -149,14 +149,14 @@ def delete_transcription_by_id(
 
 def get_minute_versions(
     transcription_id: UUID,
-) -> list[MeetingSummaryVersion]:
+) -> list[MinuteVersion]:
     with Session(engine) as session:
         # First verify the transcription exists
         transcription = session.get(Transcription, transcription_id)
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
 
-        statement = select(MeetingSummaryVersion).where(MeetingSummaryVersion.transcription_id == transcription_id)
+        statement = select(MinuteVersion).where(MinuteVersion.transcription_id == transcription_id)
         results = session.exec(statement).all()
         return list(results)
 
@@ -164,7 +164,7 @@ def get_minute_versions(
 def get_minute_version_by_id(
     minute_version_id: UUID,
     transcription_id: UUID,
-) -> MeetingSummaryVersion:
+) -> MinuteVersion:
     minute_versions = get_minute_versions(transcription_id)
     for version in minute_versions:
         if UUID(str(version.id)) == UUID(str(minute_version_id)):

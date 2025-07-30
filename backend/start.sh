@@ -15,4 +15,4 @@ else
 fi
 
 echo "🌐 Starting FastAPI server..."
-exec /app/.venv/bin/fastapi run app/main.py --port 80 
+exec /app/.venv/bin/fastapi run main.py --port 80 

@@ -31,7 +31,7 @@ from app.minutes.types import (
     UploadUrlResponse,
 )
 from utils.auth import get_current_user
-from shared_utils.database.interface_functions import (
+from app.database.interface_functions import (
     delete_transcription_by_id,
     fetch_transcriptions_metadata,
     get_minute_version_by_id,
@@ -44,13 +44,13 @@ from shared_utils.database.interface_functions import (
     save_transcription_job,
     update_user,
 )
-from shared_utils.database.postgres_models import (
+from app.database.postgres_models import (
     MinuteVersion,
     Transcription,
     TranscriptionJob,
     User,
 )
-from shared_utils.settings import settings_instance
+from utils.settings import settings_instance
 
 router = APIRouter()
 
@@ -63,12 +63,12 @@ boto3_session = Boto3Session()
 s3_config = Config(signature_version="s3v4")
 s3_client_kwargs = {"config": s3_config}
 
-if settings_instance.USE_LOCALSTACK:
-    s3_client_kwargs.update({
-        "endpoint_url": "http://localhost:4566",
-        "aws_access_key_id": "test",
-        "aws_secret_access_key": "test",
-    })
+# if settings_instance.USE_LOCALSTACK:
+#     s3_client_kwargs.update({
+#         "endpoint_url": "http://localhost:4566",
+#         "aws_access_key_id": "test",
+#         "aws_secret_access_key": "test",
+#     })
 
 s3_client = boto3_session.client("s3", **s3_client_kwargs)
 

@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   database:
@@ -14,7 +14,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U psqladmin"] 
+      test: ["CMD-SHELL", "pg_isready -U psqladmin"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,10 +25,13 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:80"
+    env_file:
+      - .env # Load all variables from .env
     environment:
-      - NODE_ENV=production
+      # Docker Compose specific overrides (these will override .env)
       - DATABASE_CONNECTION_STRING=postgresql://psqladmin:localpass@database:5432/justicetranscribe_db
       - ENVIRONMENT=development
+      - NODE_ENV=production
     depends_on:
       database:
         condition: service_healthy

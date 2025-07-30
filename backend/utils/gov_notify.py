@@ -1,6 +1,6 @@
 from notifications_python_client.notifications import NotificationsAPIClient
 
-from shared_utils.settings import settings_instance
+from utils.settings import settings_instance
 
 notifications_client = NotificationsAPIClient(settings_instance.GOV_NOTIFY_API_KEY)
 

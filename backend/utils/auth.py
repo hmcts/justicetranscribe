@@ -5,10 +5,9 @@ import jwt
 from fastapi import Header, HTTPException
 from sqlmodel import Session, select
 
-from shared_utils.auth import parse_auth_token
-from shared_utils.database.postgres_database import engine
-from shared_utils.database.postgres_models import User
-from shared_utils.settings import settings_instance
+from app.database.postgres_database import engine
+from app.database.postgres_models import User
+from utils.settings import settings_instance
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

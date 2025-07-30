@@ -10,8 +10,8 @@ import ffmpeg
 import httpx
 
 from app.logger import logger
-from shared_utils.database.postgres_models import DialogueEntry
-from shared_utils.settings import settings_instance
+from app.database.postgres_models import DialogueEntry
+from utils.settings import settings_instance
 
 async_s3_session = aioboto3.Session()
 
