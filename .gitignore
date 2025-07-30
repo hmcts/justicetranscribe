@@ -25,7 +25,6 @@ ehthumbs.db
 Thumbs.db
 
 # IDE files
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -46,3 +45,9 @@ yarn-error.log*
 frontend/.next
 frontend/node_modules
 cookiecutter_frontend
+cookiecutter_backend
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class

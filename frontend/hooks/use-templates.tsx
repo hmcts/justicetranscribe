@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { TemplateMetadata } from "@/src/api/generated";
+import { apiClient } from "@/lib/api-client";
 
 interface TemplateResponse {
   templates: TemplateMetadata[];
@@ -14,15 +15,16 @@ export default function useTemplates() {
     async function fetchTemplates() {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/proxy/templates");
+        const result = await apiClient.getTemplates();
 
-        if (!response.ok) {
+        if (result.error) {
           throw new Error("Failed to fetch templates");
         }
 
-        const data: TemplateResponse = await response.json();
-
-        setTemplates(data.templates);
+        const data = result.data;
+        if (data) {
+          setTemplates(data.templates);
+        }
       } catch (err) {
         console.error("Error fetching templates:", err);
         setError(err instanceof Error ? err.message : "Unknown error");

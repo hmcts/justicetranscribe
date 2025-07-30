@@ -1,0 +1,435 @@
+import asyncio
+import uuid
+from uuid import UUID
+
+import aioboto3
+import pytz
+from boto3.session import Config
+from boto3.session import Session as Boto3Session
+from fastapi import APIRouter, Depends, HTTPException, Header
+from starlette.responses import JSONResponse
+
+from app.audio.process_audio_fully import transcribe_and_generate_llm_output
+from app.audio.utils import (
+    get_file_s3_key,
+)
+from app.llm.llm_client import (
+    langfuse_client,
+)
+from app.logger import logger
+from app.minutes.llm_calls import ai_edit_task, generate_llm_output_task
+from app.minutes.templates.templates_metadata import (
+    get_all_templates,
+)
+from app.minutes.types import (
+    GenerateMinutesRequest,
+    StartTranscriptionJobRequest,
+    TemplateResponse,
+    TranscriptionMetadata,
+    UpdateUserRequest,
+    UploadUrlRequest,
+    UploadUrlResponse,
+)
+from utils.dependencies import get_current_user
+from app.database.interface_functions import (
+    delete_transcription_by_id,
+    fetch_transcriptions_metadata,
+    get_minute_version_by_id,
+    get_minute_versions,
+    get_transcription_by_id,
+    get_transcription_jobs,
+    get_user_by_id,
+    save_minute_version,
+    save_transcription,
+    save_transcription_job,
+    update_user,
+)
+from app.database.postgres_models import (
+    MinuteVersion,
+    Transcription,
+    TranscriptionJob,
+    User,
+)
+from utils.settings import settings_instance
+
+router = APIRouter()
+
+
+# Initialize async session
+async_session = aioboto3.Session()
+boto3_session = Boto3Session()
+
+# Configure S3 client for LocalStack or AWS
+s3_config = Config(signature_version="s3v4")
+s3_client_kwargs = {"config": s3_config}
+
+# if settings_instance.USE_LOCALSTACK:
+#     s3_client_kwargs.update({
+#         "endpoint_url": "http://localhost:4566",
+#         "aws_access_key_id": "test",
+#         "aws_secret_access_key": "test",
+#     })
+
+s3_client = boto3_session.client("s3", **s3_client_kwargs)
+
+
+UK_TIMEZONE = pytz.timezone("Europe/London")
+
+
+@router.get("/healthcheck")
+async def health_check():
+    return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@router.post("/get-upload-url", response_model=UploadUrlResponse)
+async def get_upload_url(
+    request: UploadUrlRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+) -> UploadUrlResponse:
+    file_name_uuid = uuid.uuid4()
+    file_name = f"{file_name_uuid}.{request.file_extension}"
+    user_upload_s3_file_key = get_file_s3_key(current_user.email, file_name)
+    presigned_url = s3_client.generate_presigned_url(
+        ClientMethod="put_object",
+        Params={
+            "Bucket": settings_instance.DATA_S3_BUCKET,
+            "Key": user_upload_s3_file_key,
+        },
+        ExpiresIn=3600,
+        HttpMethod="PUT",
+    )
+
+    return UploadUrlResponse(
+        upload_url=presigned_url,
+        user_upload_s3_file_key=user_upload_s3_file_key,
+    )
+
+
+async def process_transcription(
+    user_upload_s3_file_key: str, user: User, transcription_id: str | None = None
+) -> None:
+    """Parent function that handles the TranscriptionJob state management."""
+    await transcribe_and_generate_llm_output(
+        user_upload_s3_file_key, user, transcription_id
+    )
+
+
+@router.post("/start-transcription-job", response_model=None)
+async def start_transcription_job(
+    request: StartTranscriptionJobRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+) -> None:
+    try:
+        asyncio.create_task(  # noqa: RUF006
+            process_transcription(
+                request.user_upload_s3_file_key, current_user, request.transcription_id
+            )
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/generate-or-edit-minutes")
+async def generate_or_edit_minutes(
+    request: GenerateMinutesRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    new_minute_version_id = str(uuid.uuid4())
+
+    async def process_request():
+        try:
+            # First verify the user has access to this transcription
+            get_transcription_by_id(
+                request.transcription_id,
+                current_user.id,
+                tz=pytz.UTC,  # We don't need timezone conversion for this check
+            )
+
+            # Fetch transcription jobs for this transcription
+            transcription_jobs = get_transcription_jobs(request.transcription_id)
+
+            if not transcription_jobs:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No transcription jobs found for this transcription",
+                )
+
+            dialogue_entries = []
+            for job in transcription_jobs:
+                dialogue_entries.extend(job.dialogue_entries)
+
+            if request.action_type == "generate":
+                await generate_llm_output_task(
+                    dialogue_entries,
+                    request.transcription_id,
+                    request.template,
+                    current_user.email,
+                    minute_version_id=new_minute_version_id,
+                )
+            elif request.action_type == "edit":
+                if not request.edit_instructions:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="edit_instructions are required for edit action",
+                    )
+
+                await ai_edit_task(
+                    dialogue_entries,
+                    request.current_minute_version_id,
+                    new_minute_version_id,
+                    request.edit_instructions,
+                    request.transcription_id,
+                    current_user.email,
+                )
+
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 404s) as is
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    asyncio.create_task(process_request())  # noqa: RUF006
+    return JSONResponse(
+        content={"minute_version_id": new_minute_version_id, "status": "initiated"}
+    )
+
+
+@router.get("/templates", response_model=TemplateResponse)
+async def get_templates():
+    """Get all template categories and their templates."""
+    templates = get_all_templates()
+    return TemplateResponse(templates=templates)
+
+
+@router.get("/transcriptions-metadata", response_model=list[TranscriptionMetadata])
+async def get_transcriptions_metadata(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+    timezone: str = "Europe/London",  # Optional parameter with UK default
+):
+    """Get metadata for all transcriptions for the current user."""
+    logger.info("getting transcription metadata for user %s", current_user.id)
+
+    # Get timezone (fallback to UK if invalid)
+    try:
+        tz = pytz.timezone(timezone)
+    except pytz.exceptions.UnknownTimeZoneError:
+        tz = UK_TIMEZONE
+
+    return fetch_transcriptions_metadata(current_user.id, tz)
+
+
+@router.get("/transcriptions/{transcription_id}", response_model=Transcription)
+async def get_transcription(
+    transcription_id: UUID,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+    timezone: str = "Europe/London",  # Optional parameter with UK default
+):
+    """Get a specific transcription by ID."""
+    try:
+        tz = pytz.timezone(timezone)
+    except pytz.exceptions.UnknownTimeZoneError:
+        tz = UK_TIMEZONE
+
+    return get_transcription_by_id(transcription_id, current_user.id, tz)
+
+
+@router.post("/transcriptions", response_model=Transcription)
+async def save_transcription_route(
+    transcription_data: Transcription,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Save or update a transcription."""
+    logger.info("saving transcription for user %s", current_user.id)
+
+    return save_transcription(transcription_data, current_user.id)
+
+
+@router.delete("/transcriptions/{transcription_id}", status_code=204)
+async def delete_transcription(
+    transcription_id: UUID,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Delete a specific transcription by ID."""
+    delete_transcription_by_id(transcription_id, current_user.id)
+
+
+@router.get(
+    "/transcriptions/{transcription_id}/minute-versions/{minute_version_id}",
+    response_model=MinuteVersion,
+)
+async def get_minute_version_by_id_route(
+    transcription_id: UUID,
+    minute_version_id: UUID,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get a specific minute version by its ID for a given transcription."""
+    # Verify user has access to the associated transcription
+    transcription = get_transcription_by_id(
+        transcription_id, current_user.id, UK_TIMEZONE
+    )
+    if not transcription:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+
+    # Get the specific minute version, ensuring it belongs to the transcription
+    minute_version = get_minute_version_by_id(minute_version_id, transcription_id)
+    return minute_version
+
+
+@router.get(
+    "/transcriptions/{transcription_id}/minute-versions",
+    response_model=list[MinuteVersion],
+)
+async def get_minute_versions_route(
+    transcription_id: UUID,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get all minute versions for a specific transcription."""
+    # Verify user has access to this transcription
+    transcription = get_transcription_by_id(
+        transcription_id, current_user.id, UK_TIMEZONE
+    )
+    if not transcription:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+
+    return get_minute_versions(transcription_id)
+
+
+@router.post(
+    "/transcriptions/{transcription_id}/minute-versions", response_model=MinuteVersion
+)
+async def save_minute_version_route(
+    transcription_id: UUID,
+    minute_data: MinuteVersion,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Create or update a minute version for a transcription."""
+    transcription = get_transcription_by_id(
+        transcription_id, current_user.id, UK_TIMEZONE
+    )
+    if not transcription:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+
+    minute_data.transcription_id = transcription_id
+
+    # Save the minute version first
+    saved_minute = save_minute_version(minute_data)
+
+    # Then handle the additional logging if needed
+    old_html_content = get_minute_version_by_id(
+        minute_data.id, transcription_id
+    ).html_content
+
+    # Only log the event if content has changed
+    if old_html_content != minute_data.html_content:
+        langfuse_client.event(
+            trace_id=minute_data.trace_id,
+            name="user-edit",
+            input=old_html_content,
+            output=minute_data.html_content,
+        )
+
+    return saved_minute
+
+
+@router.post("/transcriptions/{transcription_id}/jobs", response_model=TranscriptionJob)
+async def save_transcription_job_route(
+    transcription_id: UUID,
+    job_data: TranscriptionJob,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+) -> TranscriptionJob:
+    """Create a new transcription job for a transcription."""
+    # Verify user has access to this transcription
+    transcription = get_transcription_by_id(
+        transcription_id, current_user.id, UK_TIMEZONE
+    )
+    if not transcription:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+
+    return save_transcription_job(
+        job=job_data,
+    )
+
+
+@router.get(
+    "/transcriptions/{transcription_id}/jobs", response_model=list[TranscriptionJob]
+)
+async def get_transcription_jobs_route(
+    transcription_id: UUID,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+) -> list[TranscriptionJob]:
+    """Get all transcription jobs for a specific transcription."""
+    # Verify user has access to this transcription
+    transcription = get_transcription_by_id(
+        transcription_id, current_user.id, UK_TIMEZONE
+    )
+    if not transcription:
+        raise HTTPException(status_code=404, detail="Transcription not found")
+
+    return get_transcription_jobs(transcription_id)
+
+
+@router.get("/user", response_model=User)
+async def get_current_user_route(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get the current user's details."""
+    return get_user_by_id(current_user.id)
+
+
+# Add missing routes that frontend expects
+@router.get("/users/me", response_model=User)
+async def get_current_user_me_route(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get the current user's details (alias for /user)."""
+    return get_user_by_id(current_user.id)
+
+
+@router.get("/user/profile", response_model=User)
+async def get_user_profile_route(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get the current user's profile (alias for /user)."""
+    return get_user_by_id(current_user.id)
+
+
+@router.get("/users/auth-info")
+async def get_user_auth_info(
+    x_amzn_oidc_accesstoken: str = Header(None),
+):
+    """Get user authentication information from JWT token."""
+    import jwt
+    from typing import Annotated
+    
+    # Use the same logic as in auth.py for local testing
+    if settings_instance.ENVIRONMENT in ["local", "integration-test"]:
+        jwt_dict = {
+            "sub": "90429234-4031-7077-b9ba-60d1af121245",
+            "preferred_username": "test@test.co.uk",
+            "email": "test@test.co.uk",
+            "realm_access": {"roles": ["justice-transcribe"]},
+        }
+    else:
+        # Decode the actual JWT token
+        try:
+            jwt_dict = jwt.decode(x_amzn_oidc_accesstoken, options={"verify_signature": False})
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    
+    return {
+        "azure_user_id": jwt_dict.get("sub", ""),
+        "name": jwt_dict.get("preferred_username", jwt_dict.get("email", "")),
+        "email": jwt_dict.get("email", ""),
+        "roles": jwt_dict.get("realm_access", {}).get("roles", []),
+    }
+
+
+@router.post("/user", response_model=User)  # changed from .patch to .post
+async def update_current_user_route(
+    request: UpdateUserRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Update the current user's details."""
+    update_fields = request.model_dump(exclude_unset=True)
+    return update_user(current_user.id, **update_fields)

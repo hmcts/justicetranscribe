@@ -24,6 +24,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { audioBackupDB } from "@/lib/indexeddb-backup";
+import { apiClient } from "@/lib/api-client";
 import AudioRecorderComponent from "./audio-recorder";
 import ScreenRecorder from "./screen-recorder";
 
@@ -129,7 +130,7 @@ function ContentDisplay({
             />
           ) : (
             <ScreenRecorder
-              onAudioReady={onRecordingStop}
+              onRecordingStop={onRecordingStop}
               onRecordingStart={onRecordingStart}
             />
           )}
@@ -180,21 +181,14 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         setProcessingStatus({ state: "uploading", progress: 0 });
         setUploadError(null);
 
-        const urlResponse = await fetch(`/api/proxy/get-upload-url`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ file_extension: fileExtension }),
-        });
+        const urlResult = await apiClient.getUploadUrl(fileExtension);
 
-        if (!urlResponse.ok) {
+        if (urlResult.error) {
           throw new Error("Failed to get upload URL");
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } =
-          await urlResponse.json();
+        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
 
         // Create XMLHttpRequest to track upload progress
         const xhr = new XMLHttpRequest();
@@ -226,20 +220,11 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           xhr.send(blob);
         });
 
-        const transcriptionJobResponse = await fetch(
-          `/api/proxy/start-transcription-job`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              user_upload_s3_file_key,
-            }),
-          },
+        const transcriptionJobResult = await apiClient.startTranscriptionJob(
+          user_upload_s3_file_key,
         );
 
-        if (!transcriptionJobResponse.ok) {
+        if (transcriptionJobResult.error) {
           throw new Error("Failed to start transcription job");
         }
         setProcessingStatus("transcribing");

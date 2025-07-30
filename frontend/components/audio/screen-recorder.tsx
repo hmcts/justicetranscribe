@@ -25,7 +25,7 @@ import RecordingControl from "@/components/audio/recording-control";
 const DIALOG_PREFERENCE_KEY = "tab-recorder-show-instructions-dialog";
 
 interface ScreenRecorderProps {
-  onAudioReady: (blob: Blob | null) => void;
+  onRecordingStop: (blob: Blob | null) => void;
   onRecordingStart: () => void;
 }
 
@@ -124,11 +124,12 @@ function ScreenShareGuidance({ isVisible }: ScreenShareGuidanceProps) {
 }
 
 function ScreenRecorder({
-  onAudioReady,
+  onRecordingStop,
   onRecordingStart,
 }: ScreenRecorderProps) {
   const [err, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [wakeLock, setWakeLock] = useState<any>(null);
   const { setIsRecording: setAppIsRecording } = useTranscripts();
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -159,6 +160,7 @@ function ScreenRecorder({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle wake lock to prevent screen sleeping during recording
   const requestWakeLock = async () => {
@@ -204,6 +206,12 @@ function ScreenRecorder({
     }
 
     try {
+      // Clear timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
       // Only call stop() if the state is not 'inactive'
       if (mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
@@ -215,6 +223,7 @@ function ScreenRecorder({
         }
 
         setIsRecording(false);
+        setRecordingTime(0);
         releaseWakeLock();
       }
     } catch (err) {
@@ -225,6 +234,7 @@ function ScreenRecorder({
       }
 
       setIsRecording(false);
+      setRecordingTime(0);
       releaseWakeLock();
     }
   }, [isRecording, releaseWakeLock]);
@@ -376,6 +386,11 @@ function ScreenRecorder({
           streamRef.current = null;
         }
         setIsRecording(false);
+        setRecordingTime(0);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
         releaseWakeLock();
       };
 
@@ -384,17 +399,23 @@ function ScreenRecorder({
           const audioBlob = new Blob(mediaChunksRef.current, {
             type: options.mimeType,
           });
-          onAudioReady(audioBlob);
+          onRecordingStop(audioBlob);
 
           // Track successful recording completion
-          posthog.capture("virtual_meeting_recording_completed");
+          posthog.capture("virtual_meeting_recording_completed", {
+            duration_seconds: recordingTime,
+            file_size_bytes: audioBlob.size,
+            mime_type: options.mimeType,
+          });
         } else {
           setError(
             "No audio data was recorded. Please try again and ensure audio is shared.",
           );
 
           // Track failed recording
-          posthog.capture("virtual_meeting_recording_failed");
+          posthog.capture("virtual_meeting_recording_failed", {
+            duration_seconds: recordingTime,
+          });
         }
 
         // Clean up all streams
@@ -408,6 +429,11 @@ function ScreenRecorder({
         mediaRecorderRef.current = null;
 
         setIsRecording(false);
+        setRecordingTime(0);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
         releaseWakeLock();
       };
 
@@ -425,14 +451,26 @@ function ScreenRecorder({
       setIsRecording(true);
       onRecordingStart();
 
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+
       // Track virtual meeting recording start
-      posthog.capture("virtual_meeting_recording_started");
+      posthog.capture("virtual_meeting_recording_started", {
+        mime_type: options.mimeType,
+      });
     } catch (error) {
       setShowShareGuidance(false);
       setError(
         error instanceof Error ? error.message : "An unknown error occurred",
       );
       setIsRecording(false);
+      setRecordingTime(0);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     }
   };
 
@@ -441,6 +479,9 @@ function ScreenRecorder({
     return () => {
       if (audioContext) {
         audioContext.close().catch(console.error);
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
     };
   }, [audioContext]);
@@ -590,6 +631,7 @@ function ScreenRecorder({
               isRecording={isRecording}
               onStopRecording={stopRecording}
               onPauseStateChange={handlePauseStateChange}
+              elapsedTime={recordingTime}
             />
           </div>
         )}

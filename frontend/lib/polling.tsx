@@ -1,6 +1,8 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable no-await-in-loop */
 
+import { apiClient } from "@/lib/api-client";
+
 interface PollableResponse {
   status: string;
   error?: string;
@@ -28,17 +30,16 @@ export async function pollEndpoint<T>({
 
   while (true) {
     try {
-      const response = await fetch(endpoint, {
+      const result = await apiClient.request<PollableResponse>(endpoint, {
         method,
-        headers: { "Content-Type": "application/json" },
         ...(requestBody && { body: JSON.stringify(requestBody) }),
       });
 
-      if (!response.ok) {
-        console.warn("Fetch failed with status", response.status);
+      if (result.error) {
+        console.warn("Request failed with error", result.error);
         errorCount += 1;
       } else {
-        const data: PollableResponse = await response.json();
+        const data = result.data!;
 
         if (data.status === "completed" && data[successField]) {
           return data[successField];
@@ -73,7 +74,7 @@ export async function pollEndpoint<T>({
 
 export function pollLLMOutput(taskId: string): Promise<any> {
   return pollEndpoint({
-    endpoint: `/api/proxy/query-llm-output/${taskId}`,
+    endpoint: `/query-llm-output/${taskId}`,
     method: "GET",
     successField: "llm_output",
   });

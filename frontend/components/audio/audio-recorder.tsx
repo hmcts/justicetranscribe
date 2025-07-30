@@ -6,6 +6,7 @@
 import { Mic, Loader2, BellOff } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -206,6 +207,11 @@ function AudioRecorderComponent({
             type: selectedMimeType, // Use the selected MIME type
           });
           onRecordingStop(audioBlob, currentBackupIdRef.current);
+
+          posthog.capture("in_person_recording_completed", {
+            duration_seconds: recordingTime,
+            file_size_bytes: audioBlob.size,
+          });
         }
 
         // Clean up

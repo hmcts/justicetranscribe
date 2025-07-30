@@ -5,6 +5,7 @@ import {
   User,
   MinuteVersion_Input,
 } from "@/src/api/generated";
+import { apiClient } from "@/lib/api-client";
 
 export type MinuteVersion = MinuteVersion_Input;
 
@@ -15,16 +16,13 @@ export const saveTranscription = async (
   transcription: Transcription,
 ): Promise<void> => {
   try {
-    const response = await fetch(`/api/proxy/transcriptions`, {
+    const result = await apiClient.request("/transcriptions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(transcription),
     });
 
-    if (!response.ok) {
-      throw new Error(`Error saving transcription: ${response.statusText}`);
+    if (result.error) {
+      throw new Error(`Error saving transcription: ${result.error}`);
     }
   } catch (error) {
     console.error("Error saving transcription:", error);
@@ -39,13 +37,15 @@ export const getTranscriptionById = async (
   id: string,
 ): Promise<Transcription | null> => {
   try {
-    const response = await fetch(`/api/proxy/transcriptions/${id}`);
+    const result = await apiClient.request<Transcription>(
+      `/transcriptions/${id}`,
+    );
 
-    if (!response.ok) {
-      throw new Error(`Error fetching transcription: ${response.statusText}`);
+    if (result.error) {
+      throw new Error(`Error fetching transcription: ${result.error}`);
     }
 
-    return await response.json();
+    return result.data || null;
   } catch (error) {
     console.error("Error fetching transcription:", error);
     return null;
@@ -59,15 +59,17 @@ export const getAllTranscriptionMetadata = async (): Promise<
   TranscriptionMetadata[]
 > => {
   try {
-    const response = await fetch(`/api/proxy/transcriptions-metadata`);
+    const result = await apiClient.request<TranscriptionMetadata[]>(
+      "/transcriptions-metadata",
+    );
 
-    if (!response.ok) {
+    if (result.error) {
       throw new Error(
-        `Error fetching transcriptions metadata: ${response.statusText}`,
+        `Error fetching transcriptions metadata: ${result.error}`,
       );
     }
 
-    const metadata: TranscriptionMetadata[] = await response.json();
+    const metadata = result.data || [];
     return metadata.map((m) => ({
       ...m,
       created_datetime: new Date(m.created_datetime).toISOString(),
@@ -83,12 +85,12 @@ export const getAllTranscriptionMetadata = async (): Promise<
  */
 export const deleteTranscription = async (id: string): Promise<void> => {
   try {
-    const response = await fetch(`/api/proxy/transcriptions/${id}`, {
+    const result = await apiClient.request(`/transcriptions/${id}`, {
       method: "DELETE",
     });
 
-    if (!response.ok) {
-      throw new Error(`Error deleting transcription: ${response.statusText}`);
+    if (result.error) {
+      throw new Error(`Error deleting transcription: ${result.error}`);
     }
 
     console.log("Transcription deleted successfully");
@@ -101,15 +103,15 @@ export const getMinuteVersions = async (
   transcriptionId: string,
 ): Promise<MinuteVersion[]> => {
   try {
-    const response = await fetch(
-      `/api/proxy/transcriptions/${transcriptionId}/minute-versions`,
+    const result = await apiClient.request<MinuteVersion[]>(
+      `/transcriptions/${transcriptionId}/minute-versions`,
     );
 
-    if (!response.ok) {
-      throw new Error(`Error fetching minute versions: ${response.statusText}`);
+    if (result.error) {
+      throw new Error(`Error fetching minute versions: ${result.error}`);
     }
 
-    return await response.json();
+    return result.data || [];
   } catch (error) {
     console.error("Error fetching minute versions:", error);
     return [];
@@ -120,39 +122,34 @@ export const saveMinuteVersion = async (
   transcriptionId: string,
   data: MinuteVersion,
 ) => {
-  const response = await fetch(
-    `/api/proxy/transcriptions/${transcriptionId}/minute-versions`,
+  const result = await apiClient.request<MinuteVersion>(
+    `/transcriptions/${transcriptionId}/minute-versions`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(data),
     },
   );
 
-  if (!response.ok) {
-    throw new Error(`Error creating minute version: ${response.statusText}`);
+  if (result.error) {
+    throw new Error(`Error creating minute version: ${result.error}`);
   }
 
-  return response.json();
+  return result.data!;
 };
 
 export const getTranscriptionJobs = async (
   transcriptionId: string,
 ): Promise<TranscriptionJob[]> => {
   try {
-    const response = await fetch(
-      `/api/proxy/transcriptions/${transcriptionId}/jobs`,
+    const result = await apiClient.request<TranscriptionJob[]>(
+      `/transcriptions/${transcriptionId}/jobs`,
     );
 
-    if (!response.ok) {
-      throw new Error(
-        `Error fetching transcription jobs: ${response.statusText}`,
-      );
+    if (result.error) {
+      throw new Error(`Error fetching transcription jobs: ${result.error}`);
     }
 
-    return await response.json();
+    return result.data || [];
   } catch (error) {
     console.error("Error fetching transcription jobs:", error);
     return [];
@@ -164,24 +161,19 @@ export const saveTranscriptionJob = async (
   jobData: TranscriptionJob,
 ) => {
   try {
-    const response = await fetch(
-      `/api/proxy/transcriptions/${transcriptionId}/jobs`,
+    const result = await apiClient.request<TranscriptionJob>(
+      `/transcriptions/${transcriptionId}/jobs`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(jobData),
       },
     );
 
-    if (!response.ok) {
-      throw new Error(
-        `Error creating transcription job: ${response.statusText}`,
-      );
+    if (result.error) {
+      throw new Error(`Error creating transcription job: ${result.error}`);
     }
 
-    return await response.json();
+    return result.data!;
   } catch (error) {
     console.error("Error creating transcription job:", error);
     throw error;
@@ -193,15 +185,15 @@ export const getMinuteVersionById = async (
   minuteVersionId: string,
 ): Promise<MinuteVersion | null> => {
   try {
-    const response = await fetch(
-      `/api/proxy/transcriptions/${transcriptionId}/minute-versions/${minuteVersionId}`,
+    const result = await apiClient.request<MinuteVersion>(
+      `/transcriptions/${transcriptionId}/minute-versions/${minuteVersionId}`,
     );
 
-    if (!response.ok) {
-      throw new Error(`Error fetching minute version: ${response.statusText}`);
+    if (result.error) {
+      throw new Error(`Error fetching minute version: ${result.error}`);
     }
 
-    return await response.json();
+    return result.data || null;
   } catch (error) {
     console.error("Error fetching minute version:", error);
     return null;
@@ -213,11 +205,11 @@ export const getMinuteVersionById = async (
  */
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
-    const response = await fetch(`/api/proxy/user`);
-    if (!response.ok) {
-      throw new Error(`Error fetching user: ${response.statusText}`);
+    const result = await apiClient.getCurrentUser();
+    if (result.error) {
+      throw new Error(`Error fetching user: ${result.error}`);
     }
-    return await response.json();
+    return result.data || null;
   } catch (error) {
     console.error("Error fetching user:", error);
     return null;
@@ -232,17 +224,14 @@ export const updateCurrentUser = async (
   updates: Partial<Pick<User, "hide_citations">>,
 ): Promise<User | null> => {
   try {
-    const response = await fetch(`/api/proxy/user`, {
+    const result = await apiClient.request<User>("/user", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(updates),
     });
-    if (!response.ok) {
-      throw new Error(`Error updating user: ${response.statusText}`);
+    if (result.error) {
+      throw new Error(`Error updating user: ${result.error}`);
     }
-    return await response.json();
+    return result.data || null;
   } catch (error) {
     console.error("Error updating user:", error);
     return null;

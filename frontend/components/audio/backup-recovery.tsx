@@ -5,6 +5,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -15,7 +20,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { RefreshCw, Trash2, FileAudio } from "lucide-react";
+import {
+  RefreshCw,
+  Trash2,
+  FileAudio,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle,
+  X,
+} from "lucide-react";
 import { audioBackupDB, AudioBackup } from "@/lib/indexeddb-backup";
 import AudioPlayerComponent from "./audio-player";
 
@@ -27,6 +40,8 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   const [backups, setBackups] = useState<AudioBackup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(true);
 
   const loadBackups = useCallback(async () => {
     try {
@@ -36,6 +51,9 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       // Sort by timestamp (newest first)
       allBackups.sort((a, b) => b.timestamp - a.timestamp);
       setBackups(allBackups);
+
+      // Auto-collapse if more than 1 recording, otherwise expand
+      setIsOpen(allBackups.length <= 1);
     } catch (err) {
       setError("Failed to load backed up recordings");
       console.error("Failed to load backups:", err);
@@ -56,6 +74,10 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       setError("Failed to delete backup");
       console.error("Failed to delete backup:", err);
     }
+  };
+
+  const handleRetryUpload = (backup: AudioBackup) => {
+    onRetryUpload(backup);
   };
 
   const formatTimestamp = (timestamp: number) => {
@@ -120,82 +142,134 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileAudio className="size-5" />
-          Backed Up Recordings
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <Alert>
-            <AlertDescription>
-              These recordings were automatically backed up but haven&apos;t
-              been uploaded yet. You can retry uploading them or download them
-              locally.
+      <CardContent className="pt-6">
+        {/* Success message for offline recordings */}
+        {showSuccessMessage && (
+          <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+            <CheckCircle className="size-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Your recordings are safely saved offline and ready for upload
+                when you&apos;re ready.
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSuccessMessage(false)}
+                className="h-auto p-1 text-green-600 hover:text-green-800"
+              >
+                <X className="size-4" />
+              </Button>
             </AlertDescription>
           </Alert>
+        )}
 
-          {backups.map((backup) => (
-            <div key={backup.id} className="space-y-3 rounded-lg border p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-medium">
-                    Recording made at {formatTimestamp(backup.timestamp)}
-                  </h4>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 sm:gap-4">
-                    <span>Size: {formatFileSize(backup.blob)}</span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 sm:shrink-0 sm:flex-nowrap">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => onRetryUpload(backup)}
-                    className="flex-1 sm:flex-initial"
-                  >
-                    <RefreshCw className="mr-1 size-3" />
-                    Retry Upload
-                  </Button>
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-red-600 hover:text-red-700 sm:flex-initial"
-                      >
-                        <Trash2 className="mr-1 size-3" />
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Recording</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete &quot;
-                          {backup.fileName}&quot;? This action cannot be undone
-                          and you will lose this recording permanently.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteBackup(backup.id)}
-                          className="bg-red-600 text-white hover:bg-red-700"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-4 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <div className="flex items-center gap-3">
+              <FileAudio className="size-5 text-gray-600" />
+              <div>
+                <h3 className="font-medium text-gray-900">
+                  Reupload Recordings
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {backups.length} recording{backups.length !== 1 ? "s" : ""}{" "}
+                  waiting for upload
+                </p>
               </div>
-
-              <AudioPlayerComponent audioBlob={backup.blob} />
+              {/* Count badge */}
+              <div className="ml-2 flex size-6 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-800">
+                {backups.length}
+              </div>
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-2">
+              {isOpen ? (
+                <ChevronDown className="size-4 text-gray-400" />
+              ) : (
+                <ChevronRight className="size-4 text-gray-400" />
+              )}
+            </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent className="mt-4">
+            <div className="space-y-4">
+              <Alert>
+                <AlertDescription>
+                  These recordings were automatically backed up but haven&apos;t
+                  been uploaded yet. You can retry uploading them or delete
+                  them.
+                </AlertDescription>
+              </Alert>
+
+              {backups.map((backup, index) => (
+                <div
+                  key={backup.id}
+                  className="space-y-3 rounded-lg border bg-gray-50 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium">
+                        Recording #{backups.length - index} -{" "}
+                        {formatTimestamp(backup.timestamp)}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 sm:gap-4">
+                        <span>Size: {formatFileSize(backup.blob)}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:shrink-0 sm:flex-nowrap">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleRetryUpload(backup)}
+                        className="flex-1 sm:flex-initial"
+                      >
+                        <RefreshCw className="mr-1 size-3" />
+                        Retry Upload
+                      </Button>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-red-600 hover:text-red-700 sm:flex-initial"
+                          >
+                            <Trash2 className="mr-1 size-3" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Delete Recording
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete &quot;
+                              {backup.fileName}&quot;? This action cannot be
+                              undone and you will lose this recording
+                              permanently.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteBackup(backup.id)}
+                              className="bg-red-600 text-white hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+
+                  <AudioPlayerComponent audioBlob={backup.blob} />
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );

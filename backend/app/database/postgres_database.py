@@ -3,6 +3,7 @@ from sqlmodel import SQLModel, create_engine, Session, select
 from typing import Generator
 import logging
 from dotenv import load_dotenv
+from utils.settings import settings_instance
 
 # Load environment variables from .env file
 load_dotenv()
@@ -12,18 +13,23 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Database URL from environment variable
-DATABASE_URL = os.getenv("DATABASE_CONNECTION_STRING")
+DATABASE_URL = settings_instance.DATABASE_CONNECTION_STRING
 
 if not DATABASE_URL:
-    # Fallback for local development
-    DATABASE_URL = "postgresql://localhost:5432/justicetranscribe_db"
-    logger.warning("DATABASE_CONNECTION_STRING not found, using local development URL")
+    raise ValueError("DATABASE_CONNECTION_STRING is not set")
 
 # Create engine
 engine = create_engine(
     DATABASE_URL,
-    echo=True if os.getenv("ENVIRONMENT", "local").lower() in ["local", "development", "dev"] else False,
+    echo=False,
 )
+
+
+# def create_db_and_tables():
+#     """Create database tables"""
+#     logger.info("Creating database tables...")
+#     SQLModel.metadata.create_all(engine)
+#     logger.info("Database tables created successfully")
 
 
 def get_session() -> Generator[Session, None, None]:
@@ -32,6 +38,14 @@ def get_session() -> Generator[Session, None, None]:
         yield session
 
 
+# def init_db():
+#     """Initialize database - create tables"""
+#     try:
+#         create_db_and_tables()
+#         logger.info("Database initialized successfully")
+#     except Exception as e:
+#         logger.error(f"Error initializing database: {e}")
+#         raise
 
 
 def test_db_connection():

@@ -11,9 +11,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # Copy the application into the container.
 COPY . /app
 
-# Install the application dependencies.
+# Install the application dependencies including fastapi group for alembic
 WORKDIR /app
-RUN uv sync --frozen --no-cache
+RUN uv sync --frozen --no-cache --group fastapi
 
 # Copy and make the startup script executable
 COPY start.sh /app/start.sh
