@@ -17,11 +17,11 @@ from app.minutes.templates.templates_metadata import (
     general_template,
 )
 from utils.gov_notify import send_email
-from shared_utils.database.interface_functions import (
+from app.database.interface_functions import (
     save_transcription,
     save_transcription_job,
 )
-from shared_utils.database.postgres_models import (
+from app.database.postgres_models import (
     Transcription,
     TranscriptionJob,
     User,

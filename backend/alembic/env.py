@@ -19,7 +19,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import your models here for autogenerate to work
-from app.models import User, Item  # noqa
+from app.database.postgres_models import User, Transcription, TranscriptionJob, MinuteVersion
 
 # add your model's MetaData object here
 # for 'autogenerate' support

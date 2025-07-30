@@ -254,10 +254,6 @@ class ApiClient {
     return this.request<User>("/user/profile");
   }
 
-  async getUsers() {
-    return this.request<User>("/users/me");
-  }
-
   async getCurrentUser() {
     return this.request<User>("/users/me");
   }

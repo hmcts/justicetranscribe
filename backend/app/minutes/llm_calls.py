@@ -21,11 +21,11 @@ from app.minutes.types import (
     SpeakerPredictionOutput,
 )
 from utils.markdown import html_to_markdown, markdown_to_html
-from shared_utils.database.interface_functions import (
+from app.database.interface_functions import (
     get_minute_version_by_id,
     save_minute_version,
 )
-from shared_utils.database.postgres_models import (
+from app.database.postgres_models import (
     DialogueEntry,
     MinuteVersion,
     TemplateMetadata,

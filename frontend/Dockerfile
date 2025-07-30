@@ -8,16 +8,23 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
-COPY frontend/package.json frontend/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY frontend .
+COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED 1
+# Declare build arguments
+ARG NEXT_PUBLIC_API_URL
+ARG ENVIRONMENT
+
+# Set environment variables from build args
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV ENVIRONMENT=$ENVIRONMENT
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
@@ -42,9 +49,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-EXPOSE 8081
+EXPOSE 3000
 
-ENV PORT 8081
+ENV PORT 3000
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output

@@ -15,11 +15,19 @@ model_config = {
 }
 
 
-# Template name constants
 class TemplateName(str, Enum):
     GENERAL = "General"
     CRISSA = "Crissa"
 
+
+class BaseTable(SQLModel):
+    model_config = {  # noqa: RUF012
+        "from_attributes": True,
+    }
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True, nullable=False)
+    created_datetime: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_datetime: datetime | None = Field(default_factory=lambda: datetime.now(UTC))
 
 class DialogueEntry(SQLModel):
     model_config = {  # noqa: RUF012
@@ -40,14 +48,7 @@ class TemplateMetadata(SQLModel):
     is_chronological: bool = False
 
 
-class BaseTable(SQLModel):
-    model_config = {  # noqa: RUF012
-        "from_attributes": True,
-    }
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True, nullable=False)
-    created_datetime: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_datetime: datetime | None = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class MinuteVersion(BaseTable, table=True):
@@ -65,7 +66,7 @@ class MinuteVersion(BaseTable, table=True):
 # Main models with table=True for DB tables
 class User(BaseTable, table=True):
     email: str = Field(index=True)
-    hide_citations: bool | None = Field(default=None)
+    azure_user_id: str = Field(unique=True, index=True)
     transcriptions: list["Transcription"] = Relationship(back_populates="user")
 
 

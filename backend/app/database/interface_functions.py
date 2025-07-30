@@ -7,9 +7,8 @@ from fastapi import HTTPException
 from sqlalchemy import event
 from sqlmodel import Session, select
 
-from app.minutes.types import TranscriptionMetadata
-from shared_utils.database.postgres_database import engine
-from shared_utils.database.postgres_models import (
+from app.database.postgres_database import engine
+from app.database.postgres_models import (
     BaseTable,
     DialogueEntry,
     MinuteVersion,
@@ -17,6 +16,7 @@ from shared_utils.database.postgres_models import (
     TranscriptionJob,
     User,
 )
+from app.minutes.types import TranscriptionMetadata
 
 
 @event.listens_for(Session, "before_flush")
@@ -43,9 +43,7 @@ def save_minute_version(
 ) -> MinuteVersion:
     with Session(engine) as session:
         minute_data.template = (
-            minute_data.template.model_dump()
-            if hasattr(minute_data.template, "model_dump")
-            else minute_data.template
+            minute_data.template.model_dump() if hasattr(minute_data.template, "model_dump") else minute_data.template
         )
         merged = session.merge(minute_data)
         session.commit()
@@ -53,14 +51,11 @@ def save_minute_version(
         return merged
 
 
-def _is_transcription_showable(
-    transcription: Transcription, current_time: datetime
-) -> bool:
+def _is_transcription_showable(transcription: Transcription, current_time: datetime) -> bool:
     try:
         # Has any minute versions with content or errors
         if transcription.minute_versions and any(
-            version.html_content or version.error_message is not None
-            for version in transcription.minute_versions
+            version.html_content or version.error_message is not None for version in transcription.minute_versions
         ):
             return True
 
@@ -100,11 +95,7 @@ def fetch_transcriptions_metadata(user_id: UUID, tz) -> list[TranscriptionMetada
                 id=t.id,
                 title=t.title or "",
                 created_datetime=pytz.utc.localize(t.created_datetime).astimezone(tz),
-                updated_datetime=(
-                    pytz.utc.localize(t.updated_datetime).astimezone(tz)
-                    if t.updated_datetime
-                    else None
-                ),
+                updated_datetime=(pytz.utc.localize(t.updated_datetime).astimezone(tz) if t.updated_datetime else None),
                 is_showable_in_ui=_is_transcription_showable(t, current_time),
             )
             for t in transcriptions
@@ -123,13 +114,9 @@ def get_transcription_by_id(transcription_id: UUID, user_id: UUID, tz) -> Transc
 
         # Convert the date to local timezone
         if transcription.created_datetime:
-            transcription.created_datetime = pytz.utc.localize(
-                transcription.created_datetime
-            ).astimezone(tz)
+            transcription.created_datetime = pytz.utc.localize(transcription.created_datetime).astimezone(tz)
         if transcription.updated_datetime:
-            transcription.updated_datetime = pytz.utc.localize(
-                transcription.updated_datetime
-            ).astimezone(tz)
+            transcription.updated_datetime = pytz.utc.localize(transcription.updated_datetime).astimezone(tz)
 
         return transcription
 
@@ -169,9 +156,7 @@ def get_minute_versions(
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
 
-        statement = select(MinuteVersion).where(
-            MinuteVersion.transcription_id == transcription_id
-        )
+        statement = select(MinuteVersion).where(MinuteVersion.transcription_id == transcription_id)
         results = session.exec(statement).all()
         return list(results)
 
@@ -192,8 +177,7 @@ def save_transcription_job(
 ) -> TranscriptionJob:
     with Session(engine) as session:
         job.dialogue_entries = [
-            entry.model_dump() if hasattr(entry, "model_dump") else entry
-            for entry in job.dialogue_entries
+            entry.model_dump() if hasattr(entry, "model_dump") else entry for entry in job.dialogue_entries
         ]
         merged = session.merge(job)
         session.commit()
@@ -209,15 +193,11 @@ def get_transcription_jobs(
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
 
-        statement = select(TranscriptionJob).where(
-            TranscriptionJob.transcription_id == transcription_id
-        )
+        statement = select(TranscriptionJob).where(TranscriptionJob.transcription_id == transcription_id)
         results = session.exec(statement).all()
 
         for job in results:
-            job.dialogue_entries = [
-                DialogueEntry(**entry) for entry in job.dialogue_entries
-            ]
+            job.dialogue_entries = [DialogueEntry(**entry) for entry in job.dialogue_entries]
 
         return list(results)
 

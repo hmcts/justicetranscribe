@@ -11,7 +11,7 @@ from langfuse.decorators import langfuse_context, observe
 from litellm import acompletion
 from pydantic import BaseModel
 
-from shared_utils.settings import settings_instance
+from utils.settings import settings_instance
 
 
 class LLMModel(str, Enum):
@@ -30,7 +30,7 @@ ALL_LLM_MODELS = [
 langfuse_client = Langfuse(
     public_key=settings_instance.LANGFUSE_PUBLIC_KEY,
     secret_key=settings_instance.LANGFUSE_SECRET_KEY,
-    host="https://cloud.langfuse.com",
+    host=settings_instance.LANGFUSE_HOST,
     environment=settings_instance.ENVIRONMENT,
 )
 langfuse_client.auth_check()

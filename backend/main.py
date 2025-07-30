@@ -4,11 +4,10 @@ from contextlib import asynccontextmanager
 import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
-from shared_utils.settings import settings_instance
+from utils.settings import settings_instance
 
 log = logging.getLogger("uvicorn")
 
@@ -40,17 +39,6 @@ app = FastAPI(lifespan=lifespan, openapi_url="/api/openapi.json")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-origins = [settings_instance.APP_URL]
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.include_router(api_router)
 

@@ -1,4 +1,4 @@
-from shared_utils.database.postgres_models import TemplateMetadata
+from app.database.postgres_models import TemplateMetadata
 
 # Define individual template variables
 general_template = TemplateMetadata(
