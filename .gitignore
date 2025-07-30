@@ -43,3 +43,12 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local 
+frontend/.next
+frontend/node_modules
+cookiecutter_frontend
+cookiecutter_backend
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class

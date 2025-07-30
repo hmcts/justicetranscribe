@@ -1,0 +1,176 @@
+/* eslint-disable jsx-a11y/no-autofocus */
+import React, { useEffect, useState } from "react";
+import { CalendarIcon, PencilIcon, UsersIcon } from "lucide-react";
+import { CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranscripts } from "@/providers/transcripts";
+import { Transcription, DialogueEntry } from "@/src/api/generated";
+import {
+  concatenateDialogueEntriesInTranscriptionJobs,
+  replaceSpeakerInDialogueEntries,
+} from "@/lib/utils";
+
+interface DialogueHeaderProps {
+  currentTranscription: Transcription | null;
+}
+
+export default function DialogueHeader({
+  currentTranscription,
+}: DialogueHeaderProps) {
+  const { renameTranscription, transcriptionJobs, saveTranscriptionJob } =
+    useTranscripts();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingSpeaker, setEditingSpeaker] = useState<string>("");
+  const [newSpeakerName, setNewSpeakerName] = useState<string>("");
+  const [newTitle, setNewTitle] = useState(currentTranscription?.title || "");
+
+  useEffect(() => {
+    if (currentTranscription?.title) {
+      setNewTitle(currentTranscription.title);
+    }
+  }, [currentTranscription?.title]);
+
+  const dialogueEntries =
+    concatenateDialogueEntriesInTranscriptionJobs(transcriptionJobs);
+  const uniqueSpeakers: string[] = dialogueEntries
+    ? Array.from(
+        new Set(dialogueEntries.map((entry: DialogueEntry) => entry.speaker)),
+      )
+    : [];
+
+  const onTitleEdit = async () => {
+    if (isEditing && currentTranscription?.id && newTitle) {
+      await renameTranscription(currentTranscription.id, newTitle);
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleSpeakerUpdate = async (oldSpeaker: string) => {
+    if (newSpeakerName.trim() === "" || newSpeakerName === oldSpeaker) {
+      return;
+    }
+
+    const updatedJobs = transcriptionJobs.map((job) => ({
+      ...job,
+      dialogue_entries: replaceSpeakerInDialogueEntries(
+        job.dialogue_entries,
+        oldSpeaker,
+        newSpeakerName,
+      ),
+    }));
+
+    await Promise.all(updatedJobs.map(saveTranscriptionJob));
+
+    setEditingSpeaker("");
+    setNewSpeakerName("");
+  };
+
+  return (
+    <CardHeader className="space-y-4">
+      <div className="flex items-center gap-2">
+        {isEditing ? (
+          <input
+            type="text"
+            value={newTitle || ""}
+            onChange={(e) => setNewTitle(e.target.value)}
+            className="mb-0 rounded-md bg-muted/50 px-2 py-1 text-2xl font-bold"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onTitleEdit();
+              } else if (e.key === "Escape") {
+                setIsEditing(false);
+                setNewTitle(currentTranscription?.title || "");
+              }
+            }}
+            onBlur={() => {
+              onTitleEdit();
+            }}
+          />
+        ) : (
+          <CardTitle
+            className="mb-0 rounded-md px-2 py-1 text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsEditing(true)}
+          >
+            {currentTranscription?.title}
+          </CardTitle>
+        )}
+        <button
+          className="text-muted-foreground hover:text-foreground"
+          aria-label={isEditing ? "Save title" : "Edit title"}
+          onClick={onTitleEdit}
+          type="button"
+        >
+          <PencilIcon className="size-4" />
+        </button>
+      </div>
+
+      <div className="flex flex-col space-y-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="size-4" />
+          <span>
+            {currentTranscription?.created_datetime
+              ? new Date(
+                  currentTranscription.created_datetime,
+                ).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })
+              : "Date not set"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <UsersIcon className="size-4" />
+          <div className="flex flex-wrap gap-2">
+            {uniqueSpeakers.map((speaker: string, index: number) =>
+              editingSpeaker === speaker ? (
+                <div
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={index}
+                  className="flex items-center gap-1"
+                >
+                  <input
+                    type="text"
+                    value={newSpeakerName}
+                    onChange={(e) => setNewSpeakerName(e.target.value)}
+                    className="h-6 w-32 rounded-full bg-muted px-2.5 py-0.5 text-xs"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSpeakerUpdate(speaker);
+                      } else if (e.key === "Escape") {
+                        setEditingSpeaker("");
+                        setNewSpeakerName("");
+                      }
+                    }}
+                    onBlur={() => {
+                      handleSpeakerUpdate(speaker);
+                    }}
+                  />
+                </div>
+              ) : (
+                <button
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={index}
+                  type="button"
+                  onClick={() => {
+                    setEditingSpeaker(speaker);
+                    setNewSpeakerName(speaker);
+                  }}
+                  className="group inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium hover:bg-muted/80"
+                >
+                  <span>{speaker}</span>
+                  <PencilIcon className="size-3" />
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+      </div>
+    </CardHeader>
+  );
+}
