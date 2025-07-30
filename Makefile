@@ -32,7 +32,7 @@ setup-preprod:
 
 
 install: ## Install backend dependencies
-	cd backend && uv sync
+	cd backend && uv sync --group fastapi --group dev
 	cd frontend && npm install
 
 backend: ## Run development server

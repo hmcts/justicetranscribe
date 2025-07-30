@@ -16,12 +16,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "local"
 
     DATA_S3_BUCKET: str
-
-    POSTGRES_HOST: str
-    POSTGRES_PORT: int
-    POSTGRES_DB: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
+    DATABASE_CONNECTION_STRING: str
     RUN_MIGRATIONS: bool = False
 
     AZURE_OPENAI_API_KEY: str
