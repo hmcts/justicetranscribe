@@ -1,6 +1,6 @@
 import sentry_sdk
 
-from backend.app.minutes.llm_calls import generate_speaker_predictions
+from app.minutes.llm_calls import generate_speaker_predictions
 from shared_utils.database.postgres_models import DialogueEntry
 
 

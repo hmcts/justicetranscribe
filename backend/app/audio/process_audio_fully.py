@@ -2,21 +2,21 @@ import asyncio
 
 import sentry_sdk
 
-from backend.app.audio.speakers import process_speakers_and_dialogue_entries
-from backend.app.audio.transcription import transcribe_audio
-from backend.app.audio.utils import (
+from app.audio.speakers import process_speakers_and_dialogue_entries
+from app.audio.transcription import transcribe_audio
+from app.audio.utils import (
     get_url_for_transcription,
 )
-from backend.app.logger import logger
-from backend.app.minutes.llm_calls import (
+from app.logger import logger
+from app.minutes.llm_calls import (
     generate_llm_output_task,
     generate_meeting_title,
 )
-from backend.app.minutes.templates.templates_metadata import (
+from app.minutes.templates.templates_metadata import (
     crissa_template,
     general_template,
 )
-from backend.utils.gov_notify import send_email
+from utils.gov_notify import send_email
 from shared_utils.database.interface_functions import (
     save_transcription,
     save_transcription_job,

@@ -7,20 +7,20 @@ from fastapi import HTTPException
 from langfuse.decorators import langfuse_context, observe
 from uwotm8 import convert_american_to_british_spelling
 
-from backend.app.llm.llm_client import (
+from app.llm.llm_client import (
     LLMModel,
     langfuse_client,
     llm_completion,
     structured_output_llm_completion_builder_func,
 )
-from backend.app.minutes.templates.crissa import generate_full_crissa
-from backend.app.minutes.templates.general_style import generate_general_style_summary
-from backend.app.minutes.templates.utils import format_transcript_string_for_prompt
-from backend.app.minutes.types import (
+from app.minutes.templates.crissa import generate_full_crissa
+from app.minutes.templates.general_style import generate_general_style_summary
+from app.minutes.templates.utils import format_transcript_string_for_prompt
+from app.minutes.types import (
     MeetingTitleOutput,
     SpeakerPredictionOutput,
 )
-from backend.utils.markdown import html_to_markdown, markdown_to_html
+from utils.markdown import html_to_markdown, markdown_to_html
 from shared_utils.database.interface_functions import (
     get_minute_version_by_id,
     save_minute_version,

@@ -18,12 +18,12 @@ from tenacity import (
 )
 from uwotm8 import convert_american_to_british_spelling
 
-from backend.app.audio.utils import (
+from app.audio.utils import (
     cleanup_files,
     convert_input_dialogue_entries_to_dialogue_entries,
     get_s3_client,
 )
-from backend.app.logger import logger
+from app.logger import logger
 from shared_utils.database.postgres_models import DialogueEntry
 from shared_utils.settings import settings_instance
 

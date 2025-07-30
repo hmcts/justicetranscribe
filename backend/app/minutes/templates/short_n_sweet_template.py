@@ -1,12 +1,12 @@
 from langfuse.decorators import langfuse_context, observe
 from uwotm8 import convert_american_to_british_spelling
 
-from backend.app.llm.llm_client import (
+from app.llm.llm_client import (
     langfuse_client,
     llm_completion,
 )
-from backend.app.minutes.templates.utils import format_transcript_string_for_prompt
-from backend.utils.markdown import markdown_to_html
+from app.minutes.templates.utils import format_transcript_string_for_prompt
+from utils.markdown import markdown_to_html
 from shared_utils.database.postgres_models import DialogueEntry
 
 
