@@ -9,19 +9,19 @@ from boto3.session import Session as Boto3Session
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse
 
-from backend.app.audio.process_audio_fully import transcribe_and_generate_llm_output
-from backend.app.audio.utils import (
+from app.audio.process_audio_fully import transcribe_and_generate_llm_output
+from app.audio.utils import (
     get_file_s3_key,
 )
-from backend.app.llm.llm_client import (
+from app.llm.llm_client import (
     langfuse_client,
 )
-from backend.app.logger import logger
-from backend.app.minutes.llm_calls import ai_edit_task, generate_llm_output_task
-from backend.app.minutes.templates.templates_metadata import (
+from app.logger import logger
+from app.minutes.llm_calls import ai_edit_task, generate_llm_output_task
+from app.minutes.templates.templates_metadata import (
     get_all_templates,
 )
-from backend.app.minutes.types import (
+from app.minutes.types import (
     GenerateMinutesRequest,
     StartTranscriptionJobRequest,
     TemplateResponse,
@@ -30,7 +30,7 @@ from backend.app.minutes.types import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
-from backend.utils.auth import get_current_user
+from utils.auth import get_current_user
 from shared_utils.database.interface_functions import (
     delete_transcription_by_id,
     fetch_transcriptions_metadata,

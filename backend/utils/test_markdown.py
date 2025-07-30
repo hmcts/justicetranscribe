@@ -1,4 +1,4 @@
-from backend.utils.markdown import html_to_markdown, markdown_to_html
+from utils.markdown import html_to_markdown, markdown_to_html
 
 
 def test_markdown_to_html_basic():

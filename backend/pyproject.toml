@@ -29,7 +29,7 @@ dependencies = [
     "markdown>=3.7",
     "markupsafe>=3.0.2",
     "notifications-python-client>=10.0.1",
-    "langfuse>=2.60.2",
+    "langfuse==2.60.7",
     "html2text>=2024.2.26",
     "commonmark>=0.9.1",
     "cryptography>=44.0.2",
@@ -37,6 +37,8 @@ dependencies = [
     "google-auth>=2.39.0",
     "uwotm8>=0.1.4",
     "deepgram-sdk>=3.11.0",
+    "pydantic-settings>=2.5.2",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [dependency-groups]

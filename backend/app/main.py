@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
-from backend.api.routes import router as api_router
+from api.routes import router as api_router
 from shared_utils.settings import settings_instance
 
 log = logging.getLogger("uvicorn")

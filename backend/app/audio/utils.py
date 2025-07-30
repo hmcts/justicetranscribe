@@ -9,7 +9,7 @@ import aioboto3
 import ffmpeg
 import httpx
 
-from backend.app.logger import logger
+from app.logger import logger
 from shared_utils.database.postgres_models import DialogueEntry
 from shared_utils.settings import settings_instance
 

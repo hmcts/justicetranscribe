@@ -7,7 +7,7 @@ from pathlib import Path
 # Add the project root to the Python path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from backend.app.minutes.templates.crissa import generate_full_crissa
+from app.minutes.templates.crissa import generate_full_crissa
 from shared_utils.database.postgres_models import DialogueEntry
 
 
