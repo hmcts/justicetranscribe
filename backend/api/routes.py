@@ -6,7 +6,7 @@ import aioboto3
 import pytz
 from boto3.session import Config
 from boto3.session import Session as Boto3Session
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from starlette.responses import JSONResponse
 
 from app.audio.process_audio_fully import transcribe_and_generate_llm_output
@@ -30,7 +30,7 @@ from app.minutes.types import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
-from utils.auth import get_current_user
+from utils.dependencies import get_current_user
 from app.database.interface_functions import (
     delete_transcription_by_id,
     fetch_transcriptions_metadata,
@@ -375,6 +375,54 @@ async def get_current_user_route(
 ):
     """Get the current user's details."""
     return get_user_by_id(current_user.id)
+
+
+# Add missing routes that frontend expects
+@router.get("/users/me", response_model=User)
+async def get_current_user_me_route(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get the current user's details (alias for /user)."""
+    return get_user_by_id(current_user.id)
+
+
+@router.get("/user/profile", response_model=User)
+async def get_user_profile_route(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get the current user's profile (alias for /user)."""
+    return get_user_by_id(current_user.id)
+
+
+@router.get("/users/auth-info")
+async def get_user_auth_info(
+    x_amzn_oidc_accesstoken: str = Header(None),
+):
+    """Get user authentication information from JWT token."""
+    import jwt
+    from typing import Annotated
+    
+    # Use the same logic as in auth.py for local testing
+    if settings_instance.ENVIRONMENT in ["local", "integration-test"]:
+        jwt_dict = {
+            "sub": "90429234-4031-7077-b9ba-60d1af121245",
+            "preferred_username": "test@test.co.uk",
+            "email": "test@test.co.uk",
+            "realm_access": {"roles": ["justice-transcribe"]},
+        }
+    else:
+        # Decode the actual JWT token
+        try:
+            jwt_dict = jwt.decode(x_amzn_oidc_accesstoken, options={"verify_signature": False})
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    
+    return {
+        "azure_user_id": jwt_dict.get("sub", ""),
+        "name": jwt_dict.get("preferred_username", jwt_dict.get("email", "")),
+        "email": jwt_dict.get("email", ""),
+        "roles": jwt_dict.get("realm_access", {}).get("roles", []),
+    }
 
 
 @router.post("/user", response_model=User)  # changed from .patch to .post
