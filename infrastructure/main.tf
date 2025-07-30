@@ -245,6 +245,40 @@ resource "azurerm_linux_web_app" "backend_api" {
     "AUTH_CLIENT_ID"    = var.auth_client_id
     "AUTH_TENANT_ID"    = var.auth_tenant_id
     "AUTH_ISSUER_URL"   = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0"
+    
+    # Application configuration
+    "DOCKER_BUILDER_CONTAINER"          = "justice-transcribe"
+    "APP_NAME"                          = "justice-transcribe"
+    "APP_URL"                           = "https://${local.frontend_hostname}"
+    "BACKEND_URL"                       = "https://${local.backend_hostname}"
+    "BACKEND_HOST"                      = "https://${local.backend_hostname}"
+    
+    # AWS Configuration
+    "AWS_REGION"                        = "eu-west-2"
+    "AWS_ACCOUNT_ID"                    = "placeholder-aws-account-id"
+    "DATA_S3_BUCKET"                    = "i-dot-ai-dev-justice-transcribe-data"
+    "USE_LOCALSTACK"                    = "false"
+    
+    # Azure AI Services
+    "AZURE_OPENAI_API_KEY"              = "placeholder-azure-openai-api-key"
+    "AZURE_OPENAI_ENDPOINT"             = "placeholder-azure-openai-endpoint"
+    "AZURE_GROK_API_KEY"                = "placeholder-azure-grok-api-key"
+    "AZURE_GROK_ENDPOINT"               = "placeholder-azure-grok-endpoint"
+    "AZURE_SPEECH_KEY"                  = "placeholder-azure-speech-key"
+    "AZURE_SPEECH_REGION"               = "placeholder-azure-speech-region"
+    
+    # Monitoring and Observability
+    "SENTRY_DSN"                        = "placeholder-sentry-dsn"
+    "LANGFUSE_SECRET_KEY"               = "placeholder-langfuse-secret-key"
+    "LANGFUSE_PUBLIC_KEY"               = "placeholder-langfuse-public-key"
+    "LANGFUSE_HOST"                     = "placeholder-langfuse-host"
+    
+    # Government Services
+    "GOV_NOTIFY_API_KEY"                = "placeholder-gov-notify-api-key"
+    
+    # Development/Testing Configuration
+    "DISABLE_AUTH_SIGNATURE_VERIFICATION" = "false"
+    "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT" = "placeholder-google-credentials-json"
   }
 
   # Only ignore changes to sensitive environment variables
@@ -252,6 +286,19 @@ resource "azurerm_linux_web_app" "backend_api" {
     ignore_changes = [
       app_settings["MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"],
       app_settings["EXTERNAL_API_KEY"],
+      app_settings["AZURE_OPENAI_API_KEY"],
+      app_settings["AZURE_OPENAI_ENDPOINT"],
+      app_settings["AZURE_GROK_API_KEY"],
+      app_settings["AZURE_GROK_ENDPOINT"],
+      app_settings["AZURE_SPEECH_KEY"],
+      app_settings["AZURE_SPEECH_REGION"],
+      app_settings["SENTRY_DSN"],
+      app_settings["LANGFUSE_SECRET_KEY"],
+      app_settings["LANGFUSE_PUBLIC_KEY"],
+      app_settings["LANGFUSE_HOST"],
+      app_settings["GOV_NOTIFY_API_KEY"],
+      app_settings["AWS_ACCOUNT_ID"],
+      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
     ]
   }
 
