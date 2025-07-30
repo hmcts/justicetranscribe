@@ -28,9 +28,8 @@ services:
     env_file:
       - .env # Load all variables from .env
     environment:
-      # Docker Compose specific overrides (these will override .env)
       - DATABASE_CONNECTION_STRING=postgresql://psqladmin:localpass@database:5432/justicetranscribe_db
-      - ENVIRONMENT=development
+      - ENVIRONMENT=local
       - NODE_ENV=production
     depends_on:
       database:
