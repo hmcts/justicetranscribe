@@ -17,7 +17,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED 1
+# Declare build arguments
+ARG NEXT_PUBLIC_API_URL
+ARG ENVIRONMENT
+
+# Set environment variables from build args
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV ENVIRONMENT=$ENVIRONMENT
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
