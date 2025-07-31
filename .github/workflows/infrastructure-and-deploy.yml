@@ -60,8 +60,7 @@ jobs:
 
       - name: Terraform Init
         working-directory: ./infrastructure
-        run: terraform init -backend-config="key=terraform-${{ steps.set-env.outputs.environment }}.tfstate"
-
+        run: terraform init -backend-config="key=${{ steps.set-env.outputs.environment }}.terraform.tfstate"
       # - name: Terraform Plan
       #   working-directory: ./infrastructure
       #   run: terraform plan -var-file="${{ steps.set-env.outputs.tfvars_file }}"
