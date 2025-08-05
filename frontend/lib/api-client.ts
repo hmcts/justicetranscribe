@@ -258,15 +258,6 @@ class ApiClient {
     return this.request<User>("/users/me");
   }
 
-  async getUserAuthInfo() {
-    return this.request<{
-      azure_user_id: string;
-      name: string;
-      email: string;
-      roles: string[];
-    }>("/users/auth-info");
-  }
-
   async getItems() {
     return this.request<Array<unknown>>("/items/");
   }
