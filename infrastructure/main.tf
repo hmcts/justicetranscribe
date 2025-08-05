@@ -281,7 +281,6 @@ resource "azurerm_linux_web_app" "backend_api" {
     ignore_changes = [
       app_settings["MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"],
       app_settings["EXTERNAL_API_KEY"],
-      app_settings["AZURE_STORAGE_CONNECTION_STRING"],
       app_settings["AZURE_OPENAI_API_KEY"],
       app_settings["AZURE_OPENAI_ENDPOINT"],
       app_settings["AZURE_GROK_API_KEY"],
