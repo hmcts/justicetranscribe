@@ -60,7 +60,7 @@ function BackupUploader({
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve(xhr.response);
             } else {
-              reject(new Error("Failed to upload file to S3"));
+              reject(new Error("Failed to upload file to Azure Storage"));
             }
           });
 
@@ -73,6 +73,8 @@ function BackupUploader({
           });
 
           xhr.open("PUT", upload_url);
+          // Add required headers for Azure Blob Storage
+          xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
           xhr.send(blob);
         });
 

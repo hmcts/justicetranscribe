@@ -479,6 +479,15 @@ resource "azurerm_storage_account" "main" {
     container_delete_retention_policy {
       days = 7
     }
+
+    # CORS configuration for direct frontend uploads
+    cors_rule {
+      allowed_origins    = ["http://localhost:3000", "https://localhost:3000", "https://${local.frontend_hostname}", var.custom_domain_url]
+      allowed_methods    = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]
+      allowed_headers    = ["*"]
+      exposed_headers    = ["*"]
+      max_age_in_seconds = 3600
+    }
   }
 
   # Network rules for security
