@@ -9,10 +9,13 @@ class Settings(BaseSettings):
 
     APP_URL: str
 
-    AWS_REGION: str
     ENVIRONMENT: str = "local"
 
-    DATA_S3_BUCKET: str
+    # Azure Storage Configuration (replacing AWS S3)
+    AZURE_STORAGE_ACCOUNT_NAME: str
+    AZURE_STORAGE_CONNECTION_STRING: str
+    AZURE_STORAGE_CONTAINER_NAME: str
+    AZURE_STORAGE_TRANSCRIPTION_CONTAINER: str
     DATABASE_CONNECTION_STRING: str
     RUN_MIGRATIONS: bool = False
 
