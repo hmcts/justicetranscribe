@@ -2,16 +2,14 @@ import asyncio
 import uuid
 from uuid import UUID
 
-import aioboto3
 import pytz
-from boto3.session import Config
-from boto3.session import Session as Boto3Session
 from fastapi import APIRouter, Depends, HTTPException, Header
 from starlette.responses import JSONResponse
 
 from app.audio.process_audio_fully import transcribe_and_generate_llm_output
 from app.audio.utils import (
-    get_file_s3_key,
+    get_file_blob_path,
+    generate_blob_upload_url,
 )
 from app.llm.llm_client import (
     langfuse_client,
@@ -55,22 +53,7 @@ from utils.settings import settings_instance
 router = APIRouter()
 
 
-# Initialize async session
-async_session = aioboto3.Session()
-boto3_session = Boto3Session()
-
-# Configure S3 client for LocalStack or AWS
-s3_config = Config(signature_version="s3v4")
-s3_client_kwargs = {"config": s3_config}
-
-# if settings_instance.USE_LOCALSTACK:
-#     s3_client_kwargs.update({
-#         "endpoint_url": "http://localhost:4566",
-#         "aws_access_key_id": "test",
-#         "aws_secret_access_key": "test",
-#     })
-
-s3_client = boto3_session.client("s3", **s3_client_kwargs)
+# Azure Blob Storage configuration is handled through settings_instance
 
 
 UK_TIMEZONE = pytz.timezone("Europe/London")
@@ -88,20 +71,18 @@ async def get_upload_url(
 ) -> UploadUrlResponse:
     file_name_uuid = uuid.uuid4()
     file_name = f"{file_name_uuid}.{request.file_extension}"
-    user_upload_s3_file_key = get_file_s3_key(current_user.email, file_name)
-    presigned_url = s3_client.generate_presigned_url(
-        ClientMethod="put_object",
-        Params={
-            "Bucket": settings_instance.DATA_S3_BUCKET,
-            "Key": user_upload_s3_file_key,
-        },
-        ExpiresIn=3600,
-        HttpMethod="PUT",
+    user_upload_blob_path = get_file_blob_path(current_user.email, file_name)
+    
+    # Generate presigned URL for Azure Blob Storage upload
+    presigned_url = generate_blob_upload_url(
+        container_name=settings_instance.AZURE_STORAGE_CONTAINER_NAME,
+        blob_name=user_upload_blob_path,
+        expiry_hours=1,
     )
 
     return UploadUrlResponse(
         upload_url=presigned_url,
-        user_upload_s3_file_key=user_upload_s3_file_key,
+        user_upload_s3_file_key=user_upload_blob_path,  # Keep same field name for compatibility
     )
 
 

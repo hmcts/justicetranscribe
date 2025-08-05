@@ -125,3 +125,25 @@ output "database_connection_string" {
   value       = local.database_connection_string
   sensitive   = true
 }
+
+# Azure Storage outputs
+output "storage_account_name" {
+  description = "Name of the Azure Storage account"
+  value       = azurerm_storage_account.main.name
+}
+
+output "storage_connection_string" {
+  description = "Azure Storage connection string (sensitive)"
+  value       = azurerm_storage_account.main.primary_connection_string
+  sensitive   = true
+}
+
+output "storage_container_name" {
+  description = "Name of the main storage container"
+  value       = azurerm_storage_container.data.name
+}
+
+output "storage_transcription_container" {
+  description = "Name of the transcription storage container"
+  value       = azurerm_storage_container.transcription.name
+}

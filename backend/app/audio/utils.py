@@ -2,32 +2,29 @@ import shutil
 import subprocess
 import tempfile
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
-import aioboto3
 import ffmpeg
 import httpx
+from azure.storage.blob import BlobSasPermissions, generate_blob_sas
+from azure.storage.blob.aio import BlobServiceClient
 
-from app.logger import logger
 from app.database.postgres_models import DialogueEntry
+from app.logger import logger
 from utils.settings import settings_instance
-
-async_s3_session = aioboto3.Session()
 
 
 @asynccontextmanager
-async def get_s3_client():
-    s3_config = {}
-    if settings_instance.USE_LOCALSTACK:
-        s3_config = {
-            "endpoint_url": "http://localhost:4566",
-            "aws_access_key_id": "test",
-            "aws_secret_access_key": "test",
-        }
+async def get_blob_service_client():
+    """Get Azure Blob Service Client with async context manager."""
+    # Always use the real Azure Storage connection string
+    connection_string = settings_instance.AZURE_STORAGE_CONNECTION_STRING
 
-    async with async_s3_session.client("s3", **s3_config) as s3:
-        yield s3
+    async with BlobServiceClient.from_connection_string(connection_string) as blob_service_client:
+        yield blob_service_client
+
 
 
 def is_rate_limit_error(exception):
@@ -37,18 +34,57 @@ def is_rate_limit_error(exception):
     )
 
 
-def get_file_s3_key(user_email: str, file_name: str) -> str:
+def get_file_blob_path(user_email: str, file_name: str) -> str:
     """
-    Generate a consistent S3 file key for user uploads.
+    Generate a consistent blob path for user uploads.
 
     Args:
         user_email (str): The email of the user uploading the file
-        extension (str): The file extension
+        file_name (str): The file name including extension
 
     Returns:
-        str: The generated file key in the format 'user-uploads/{email}/{uuid}.{extension}'
+        str: The generated blob path in the format 'user-uploads/{email}/{filename}'
     """
     return f"user-uploads/{user_email}/{file_name}"
+
+
+def generate_blob_upload_url(container_name: str, blob_name: str, expiry_hours: int = 1) -> str:
+    """
+    Generate a presigned URL for uploading to Azure Blob Storage.
+
+    Args:
+        container_name (str): The name of the blob container
+        blob_name (str): The name of the blob
+        expiry_hours (int): How many hours the URL should be valid for
+
+    Returns:
+        str: The presigned URL for uploading
+    """
+    # Extract account key from connection string
+    connection_string = settings_instance.AZURE_STORAGE_CONNECTION_STRING
+    account_key = None
+
+    # Parse connection string to extract account key
+    for part in connection_string.split(";"):
+        if part.startswith("AccountKey="):
+            account_key = part.split("=", 1)[1]
+            break
+
+    if not account_key:
+        error_msg = "Could not extract account key from connection string"
+        raise ValueError(error_msg)
+
+    # Generate SAS token for upload (write permission)
+    sas_token = generate_blob_sas(
+        account_name=settings_instance.AZURE_STORAGE_ACCOUNT_NAME,
+        container_name=container_name,
+        blob_name=blob_name,
+        account_key=account_key,
+        permission=BlobSasPermissions(write=True, create=True),
+        expiry=datetime.now(timezone.utc) + timedelta(hours=expiry_hours),
+    )
+
+    return f"https://{settings_instance.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{container_name}/{blob_name}?{sas_token}"
 
 
 def convert_to_mp3(  # noqa: C901, PLR0912
