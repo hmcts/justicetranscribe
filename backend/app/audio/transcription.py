@@ -5,9 +5,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-import aioboto3
 import aiofiles
-import boto3
 import httpx
 from fastapi import HTTPException
 from tenacity import (
@@ -21,13 +19,12 @@ from uwotm8 import convert_american_to_british_spelling
 from app.audio.utils import (
     cleanup_files,
     convert_input_dialogue_entries_to_dialogue_entries,
-    get_s3_client,
+    get_blob_service_client,
 )
 from app.logger import logger
 from app.database.postgres_models import DialogueEntry
 from utils.settings import settings_instance
 
-async_session = aioboto3.Session()
 TOO_MANY_REQUESTS = 429
 
 
@@ -87,22 +84,26 @@ async def transcribe_audio(user_upload_s3_file_key: str) -> list[DialogueEntry]:
 
 
 async def perform_transcription_steps_with_azure_and_aws(
-    user_upload_s3_file_key: str,
+    user_upload_blob_path: str,
 ) -> list[DialogueEntry]:
     temp_file_path = None
 
     try:
-        file_extension = Path(user_upload_s3_file_key).suffix.lower()
+        file_extension = Path(user_upload_blob_path).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
-            logger.info(f"Downloading file from S3: {user_upload_s3_file_key} to {temp_file.name}")
+            logger.info(f"Downloading file from Azure Blob Storage: {user_upload_blob_path} to {temp_file.name}")
 
-            # Use async S3 client
-            async with get_s3_client() as s3:
-                await s3.download_fileobj(
-                    settings_instance.DATA_S3_BUCKET,
-                    user_upload_s3_file_key,
-                    temp_file,
+            # Use async Azure Blob client
+            async with get_blob_service_client() as blob_service_client:
+                blob_client = blob_service_client.get_blob_client(
+                    container=settings_instance.AZURE_STORAGE_CONTAINER_NAME,
+                    blob=user_upload_blob_path
                 )
+                
+                # Download the blob content
+                download_stream = await blob_client.download_blob()
+                content = await download_stream.readall()
+                temp_file.write(content)
 
             temp_file_path = Path(temp_file.name)
 
@@ -127,71 +128,70 @@ async def perform_transcription_steps_with_azure_and_aws(
 #         return await transcribe_audio_with_aws_transcribe(audio_file_path)
 
 
-s3 = boto3.client("s3", region_name=settings_instance.AWS_REGION)
-transcribe = boto3.client("transcribe", region_name=settings_instance.AWS_REGION)
+# AWS Transcribe functionality has been removed - using Azure Speech Services only
 
 
-async def transcribe_audio_with_aws_transcribe(
-    audio_file_path: Path,
-) -> list[DialogueEntry]:
-    file_name = uuid.uuid4()
-    file_extension = audio_file_path.suffix.lower()
-
-    s3_key = f"aws-transcribe/{file_name}{file_extension}"
-    async with aiofiles.open(audio_file_path, "rb") as audio_file:
-        file_content = await audio_file.read()
-        s3.put_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=s3_key, Body=file_content)
-
-    s3_uri = f"s3://{settings_instance.DATA_S3_BUCKET}/{s3_key}"
-    job_name = f"minute-transcription-job-{file_name}"
-
-    # Start transcription job
-    transcribe.start_transcription_job(
-        TranscriptionJobName=job_name,
-        Media={"MediaFileUri": s3_uri},
-        OutputBucketName=settings_instance.DATA_S3_BUCKET,
-        OutputKey=f"transcribe-output/{file_name}/",
-        LanguageCode="en-GB",
-        Settings={"ShowSpeakerLabels": True, "MaxSpeakerLabels": 30},
-    )
-
-    # Poll for completion
-    while True:
-        status = transcribe.get_transcription_job(TranscriptionJobName=job_name)
-        job_status = status["TranscriptionJob"]["TranscriptionJobStatus"]
-
-        if job_status == "COMPLETED":
-            try:
-                transcript_uri = status["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
-                transcript_key = transcript_uri.split(f"{settings_instance.DATA_S3_BUCKET}/")[1]
-
-                # Get the transcript JSON from S3
-                response = s3.get_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=transcript_key)
-                transcript_content = json.loads(response["Body"].read().decode("utf-8"))
-
-                # Extract and group audio segments
-                audio_segments = transcript_content.get("results", {}).get("audio_segments", [])
-                grouped_segments = convert_to_dialogue_entries(audio_segments)
-
-                try:
-                    s3.delete_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=transcript_key)
-                    s3.delete_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=s3_key)
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to delete transcript or audio file: {cleanup_error}")
-
-                return grouped_segments  # noqa: TRY300
-
-            except Exception as e:
-                logger.error(f"Error processing completed transcription: {e}")
-                raise
-
-        elif job_status == "FAILED":
-            failure_reason = status["TranscriptionJob"].get("FailureReason", "Unknown error")
-            raise ValueError(  # noqa: TRY003
-                f"Transcription job failed: {failure_reason}"
-            )
-
-        await asyncio.sleep(4)
+# async def transcribe_audio_with_aws_transcribe(
+#     audio_file_path: Path,
+# ) -> list[DialogueEntry]:
+#     file_name = uuid.uuid4()
+#     file_extension = audio_file_path.suffix.lower()
+#
+#     s3_key = f"aws-transcribe/{file_name}{file_extension}"
+#     async with aiofiles.open(audio_file_path, "rb") as audio_file:
+#         file_content = await audio_file.read()
+#         s3.put_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=s3_key, Body=file_content)
+#
+#     s3_uri = f"s3://{settings_instance.DATA_S3_BUCKET}/{s3_key}"
+#     job_name = f"minute-transcription-job-{file_name}"
+#
+#     # Start transcription job
+#     transcribe.start_transcription_job(
+#         TranscriptionJobName=job_name,
+#         Media={"MediaFileUri": s3_uri},
+#         OutputBucketName=settings_instance.DATA_S3_BUCKET,
+#         OutputKey=f"transcribe-output/{file_name}/",
+#         LanguageCode="en-GB",
+#         Settings={"ShowSpeakerLabels": True, "MaxSpeakerLabels": 30},
+#     )
+#
+#     # Poll for completion
+#     while True:
+#         status = transcribe.get_transcription_job(TranscriptionJobName=job_name)
+#         job_status = status["TranscriptionJob"]["TranscriptionJobStatus"]
+#
+#         if job_status == "COMPLETED":
+#             try:
+#                 transcript_uri = status["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
+#                 transcript_key = transcript_uri.split(f"{settings_instance.DATA_S3_BUCKET}/")[1]
+#
+#                 # Get the transcript JSON from S3
+#                 response = s3.get_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=transcript_key)
+#                 transcript_content = json.loads(response["Body"].read().decode("utf-8"))
+#
+#                 # Extract and group audio segments
+#                 audio_segments = transcript_content.get("results", {}).get("audio_segments", [])
+#                 grouped_segments = convert_to_dialogue_entries(audio_segments)
+#
+#                 try:
+#                     s3.delete_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=transcript_key)
+#                     s3.delete_object(Bucket=settings_instance.DATA_S3_BUCKET, Key=s3_key)
+#                 except Exception as cleanup_error:
+#                     logger.warning(f"Failed to delete transcript or audio file: {cleanup_error}")
+#
+#                 return grouped_segments  # noqa: TRY300
+#
+#             except Exception as e:
+#                 logger.error(f"Error processing completed transcription: {e}")
+#                 raise
+#
+#         elif job_status == "FAILED":
+#             failure_reason = status["TranscriptionJob"].get("FailureReason", "Unknown error")
+#             raise ValueError(  # noqa: TRY003
+#                 f"Transcription job failed: {failure_reason}"
+#             )
+#
+#         await asyncio.sleep(4)
 
 
 def convert_to_dialogue_entries(transcript_data: list[dict]) -> list[DialogueEntry]:

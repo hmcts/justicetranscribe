@@ -248,10 +248,11 @@ resource "azurerm_linux_web_app" "backend_api" {
     # Application configuration
     "APP_URL"                           = "https://${local.frontend_hostname}"
     
-    # AWS Configuration
-    "AWS_REGION"                        = "eu-west-2"
-    "AWS_ACCOUNT_ID"                    = "placeholder-aws-account-id"
-    "DATA_S3_BUCKET"                    = "i-dot-ai-dev-justice-transcribe-data"
+    # Azure Storage Configuration (replacing AWS S3)
+    "AZURE_STORAGE_ACCOUNT_NAME"        = azurerm_storage_account.main.name
+    "AZURE_STORAGE_CONNECTION_STRING"   = azurerm_storage_account.main.primary_connection_string
+    "AZURE_STORAGE_CONTAINER_NAME"      = azurerm_storage_container.data.name
+    "AZURE_STORAGE_TRANSCRIPTION_CONTAINER" = azurerm_storage_container.transcription.name
     
     # Azure AI Services
     "AZURE_OPENAI_API_KEY"              = "placeholder-azure-openai-api-key"
@@ -291,7 +292,6 @@ resource "azurerm_linux_web_app" "backend_api" {
       app_settings["LANGFUSE_PUBLIC_KEY"],
       app_settings["LANGFUSE_HOST"],
       app_settings["GOV_NOTIFY_API_KEY"],
-      app_settings["AWS_ACCOUNT_ID"],
       app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
     ]
   }
@@ -455,6 +455,65 @@ resource "azurerm_postgresql_flexible_server_database" "main" {
 # Create database connection string
 locals {
   database_connection_string = "postgresql://${var.postgres_admin_username}:${urlencode(random_password.postgres_password.result)}@${azurerm_postgresql_flexible_server.main.fqdn}:5432/${var.postgres_database_name}?sslmode=require"
+}
+
+# Azure Storage Account for file uploads and processing
+resource "azurerm_storage_account" "main" {
+  name                     = "${substr(var.prefix, 0, 12)}${var.environment}stor"
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = var.environment == "prod" ? "GRS" : "LRS"
+  account_kind             = "StorageV2"
+  
+  # Enable blob versioning and soft delete for data protection
+  blob_properties {
+    versioning_enabled  = true
+    change_feed_enabled = true
+    
+    delete_retention_policy {
+      days = 7
+    }
+    
+    container_delete_retention_policy {
+      days = 7
+    }
+
+    # CORS configuration for direct frontend uploads
+    cors_rule {
+      allowed_origins    = ["http://localhost:3000", "https://localhost:3000", "https://${local.frontend_hostname}", var.custom_domain_url]
+      allowed_methods    = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]
+      allowed_headers    = ["*"]
+      exposed_headers    = ["*"]
+      max_age_in_seconds = 3600
+    }
+  }
+
+  # Network rules for security
+  network_rules {
+    default_action = "Allow"  # Can be restricted to VNet in production
+    bypass         = ["AzureServices"]
+  }
+
+  tags = {
+    Environment = var.environment
+    Project     = var.prefix
+    Component   = "storage"
+  }
+}
+
+# Blob container for application data (equivalent to S3 bucket)
+resource "azurerm_storage_container" "data" {
+  name                  = "application-data"
+  storage_account_name  = azurerm_storage_account.main.name
+  container_access_type = "private"
+}
+
+# Blob container for transcription processing
+resource "azurerm_storage_container" "transcription" {
+  name                  = "transcription-processing"
+  storage_account_name  = azurerm_storage_account.main.name
+  container_access_type = "private"
 }
 
 # Map branch names to environments
