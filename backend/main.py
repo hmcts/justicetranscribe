@@ -24,7 +24,7 @@ async def lifespan(app_: FastAPI):  # noqa: ARG001
 sentry_sdk.init(
     dsn=settings_instance.SENTRY_DSN,
     environment=settings_instance.ENVIRONMENT,
-    send_default_pii=True,
+    send_default_pii=False,
     # Set traces_sample_rate to 1.0 to capture 100%
     # of transactions for tracing.
     traces_sample_rate=1.0,
