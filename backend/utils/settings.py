@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     LANGFUSE_HOST: str
 
     # JWT Verification Settings - Strict by default
-    AZURE_AD_TENANT_ID: str = "c6874728-71e6-41fe-a9e1-2e8c36776ad8"  # From your user claims
-    AZURE_AD_CLIENT_ID: str = "5087b20c-ae0e-40dd-ad76-55adabfefb92"   # From your user claims
+    AZURE_AD_TENANT_ID: str
+    AZURE_AD_CLIENT_ID: str
     ENABLE_JWT_VERIFICATION: bool = True
     JWT_VERIFICATION_STRICT: bool = True
 
