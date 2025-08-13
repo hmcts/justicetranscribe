@@ -29,14 +29,15 @@ TOO_MANY_REQUESTS = 429
 
 
 async def transcribe_audio(user_upload_s3_file_key: str) -> list[DialogueEntry]:
-    result = await perform_transcription_steps_with_azure_and_aws(user_upload_s3_file_key)
+    result = await perform_transcription_steps_with_azure_and_aws(
+        user_upload_s3_file_key
+    )
 
     # Convert to British English spelling regardless of which service was used
     for entry in result:
         entry.text = convert_american_to_british_spelling(entry.text)
 
     return result
-
 
 
 async def perform_transcription_steps_with_azure_and_aws(
@@ -46,16 +47,20 @@ async def perform_transcription_steps_with_azure_and_aws(
 
     try:
         file_extension = Path(user_upload_blob_path).suffix.lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
-            logger.info(f"Downloading file from Azure Blob Storage: {user_upload_blob_path} to {temp_file.name}")
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=file_extension
+        ) as temp_file:
+            logger.info(
+                f"Downloading file from Azure Blob Storage: {user_upload_blob_path} to {temp_file.name}"
+            )
 
             # Use async Azure Blob client
             async with get_blob_service_client() as blob_service_client:
                 blob_client = blob_service_client.get_blob_client(
                     container=settings_instance.AZURE_STORAGE_CONTAINER_NAME,
-                    blob=user_upload_blob_path
+                    blob=user_upload_blob_path,
                 )
-                
+
                 # Download the blob content
                 download_stream = await blob_client.download_blob()
                 content = await download_stream.readall()
@@ -71,8 +76,6 @@ async def perform_transcription_steps_with_azure_and_aws(
     else:
         await cleanup_files(temp_file_path)
         return result
-
-
 
 
 def convert_to_dialogue_entries(transcript_data: list[dict]) -> list[DialogueEntry]:
@@ -151,4 +154,3 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
                 )
 
             return convert_input_dialogue_entries_to_dialogue_entries(phrases)
-

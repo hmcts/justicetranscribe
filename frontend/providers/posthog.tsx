@@ -12,9 +12,9 @@ if (typeof window !== "undefined") {
   const API_KEY = "phc_gMiQR2FpJt3FObuZ2HXF2yVtbGfKhdHfbpbjTcpyQQz"; // pragma: allowlist secret
   posthog.init(API_KEY, {
     api_host: "https://eu.i.posthog.com",
-    capture_pageview: false, // Disable automatic pageview capture, as we capture manually
+    capture_pageview: true,
     session_recording: {
-      maskAllInputs: false,
+      maskAllInputs: true,
       maskInputOptions: {
         password: true,
       },

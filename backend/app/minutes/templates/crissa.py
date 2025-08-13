@@ -6,15 +6,15 @@ from langfuse.decorators import langfuse_context, observe
 from pydantic import BaseModel
 from uwotm8 import convert_american_to_british_spelling
 
-from app.llm.llm_client import (
+from backend.app.llm.llm_client import (
     LLMModel,
     langfuse_client,
     llm_completion,
     structured_output_llm_completion_builder_func,
 )
-from app.minutes.templates.utils import format_transcript_string_for_prompt
-from utils.markdown import html_to_markdown, markdown_to_html
-from app.database.postgres_models import DialogueEntry, TemplateName
+from backend.app.minutes.templates.utils import format_transcript_string_for_prompt
+from backend.utils.markdown import html_to_markdown, markdown_to_html
+from shared_utils.database.postgres_models import DialogueEntry, TemplateName
 
 CRISSA_SECTIONS = [
     "Check in",
@@ -43,7 +43,9 @@ async def generate_crissa_section(
         user_id=user_email,
     )
 
-    prompt = langfuse_client.get_prompt("crissa-prompt", version=prompt_version, type="chat")
+    prompt = langfuse_client.get_prompt(
+        "crissa-prompt", version=prompt_version, type="chat"
+    )
     langfuse_context.update_current_observation(
         prompt=prompt,
         user_id=user_email,
@@ -63,6 +65,7 @@ async def generate_crissa_section(
     )
 
     markdown_output = completion.choices[0].message.content
+
     markdown_output = convert_american_to_british_spelling(markdown_output)
     html_output = markdown_to_html(markdown_output)
 
@@ -80,7 +83,9 @@ async def generate_full_crissa(
     all_sections: list[str] = []
     trace_id: str | None = None
 
-    transcript_string = format_transcript_string_for_prompt(dialogue_entries, include_index=False)
+    transcript_string = format_transcript_string_for_prompt(
+        dialogue_entries, include_index=False
+    )
 
     today_date_readable = datetime.now(UTC).strftime("%d %B %Y")
 

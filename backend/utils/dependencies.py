@@ -71,14 +71,9 @@ async def get_current_user(
                     detail="Authentication failed: email claim missing from Azure AD token"
                 )
 
-            # Use email as user_id if userId is empty
-            if not azure_user_id:
-                azure_user_id = email
-
-            print(f"✅ Easy Auth validation passed - ID: {azure_user_id}, Email: {email}")
-
             # SECONDARY: JWT signature verification (defense in depth)
             jwt_token = None
+            jwt_user_id = None
             if authorization and authorization.startswith("Bearer "):
                 jwt_token = authorization[7:]  # Remove "Bearer " prefix
                 
@@ -99,14 +94,6 @@ async def get_current_user(
                                     detail="Authentication claims mismatch between Easy Auth and JWT"
                                 )
                         
-                        if jwt_user_id and jwt_user_id != azure_user_id:
-                            print(f"⚠️ User ID mismatch: Easy Auth={azure_user_id}, JWT={jwt_user_id}")
-                            if jwt_verification_service.strict_mode:
-                                raise HTTPException(
-                                    status_code=401, 
-                                    detail="User ID mismatch between Easy Auth and JWT"
-                                )
-                        
                         print(f"✅ JWT signature verification passed - Additional security layer confirmed")
                     else:
                         print(f"ℹ️ JWT verification skipped or failed non-strictly")
@@ -122,6 +109,19 @@ async def get_current_user(
                         detail="JWT token required for strict verification mode"
                     )
                 print("ℹ️ No JWT token provided for secondary verification")
+
+            # Use JWT user ID as the primary identifier if available (more reliable)
+            # Fall back to Easy Auth userId, then email as last resort
+            if jwt_user_id:
+                azure_user_id = jwt_user_id
+                print(f"✅ Using JWT object ID as primary user identifier: {azure_user_id}")
+            elif azure_user_id:
+                print(f"✅ Using Easy Auth userId: {azure_user_id}")
+            else:
+                azure_user_id = email
+                print(f"✅ Falling back to email as user identifier: {azure_user_id}")
+
+            print(f"✅ Authentication validated - ID: {azure_user_id}, Email: {email}")
 
         except (json.JSONDecodeError, base64.binascii.Error) as e:
             raise HTTPException(status_code=401, detail=f"Invalid authentication information: {str(e)}")

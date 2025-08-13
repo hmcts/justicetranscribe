@@ -4,7 +4,7 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, Field
 
-from app.database.postgres_models import (
+from shared_utils.database.postgres_models import (
     TemplateMetadata,
 )
 
@@ -21,6 +21,7 @@ class TranscriptionMetadata(BaseModel):
     created_datetime: datetime
     updated_datetime: datetime | None = None
     is_showable_in_ui: bool
+    speakers: list[str] = Field(default_factory=list)
 
     class Config:
         json_encoders: ClassVar[dict] = {datetime: lambda dt: dt.isoformat()}
