@@ -111,7 +111,7 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
     """
     Async version of transcribe audio using Azure Speech-to-Text API
     """
-    url = f"https://{settings_instance.AZURE_SPEECH_REGION}.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe"
+    url = "https://production-justice-ai.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2024-11-15"
     if not settings_instance.AZURE_SPEECH_KEY:
         raise HTTPException(status_code=500, detail="AZURE_SPEECH_KEY not set")
     headers = {"Ocp-Apim-Subscription-Key": settings_instance.AZURE_SPEECH_KEY}
@@ -125,8 +125,6 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
             ),
         }
 
-        params = {"api-version": "2024-11-15"}
-
         timeout_settings = httpx.Timeout(
             timeout=900.0,
             connect=900.0,
@@ -135,9 +133,7 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
         )
 
         async with httpx.AsyncClient(timeout=timeout_settings) as client:
-            response = await client.post(
-                url, headers=headers, files=files, params=params
-            )
+            response = await client.post(url, headers=headers, files=files)
             if response.status_code == TOO_MANY_REQUESTS:
                 response.raise_for_status()
 
