@@ -370,7 +370,7 @@ resource "azurerm_linux_web_app" "backend_api" {
     }
   }
 
-  # Add VNet integration
+  # Add VNet integration  
   virtual_network_subnet_id = azurerm_subnet.app_services.id
 
   tags = {

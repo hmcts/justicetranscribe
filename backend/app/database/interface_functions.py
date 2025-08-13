@@ -7,9 +7,9 @@ from fastapi import HTTPException
 from sqlalchemy import event
 from sqlmodel import Session, select
 
-from backend.app.minutes.types import TranscriptionMetadata
-from shared_utils.database.postgres_database import engine
-from shared_utils.database.postgres_models import (
+from app.minutes.types import TranscriptionMetadata
+from app.database.postgres_database import engine
+from app.database.postgres_models import (
     BaseTable,
     DialogueEntry,
     MinuteVersion,
