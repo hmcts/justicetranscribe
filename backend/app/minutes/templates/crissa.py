@@ -6,7 +6,7 @@ from langfuse.decorators import langfuse_context, observe
 from pydantic import BaseModel
 from uwotm8 import convert_american_to_british_spelling
 
-from app.database.postgres_models import DialogueEntry
+from app.database.postgres_models import DialogueEntry, TemplateName
 from app.llm.llm_client import (
     LLMModel,
     langfuse_client,
