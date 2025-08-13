@@ -227,7 +227,7 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
     """
     Async version of transcribe audio using Azure Speech-to-Text API
     """
-    url = f"https://{settings_instance.AZURE_SPEECH_REGION}.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe"
+    url = "https://production-justice-ai.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2024-11-15"
     if not settings_instance.AZURE_SPEECH_KEY:
         raise HTTPException(status_code=500, detail="AZURE_SPEECH_KEY not set")
     headers = {"Ocp-Apim-Subscription-Key": settings_instance.AZURE_SPEECH_KEY}
@@ -241,8 +241,6 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
             ),
         }
 
-        params = {"api-version": "2024-11-15"}
-
         timeout_settings = httpx.Timeout(
             timeout=900.0,
             connect=900.0,
@@ -251,7 +249,7 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
         )
 
         async with httpx.AsyncClient(timeout=timeout_settings) as client:
-            response = await client.post(url, headers=headers, files=files, params=params)
+            response = await client.post(url, headers=headers, files=files)
             if response.status_code == TOO_MANY_REQUESTS:
                 response.raise_for_status()
 
@@ -273,74 +271,3 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
 
             return convert_input_dialogue_entries_to_dialogue_entries(phrases)
 
-
-# async def perform_transcription_steps_with_deepgram_mp3_conversion(
-#     user_upload_s3_file_key: str,
-# ) -> list[DialogueEntry]:
-#     temp_file_path = None
-#     converted_file_path = None
-
-#     try:
-#         # Extract file extension from the S3 key directly
-#         file_extension = f".{user_upload_s3_file_key.split('.')[-1].lower()}"
-#         with tempfile.NamedTemporaryFile(
-#             delete=False, suffix=file_extension
-#         ) as temp_file:
-#             logger.info(
-#                 f"Downloading file from S3: {user_upload_s3_file_key} to {temp_file.name}"
-#             )
-
-#             async with get_s3_client() as s3:
-#                 await s3.download_fileobj(
-#                     settings_instance.DATA_S3_BUCKET,
-#                     user_upload_s3_file_key,
-#                     temp_file,
-#                 )
-
-#             temp_file_path = Path(temp_file.name)
-
-#         # Convert to MP3 if needed
-#         converted_file_path = convert_to_mp3(temp_file_path)
-
-#         # Initialize Deepgram client
-#         deepgram = DeepgramClient("")
-
-#         # Read the converted file
-#         async with aiofiles.open(converted_file_path, "rb") as file:
-#             buffer_data = await file.read()
-
-#         # Set up Deepgram options
-#         options = PrerecordedOptions(
-#             model="nova-3",
-#             smart_format=True,
-#             utterances=True,
-#             punctuate=True,
-#             diarize=True,
-#         )
-
-#         # Perform transcription
-#         response = deepgram.listen.rest.v("1").transcribe_file(
-#             {"buffer": buffer_data}, options, timeout=httpx.Timeout(300.0, connect=10.0)
-#         )
-
-#         dialogue_entries = []
-#         transcript = response.results.channels[0].alternatives[0]
-
-#         for word in transcript.words:
-#             entry = DialogueEntry(
-#                 speaker=f"Speaker {word.speaker if hasattr(word, 'speaker') else 'Unknown'}",
-#                 text=word.word,
-#                 start_time=word.start,
-#                 end_time=word.end,
-#             )
-#             dialogue_entries.append(entry)
-
-#         return dialogue_entries
-
-#     except Exception as e:
-#         logger.error(f"Error in Deepgram transcription: {e}")
-#         raise
-#     finally:
-#         # Clean up temporary files
-#         # await cleanup_files(temp_file_path, converted_file_path)
-#         pass
