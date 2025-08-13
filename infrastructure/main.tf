@@ -121,16 +121,33 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
   }
 }
 
-resource "azurerm_service_plan" "main" {
-  name                = "${local.environment_prefix}-sp-zipdeploy"
+# Frontend Service Plan - optimized for serving Next.js app
+resource "azurerm_service_plan" "frontend" {
+  name                = "${local.environment_prefix}-frontend-sp"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   os_type             = "Linux"
-  sku_name            = "S1"
+  sku_name            = var.frontend_service_plan_sku
 
   tags = {
     Environment = var.environment
     Project     = var.prefix
+    Component   = "frontend"
+  }
+}
+
+# Backend Service Plan - optimized for transcription processing
+resource "azurerm_service_plan" "backend" {
+  name                = "${local.environment_prefix}-backend-sp"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  os_type             = "Linux"
+  sku_name            = var.backend_service_plan_sku
+
+  tags = {
+    Environment = var.environment
+    Project     = var.prefix
+    Component   = "backend"
   }
 }
 
@@ -151,7 +168,7 @@ resource "azurerm_linux_web_app" "frontend" {
   name                = local.frontend_app_name
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  service_plan_id     = azurerm_service_plan.main.id
+  service_plan_id     = azurerm_service_plan.frontend.id
 
   app_settings = {
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
@@ -223,7 +240,7 @@ resource "azurerm_linux_web_app" "backend_api" {
   name                = local.backend_api_name
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  service_plan_id     = azurerm_service_plan.main.id
+  service_plan_id     = azurerm_service_plan.backend.id
 
   app_settings = {
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
@@ -353,7 +370,7 @@ resource "azurerm_linux_web_app" "backend_api" {
     }
   }
 
-  # Add VNet integration
+  # Add VNet integration  
   virtual_network_subnet_id = azurerm_subnet.app_services.id
 
   tags = {

@@ -156,3 +156,36 @@ variable "custom_domain_url" {
   type        = string
   default     = "https://transcribe.justice.gov.uk"
 }
+
+# Service Plan configuration
+variable "frontend_service_plan_sku" {
+  description = "The SKU name for the Frontend App Service Plan"
+  type        = string
+  default     = "S2"
+  
+  validation {
+    condition = contains([
+      "S1", "S2", "S3",                           # Standard tier
+      "P1v2", "P2v2", "P3v2",                    # Premium V2 tier  
+      "P1v3", "P2v3", "P3v3",                    # Premium V3 tier
+      "I1v2", "I2v2", "I3v2"                     # Isolated V2 tier
+    ], var.frontend_service_plan_sku)
+    error_message = "frontend_service_plan_sku must be a valid App Service Plan SKU."
+  }
+}
+
+variable "backend_service_plan_sku" {
+  description = "The SKU name for the Backend App Service Plan"
+  type        = string
+  default     = "S3"
+  
+  validation {
+    condition = contains([
+      "S1", "S2", "S3",                           # Standard tier
+      "P1v2", "P2v2", "P3v2",                    # Premium V2 tier  
+      "P1v3", "P2v3", "P3v3",                    # Premium V3 tier
+      "I1v2", "I2v2", "I3v2"                     # Isolated V2 tier
+    ], var.backend_service_plan_sku)
+    error_message = "backend_service_plan_sku must be a valid App Service Plan SKU."
+  }
+}

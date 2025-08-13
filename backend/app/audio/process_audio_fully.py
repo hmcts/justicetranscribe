@@ -46,7 +46,7 @@ async def generate_and_save_meeting_title(
 
 
 async def transcribe_and_generate_llm_output(
-    user_upload_s3_file_key: str, user: User, transcription_id: str | None = None
+    user_upload_blob_storage_file_key: str, user: User, transcription_id: str | None = None
 ):
     # Start a Sentry transaction for the whole function
     with sentry_sdk.start_transaction(
@@ -56,7 +56,7 @@ async def transcribe_and_generate_llm_output(
         transcription = save_transcription(transcription_data, user.id)
 
         try:
-            dialogue_entries = await transcribe_audio(user_upload_s3_file_key)
+            dialogue_entries = await transcribe_audio(user_upload_blob_storage_file_key)
             updated_dialogue_entries = await process_speakers_and_dialogue_entries(
                 dialogue_entries, user.email
             )
@@ -64,7 +64,7 @@ async def transcribe_and_generate_llm_output(
                 TranscriptionJob(
                     transcription_id=transcription.id,
                     dialogue_entries=updated_dialogue_entries,
-                    s3_audio_url=user_upload_s3_file_key,
+                    s3_audio_url=user_upload_blob_storage_file_key,
                 )
             )
         except Exception as e:
@@ -72,7 +72,7 @@ async def transcribe_and_generate_llm_output(
                 TranscriptionJob(
                     transcription_id=transcription.id,
                     dialogue_entries=[],
-                    s3_audio_url=user_upload_s3_file_key,
+                    s3_audio_url=user_upload_blob_storage_file_key,
                     error_message=str(e),
                 )
             )

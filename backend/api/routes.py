@@ -87,11 +87,11 @@ async def get_upload_url(
 
 
 async def process_transcription(
-    user_upload_s3_file_key: str, user: User, transcription_id: str | None = None
+    user_upload_blob_storage_file_key: str, user: User, transcription_id: str | None = None
 ) -> None:
     """Parent function that handles the TranscriptionJob state management."""
     await transcribe_and_generate_llm_output(
-        user_upload_s3_file_key, user, transcription_id
+        user_upload_blob_storage_file_key, user, transcription_id
     )
 
 

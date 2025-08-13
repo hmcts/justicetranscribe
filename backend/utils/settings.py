@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str
     AZURE_SPEECH_KEY: str
     AZURE_SPEECH_REGION: str
+    AZURE_GROK_API_KEY: str
+    AZURE_GROK_ENDPOINT: str
     SENTRY_DSN: str
     GOV_NOTIFY_API_KEY: str
     LANGFUSE_PUBLIC_KEY: str

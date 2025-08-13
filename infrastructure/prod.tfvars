@@ -7,6 +7,10 @@ auth_tenant_id = "c6874728-71e6-41fe-a9e1-2e8c36776ad8"
 
 backend_docker_image_tag = "latest"
 
+# Service Plan configuration
+frontend_service_plan_sku = "S2"  # 2 vCPU, 3.5GB RAM for frontend
+backend_service_plan_sku = "S3"   # 4 vCPU, 7GB RAM for backend
+
 # Database configuration - PASSWORD NOW AUTO-GENERATED
 # postgres_admin_password = "CHANGE_ME_SECURE_PASSWORD_123!" # REMOVED - now auto-generated
 

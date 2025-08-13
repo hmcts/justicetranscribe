@@ -21,6 +21,7 @@ class TranscriptionMetadata(BaseModel):
     created_datetime: datetime
     updated_datetime: datetime | None = None
     is_showable_in_ui: bool
+    speakers: list[str] = Field(default_factory=list)
 
     class Config:
         json_encoders: ClassVar[dict] = {datetime: lambda dt: dt.isoformat()}
