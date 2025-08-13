@@ -14,6 +14,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { getFirstName } from "@/lib/utils";
 import { AudioBackup } from "@/lib/indexeddb-backup";
@@ -28,6 +35,7 @@ function WelcomePage() {
     isLoading,
     selectedRecordingMode,
     setSelectedRecordingMode,
+    transcriptsMetadata,
   } = useTranscripts();
 
   const { user } = useUserSettings();
@@ -35,6 +43,7 @@ function WelcomePage() {
   const [showAllMeetings, setShowAllMeetings] = React.useState(false);
   const [retryingBackup, setRetryingBackup] =
     React.useState<AudioBackup | null>(null);
+  const [speakerFilter, setSpeakerFilter] = React.useState<string>("all");
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   const firstName = user?.email
@@ -44,6 +53,23 @@ function WelcomePage() {
   const heading = firstName
     ? `Welcome back ${firstName} 👋`
     : "Welcome back 👋";
+
+  const allSpeakers = React.useMemo(() => {
+    const speakers = new Set<string>();
+    transcriptsMetadata.forEach((transcript) => {
+      transcript.speakers?.forEach((speaker) => speakers.add(speaker));
+    });
+    return Array.from(speakers).sort();
+  }, [transcriptsMetadata]);
+
+  const filteredMeetings = React.useMemo(() => {
+    if (speakerFilter === "all") {
+      return transcriptsMetadata;
+    }
+    return transcriptsMetadata.filter((meeting) =>
+      meeting.speakers.includes(speakerFilter),
+    );
+  }, [transcriptsMetadata, speakerFilter]);
 
   const handleNewMeeting = () => {
     if (isMobile) {
@@ -179,6 +205,34 @@ function WelcomePage() {
         </div>
       )}
 
+      {!showAllMeetings && allSpeakers.length > 0 && (
+        <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="mb-2">
+            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+            <label
+              id="speaker-filter-label"
+              htmlFor="speaker-filter"
+              className="text-sm font-medium text-gray-700"
+            >
+              Filter by Speaker
+            </label>
+          </div>
+          <Select value={speakerFilter} onValueChange={setSpeakerFilter}>
+            <SelectTrigger id="speaker-filter" className="w-full">
+              <SelectValue placeholder="All speakers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All speakers</SelectItem>
+              {allSpeakers.map((speaker) => (
+                <SelectItem key={speaker} value={speaker}>
+                  {speaker}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <BackupRecovery onRetryUpload={handleRetryUpload} />
 
       <MeetingsList
@@ -186,6 +240,7 @@ function WelcomePage() {
         setShowAllMeetings={setShowAllMeetings}
         handleNewMeeting={handleNewMeeting}
         isLoading={isLoading}
+        meetings={filteredMeetings}
       />
     </div>
   );

@@ -16,18 +16,16 @@ function MeetingsList({
   setShowAllMeetings,
   handleNewMeeting,
   isLoading,
+  meetings,
 }: {
   showAllMeetings: boolean;
   setShowAllMeetings: (show: boolean) => void;
   handleNewMeeting: () => void;
   isLoading: boolean;
+  meetings: any[];
 }) {
-  const {
-    transcriptsMetadata,
-    loadTranscription,
-    deleteTranscription,
-    renameTranscription,
-  } = useTranscripts();
+  const { loadTranscription, deleteTranscription, renameTranscription } =
+    useTranscripts();
 
   const [showDeleteModal, setShowDeleteModal] = React.useState<string | null>(
     null,
@@ -37,7 +35,7 @@ function MeetingsList({
   );
   const [renameTitle, setRenameTitle] = React.useState("");
 
-  const sortedMeetings = [...transcriptsMetadata]
+  const sortedMeetings = [...meetings]
     .filter((transcript) => transcript.is_showable_in_ui)
     .sort(
       (a, b) =>
