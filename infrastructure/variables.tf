@@ -154,7 +154,7 @@ variable "postgres_allowed_ips" {
 variable "custom_domain_url" {
   description = "Custom domain URL for allowed redirects and CORS origins"
   type        = string
-  default     = "https://transcribe.justice.gov.uk"
+  default     = "https://transcription.service.justice.gov.uk"
 }
 
 # Service Plan configuration
