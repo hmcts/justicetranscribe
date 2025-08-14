@@ -34,7 +34,7 @@ langfuse_client = Langfuse(
     host="https://cloud.langfuse.com",
     environment=settings_instance.ENVIRONMENT,
 )
-langfuse_client.auth_check()
+# langfuse_client.auth_check()
 langfuse_context.configure(environment=settings_instance.ENVIRONMENT)
 
 

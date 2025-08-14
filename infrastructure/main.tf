@@ -310,6 +310,8 @@ resource "azurerm_linux_web_app" "backend_api" {
       app_settings["LANGFUSE_HOST"],
       app_settings["GOV_NOTIFY_API_KEY"],
       app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
+      app_settings["AZURE_AD_TENANT_ID"],
+      app_settings["AZURE_AD_CLIENT_ID"],
     ]
   }
 
