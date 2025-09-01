@@ -211,8 +211,8 @@ function WelcomePage() {
       {!showAllMeetings && (
         <div className="mb-6 flex justify-center">
           <Button
-            onClick={() => router.push('/onboarding')}
-            className="bg-pink-500 hover:bg-pink-600 text-white px-8 py-4 text-lg font-semibold"
+            onClick={() => router.push("/onboarding")}
+            className="bg-pink-500 px-8 py-4 text-lg font-semibold text-white hover:bg-pink-600"
           >
             Test Onboarding Flow
           </Button>

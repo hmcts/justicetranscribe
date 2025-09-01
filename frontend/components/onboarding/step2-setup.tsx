@@ -9,18 +9,18 @@ interface Step2SetupProps {
   onMinutesChange: (minutes: string) => void;
 }
 
-export default function Step2Setup({ 
-  email, 
-  minutesSpent, 
-  onEmailChange, 
-  onMinutesChange 
+export default function Step2Setup({
+  email,
+  minutesSpent,
+  onEmailChange,
+  onMinutesChange,
 }: Step2SetupProps) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-2xl font-semibold mb-6">Get started</h3>
+        <h3 className="mb-6 text-2xl font-semibold">Get started</h3>
       </div>
-      
+
       <div className="space-y-4">
         <div>
           <Label htmlFor="email" className="text-base font-medium">

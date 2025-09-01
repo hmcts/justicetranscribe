@@ -5,20 +5,20 @@ interface Step5EmailNotificationsProps {
   email: string;
 }
 
-export default function Step5EmailNotifications({ email }: Step5EmailNotificationsProps) {
+export default function Step5EmailNotifications({
+  email,
+}: Step5EmailNotificationsProps) {
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-2">
+      <div className="space-y-2 text-center">
         <h3 className="text-2xl font-semibold">Email notifications</h3>
-        <p>
-          We&apos;ll email you when your summary is ready for review.
-        </p>
+        <p>We&apos;ll email you when your summary is ready for review.</p>
       </div>
 
       {/* Email Display */}
-      <div className="border rounded-lg p-6 bg-gray-50">
+      <div className="rounded-lg border bg-gray-50 p-6">
         <div className="flex items-center space-x-3">
-          <Mail className="w-6 h-6 text-gray-600" />
+          <Mail className="size-6 text-gray-600" />
           <div>
             <p className="font-semibold">Notifications to:</p>
             <p className="text-lg">{email || "your-email@example.com"}</p>
