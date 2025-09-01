@@ -131,9 +131,16 @@ function WelcomePage() {
         ) : (
           <>
             <h1 className="mb-2 text-3xl font-bold">{heading}</h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-4">
               Create a new meeting or continue with a recent one
             </p>
+            {/* Temporary button for testing onboarding flow */}
+            <Button
+              onClick={() => window.location.href = '/onboarding'}
+              className="bg-pink-500 hover:bg-pink-600 mx-auto"
+            >
+              Test Onboarding Flow
+            </Button>
           </>
         )}
       </div>
