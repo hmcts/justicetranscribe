@@ -5,7 +5,7 @@ export default function Step1Welcome() {
     <div className="space-y-6">
       <div className="text-center space-y-4">
         <h2 className="text-3xl font-bold">Welcome to Justice Transcribe</h2>
-        <p className="text-xl text-muted-foreground">
+        <p className="text-xl">
           Spend less time notetaking and more time listening.
         </p>
       </div>
@@ -26,10 +26,10 @@ export default function Step1Welcome() {
       </div>
 
       <div className="bg-gray-50 border-l-4 border-blue-500 p-6 rounded-r-lg">
-        <blockquote className="italic text-gray-700">
+        <blockquote className="italic">
           &quot;I&apos;m spending a lot more time with the people, which is what I wanted to do in the job.&quot;
         </blockquote>
-        <cite className="text-sm text-gray-600 mt-2 block">
+        <cite className="text-sm mt-2 block">
           — Wales Probation Officer
         </cite>
       </div>

@@ -5,7 +5,7 @@ export default function Step6ReviewEdit() {
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-semibold">Review and edit</h3>
-        <p className="text-muted-foreground">
+        <p>
           You need to add your professional judgement to the AI generated summary. 
           You choose what to keep, change, delete and add.
         </p>

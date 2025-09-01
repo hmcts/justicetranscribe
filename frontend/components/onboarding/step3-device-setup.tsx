@@ -8,7 +8,7 @@ export default function Step3DeviceSetup() {
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-semibold">Device setup</h3>
-        <p className="text-muted-foreground">
+        <p>
           Optimise your device for the best recording experience.
         </p>
       </div>
@@ -45,7 +45,7 @@ export default function Step3DeviceSetup() {
       {selectedDevice === "desktop" && (
         <div className="space-y-4">
           <h4 className="text-lg font-semibold">Save as bookmark</h4>
-          <p className="text-muted-foreground">Save as bookmark to find JT easily</p>
+          <p>Save as bookmark to find JT easily</p>
           <div className="space-y-2">
             <div className="flex items-start space-x-3">
               <span className="text-lg">•</span>

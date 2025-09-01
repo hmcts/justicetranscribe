@@ -11,7 +11,7 @@ export default function Step7Ready({ onStartRecording, onNeedHelp }: Step7ReadyP
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-semibold">You&apos;re ready</h3>
-        <p className="text-muted-foreground">
+        <p>
           Start recording and focus on what matters most
         </p>
       </div>
@@ -34,10 +34,10 @@ export default function Step7Ready({ onStartRecording, onNeedHelp }: Step7ReadyP
 
       {/* Quote */}
       <div className="bg-gray-50 border-l-4 border-green-500 p-6 rounded-r-lg">
-        <blockquote className="italic text-gray-700">
+        <blockquote className="italic">
           &quot;The Justice Transcribe AI has been life-saving… the amount of time it saves is invaluable.&quot;
         </blockquote>
-        <cite className="text-sm text-gray-600 mt-2 block">
+        <cite className="text-sm mt-2 block">
           — KSS Probation Service Officer
         </cite>
       </div>

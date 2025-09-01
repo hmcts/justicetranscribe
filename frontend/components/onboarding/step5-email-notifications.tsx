@@ -10,7 +10,7 @@ export default function Step5EmailNotifications({ email }: Step5EmailNotificatio
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-semibold">Email notifications</h3>
-        <p className="text-muted-foreground">
+        <p>
           We&apos;ll email you when your summary is ready for review.
         </p>
       </div>
