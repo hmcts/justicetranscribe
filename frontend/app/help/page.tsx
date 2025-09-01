@@ -78,27 +78,20 @@ export default function HelpPage() {
 
         {/* Individual Sections */}
         <div className="space-y-6">
-          {/* Device Setup */}
+          {/* Mobile Recording Tips */}
           <section className="border rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-2">Device Setup</h3>
+            <h3 className="text-lg font-semibold mb-2">Mobile Recording Tips</h3>
+            <p className="text-muted-foreground mb-4">Keep your recording smooth:</p>
+            
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium mb-2">Desktop</h4>
-                <p className="text-sm text-muted-foreground mb-2">Save as bookmark</p>
-                <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>• Press Ctrl+D (Windows) or Cmd+D (Mac)</li>
-                  <li>• Save to bookmarks bar for quick access</li>
-                  <li>• Use external microphone for better quality</li>
-                </ul>
+                <h4 className="font-medium mb-2">Turn on Do Not Disturb</h4>
+                <p className="text-sm text-muted-foreground">• Stops calls or notifications from cutting your recording.</p>
               </div>
+              
               <div>
-                <h4 className="font-medium mb-2">Mobile</h4>
-                <p className="text-sm text-muted-foreground mb-2">Enable "Do Not Disturb"</p>
-                <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>• Swipe down from top-right corner</li>
-                  <li>• Tap moon icon to enable DND</li>
-                  <li>• Prevents call interruptions during recording</li>
-                </ul>
+                <h4 className="font-medium mb-2">Don't refresh the page</h4>
+                <p className="text-sm text-muted-foreground">• Refreshing ends the recording and you'll lose progress.</p>
               </div>
             </div>
           </section>
