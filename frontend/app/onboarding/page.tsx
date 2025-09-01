@@ -15,7 +15,7 @@ import Step7Ready from "@/components/onboarding/step7-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
 // TODO: Update these placeholder routes once Help page PR is merged
-const HELP_PAGE_ROUTE = "/help";  // Will be updated after Help page PR merge
+const HELP_PAGE_ROUTE = "/help"; // Will be updated after Help page PR merge
 
 const TOTAL_STEPS = 7;
 
@@ -32,9 +32,11 @@ export default function OnboardingPage() {
   // Validation for step 2
   const isStep2Valid = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(formData.email) && 
-           formData.minutesSpent && 
-           parseInt(formData.minutesSpent) > 0;
+    return (
+      emailRegex.test(formData.email) &&
+      formData.minutesSpent &&
+      parseInt(formData.minutesSpent, 10) > 0
+    );
   };
 
   const canContinue = () => {
@@ -47,7 +49,7 @@ export default function OnboardingPage() {
   // Check if user has valid license
   const checkLicense = (email: string) => {
     // Simulate license check - if email is 'fake@fake.com', deny access
-    return email.toLowerCase() !== 'fake@fake.com';
+    return email.toLowerCase() !== "fake@fake.com";
   };
 
   const handleNext = () => {
@@ -55,13 +57,13 @@ export default function OnboardingPage() {
       // Check license after step 2 (Get Started)
       const licenseValid = checkLicense(formData.email);
       setHasValidLicense(licenseValid);
-      
+
       if (!licenseValid) {
         // Don't proceed to step 3, stay on license check fail page
         return;
       }
     }
-    
+
     if (currentStep < TOTAL_STEPS && canContinue()) {
       setCurrentStep(currentStep + 1);
     }
@@ -74,7 +76,7 @@ export default function OnboardingPage() {
   };
 
   const handleStartRecording = () => {
-    router.push("/");  // Return to home to start recording
+    router.push("/"); // Return to home to start recording
   };
 
   const handleNeedHelp = () => {
@@ -84,12 +86,22 @@ export default function OnboardingPage() {
 
   const handleSignUpForEarlyAccess = () => {
     // TODO: Replace with actual early access signup URL
-    window.open('https://example.com/early-access-signup', '_blank');
+    window.open("https://example.com/early-access-signup", "_blank");
   };
 
   const handleBackFromLicenseCheck = () => {
     setHasValidLicense(null);
     // Stay on step 2 to allow user to try different email
+  };
+
+  const getStepClassName = (stepNum: number) => {
+    if (stepNum === currentStep) {
+      return "bg-black text-white";
+    }
+    if (stepNum < currentStep) {
+      return "bg-gray-200";
+    }
+    return "border";
   };
 
   const handleEmailChange = (email: string) => {
@@ -128,7 +140,7 @@ export default function OnboardingPage() {
         return <Step6ReviewEdit />;
       case 7:
         return (
-          <Step7Ready 
+          <Step7Ready
             onStartRecording={handleStartRecording}
             onNeedHelp={handleNeedHelp}
             onBack={handleBack}
@@ -141,42 +153,35 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto max-w-2xl px-4 py-8">
         {/* Progress indicator - Hide when showing license check fail */}
         {hasValidLicense !== false && (
           <div className="mb-8">
             <div className="flex items-center justify-between">
-              {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((stepNum) => (
-                <div
-                  key={stepNum}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    stepNum === currentStep
-                      ? "bg-black text-white"
-                      : stepNum < currentStep
-                      ? "bg-gray-200"
-                      : "border"
-                  }`}
-                >
-                  {stepNum}
-                </div>
-              ))}
+              {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(
+                (stepNum) => (
+                  <div
+                    key={stepNum}
+                    className={`flex size-8 items-center justify-center rounded-full ${getStepClassName(
+                      stepNum,
+                    )}`}
+                  >
+                    {stepNum}
+                  </div>
+                ),
+              )}
             </div>
           </div>
         )}
 
         {/* Step content */}
-        <div className="mb-8">
-          {renderStep()}
-        </div>
+        <div className="mb-8">{renderStep()}</div>
 
         {/* Navigation - Only show for steps 1-6, step 7 has its own buttons, hide for license check fail */}
         {currentStep < 7 && hasValidLicense !== false && (
           <div className="flex justify-between pt-6">
             {currentStep > 1 && (
-              <Button
-                onClick={handleBack}
-                variant="outline"
-              >
+              <Button onClick={handleBack} variant="outline">
                 Back
               </Button>
             )}
@@ -184,7 +189,7 @@ export default function OnboardingPage() {
               <Button
                 onClick={handleNext}
                 disabled={!canContinue()}
-                className={`mx-auto py-6 px-12 text-lg ${!canContinue() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`mx-auto px-12 py-6 text-lg ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
               >
                 Continue
               </Button>
@@ -192,7 +197,7 @@ export default function OnboardingPage() {
               <Button
                 onClick={handleNext}
                 disabled={!canContinue()}
-                className={`ml-auto ${!canContinue() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`ml-auto ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
               >
                 Continue
               </Button>
@@ -203,10 +208,7 @@ export default function OnboardingPage() {
         {/* Back button for license check fail page */}
         {hasValidLicense === false && (
           <div className="flex justify-center pt-6">
-            <Button
-              onClick={handleBackFromLicenseCheck}
-              variant="outline"
-            >
+            <Button onClick={handleBackFromLicenseCheck} variant="outline">
               Try Different Email
             </Button>
           </div>
