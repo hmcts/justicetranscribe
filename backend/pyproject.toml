@@ -62,7 +62,7 @@ fastapi = [
 
 dev = [
     "bumpversion>=0.6.0",
-    "pytest>=8.3.2",
+    "pytest>=8.4.1",
     "pytest-env>=1.1.1",
     "pytest-mock>=3.14.0",
     "pytest-cov>=5.0.0",
