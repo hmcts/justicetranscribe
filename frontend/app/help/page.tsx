@@ -19,32 +19,61 @@ export default function HelpPage() {
           </p>
         </div>
 
-        {/* Tutorial Video Card */}
+        {/* Tutorial Cards */}
         <section className="mb-12">
-          <Card className="group hover:shadow-md transition-shadow max-w-md mx-auto">
-            <CardHeader className="text-center pb-4">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
-                <Play className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
-              </div>
-              <CardTitle className="text-xl">Tutorial Video</CardTitle>
-              <CardDescription>
-                Short video: how to record, label speakers, generate minutes
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-sm text-muted-foreground mb-4">Coming soon</p>
-              <Button 
-                variant="default" 
-                size="lg" 
-                disabled
-                className="w-full"
-                aria-label="Play tutorial video - coming soon"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Play Tutorial
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {/* Basic Tutorial Card */}
+            <Card className="group hover:shadow-md transition-shadow">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
+                  <Play className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-xl">Basic Tutorial</CardTitle>
+                <CardDescription>
+                  Must-know actions to succeed straight away
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-sm text-muted-foreground mb-4">Coming soon</p>
+                <Button 
+                  variant="default" 
+                  size="lg" 
+                  disabled
+                  className="w-full"
+                  aria-label="Play basic tutorial - coming soon"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Play Basic Tutorial
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Advanced Tutorial Card */}
+            <Card className="group hover:shadow-md transition-shadow">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
+                  <Play className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-xl">Advanced Tutorial</CardTitle>
+                <CardDescription>
+                  Time-saving tricks with AI edit for summaries
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-sm text-muted-foreground mb-4">Coming soon</p>
+                <Button 
+                  variant="default" 
+                  size="lg" 
+                  disabled
+                  className="w-full"
+                  aria-label="Play advanced tutorial - coming soon"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Play Advanced Tutorial
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </section>
 
         {/* Individual Sections */}
