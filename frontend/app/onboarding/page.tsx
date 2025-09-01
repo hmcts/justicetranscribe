@@ -144,13 +144,23 @@ export default function OnboardingPage() {
                 Back
               </Button>
             )}
-            <Button
-              onClick={handleNext}
-              disabled={!canContinue()}
-              className={`ml-auto ${!canContinue() ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              Continue
-            </Button>
+            {currentStep === 1 ? (
+              <Button
+                onClick={handleNext}
+                disabled={!canContinue()}
+                className={`mx-auto py-6 px-12 text-lg ${!canContinue() ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Continue
+              </Button>
+            ) : (
+              <Button
+                onClick={handleNext}
+                disabled={!canContinue()}
+                className={`ml-auto ${!canContinue() ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Continue
+              </Button>
+            )}
           </div>
         )}
       </div>

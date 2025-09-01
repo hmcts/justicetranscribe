@@ -29,7 +29,15 @@ export default function Step7Ready({ onStartRecording, onNeedHelp, onBack }: Ste
         </div>
         <div className="flex items-start space-x-3">
           <span className="text-lg">•</span>
-          <span>Review and edit summaries to add your professional judgement</span>
+          <span>
+            Review and edit summaries to add your professional judgement -{" "}
+            <button
+              onClick={onNeedHelp}
+              className="text-blue-600 hover:underline"
+            >
+              Need help? Visit support
+            </button>
+          </span>
         </div>
       </div>
 
@@ -44,7 +52,7 @@ export default function Step7Ready({ onStartRecording, onNeedHelp, onBack }: Ste
       </div>
 
       {/* Action Buttons */}
-      <div className="space-y-4 pt-4">
+      <div className="space-y-6 pt-4">
         <div className="flex justify-between items-center">
           <Button 
             onClick={onBack}
@@ -53,20 +61,15 @@ export default function Step7Ready({ onStartRecording, onNeedHelp, onBack }: Ste
             Back
           </Button>
           
-          <Button 
-            onClick={onStartRecording}
-            className="bg-black text-white hover:bg-black/90 py-6 text-lg px-8"
-          >
-            Start first recording
-          </Button>
+          <div className="flex-1 flex justify-center">
+            <Button 
+              onClick={onStartRecording}
+              className="bg-black text-white hover:bg-black/90 py-6 text-lg px-12"
+            >
+              Start first recording
+            </Button>
+          </div>
         </div>
-        
-        <button
-          onClick={onNeedHelp}
-          className="w-full text-center text-blue-600 hover:underline py-2"
-        >
-          Need help? Visit support
-        </button>
       </div>
     </div>
   );

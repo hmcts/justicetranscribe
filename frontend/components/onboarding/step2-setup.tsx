@@ -17,6 +17,10 @@ export default function Step2Setup({
 }: Step2SetupProps) {
   return (
     <div className="space-y-6">
+      <div className="text-center">
+        <h3 className="text-2xl font-semibold mb-6">Get started</h3>
+      </div>
+      
       <div className="space-y-4">
         <div>
           <Label htmlFor="email" className="text-base font-medium">
