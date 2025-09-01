@@ -46,8 +46,8 @@ export default function OnboardingPage() {
 
   // Check if user has valid license
   const checkLicense = (email: string) => {
-    // Simulate license check - if email is 'fake', deny access
-    return email.toLowerCase() !== 'fake';
+    // Simulate license check - if email is 'fake@fake.com', deny access
+    return email.toLowerCase() !== 'fake@fake.com';
   };
 
   const handleNext = () => {
