@@ -6,7 +6,7 @@
 /* eslint-disable react/react-in-jsx-scope */
 import Link from "next/link";
 import { useTranscripts } from "@/providers/transcripts";
-import { Home, ChevronLeft, ChevronRight } from "lucide-react";
+import { Home, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +92,15 @@ export default function Header({ className }: { className?: string }) {
               <Home className="mr-1 size-4" />
               <span className="text-sm">Home</span>
             </button>
+            <Link
+              href="/help"
+              className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
+              aria-label="Go to help"
+              title="Go to help"
+            >
+              <HelpCircle className="mr-1 size-4" />
+              <span className="text-sm">Help</span>
+            </Link>
           </div>
         )}
       </div>
