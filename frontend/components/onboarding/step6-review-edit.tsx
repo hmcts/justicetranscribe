@@ -20,12 +20,6 @@ export default function Step6ReviewEdit() {
           <p className="leading-relaxed">
             Sometimes AI will be wrong for example the name sounding Louwee could be spelt Louis or Louie.
           </p>
-
-          <div className="space-y-2">
-            <p>Add the observations not captured in audio</p>
-            <p>Remove irrelevant information</p>
-            <p>Your professional judgement completes the picture</p>
-          </div>
         </div>
 
         {/* Image */}
@@ -34,7 +28,7 @@ export default function Step6ReviewEdit() {
             src="/Probation Officer reading.png"
             alt="Probation officer reading and reviewing documents"
             className="rounded-2xl max-w-full h-auto object-cover"
-            style={{ maxHeight: "400px", width: "auto" }}
+            style={{ maxHeight: "500px", width: "auto" }}
           />
         </div>
       </div>

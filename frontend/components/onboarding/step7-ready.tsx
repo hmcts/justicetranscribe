@@ -29,15 +29,16 @@ export default function Step7Ready({ onStartRecording, onNeedHelp, onBack }: Ste
         </div>
         <div className="flex items-start space-x-3">
           <span className="text-lg">•</span>
-          <span>
-            Review and edit summaries to add your professional judgement -{" "}
-            <button
-              onClick={onNeedHelp}
-              className="text-blue-600 hover:underline"
-            >
-              Need help? Visit support
-            </button>
-          </span>
+          <span>Review and edit summaries to add your professional judgement</span>
+        </div>
+        <div className="flex items-start space-x-3">
+          <span className="text-lg">•</span>
+          <button
+            onClick={onNeedHelp}
+            className="text-blue-600 hover:underline text-left"
+          >
+            Need help? Visit support
+          </button>
         </div>
       </div>
 
