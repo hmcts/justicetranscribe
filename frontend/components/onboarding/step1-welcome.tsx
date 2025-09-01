@@ -43,7 +43,7 @@ export default function Step1Welcome() {
         <div className="flex justify-center lg:justify-end">
           <div className="relative">
             <img
-              src="/images/probation-officer-listening.jpg"
+              src="/Probation officer listening.png"
               alt="Probation officer listening attentively to client"
               className="rounded-2xl shadow-2xl max-w-full h-auto object-cover"
               style={{ maxHeight: "400px", width: "auto" }}
