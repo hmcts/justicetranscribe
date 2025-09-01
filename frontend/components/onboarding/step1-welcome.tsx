@@ -45,7 +45,7 @@ export default function Step1Welcome() {
             <img
               src="/Probation officer listening.png"
               alt="Probation officer listening attentively to client"
-              className="rounded-2xl shadow-2xl max-w-full h-auto object-cover"
+              className="rounded-2xl max-w-full h-auto object-cover"
               style={{ maxHeight: "400px", width: "auto" }}
             />
           </div>
