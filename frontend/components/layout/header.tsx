@@ -51,7 +51,7 @@ export default function Header({ className }: { className?: string }) {
                 rel="noopener noreferrer"
               >
                 <img
-                  src="/2.png"
+                  src="/justice-ai-logo-bnw.png"
                   width="160"
                   height="100"
                   alt="Justice AI"
