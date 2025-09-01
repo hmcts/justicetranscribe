@@ -80,20 +80,12 @@ export default function HelpPage() {
         <div className="space-y-6">
           {/* Mobile Recording Tips */}
           <section className="border rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-2">Mobile Recording Tips</h3>
-            <p className="text-muted-foreground mb-4">Keep your recording smooth:</p>
-            
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-2">Turn on Do Not Disturb</h4>
-                <p className="text-sm text-muted-foreground">• Stops calls or notifications from cutting your recording.</p>
-              </div>
-              
-              <div>
-                <h4 className="font-medium mb-2">Don't refresh the page</h4>
-                <p className="text-sm text-muted-foreground">• Refreshing ends the recording and you'll lose progress.</p>
-              </div>
-            </div>
+            <h3 className="text-lg font-semibold mb-4">Before you start recording on mobile</h3>
+            <p className="text-muted-foreground mb-3">Do these two things to avoid losing your recording:</p>
+            <ol className="text-muted-foreground space-y-2 ml-6 list-decimal">
+              <li>Turn on Do Not Disturb to stop calls or notifications from interrupting.</li>
+              <li>Don't refresh the page as this will delete your recording.</li>
+            </ol>
           </section>
 
           {/* Need additional support */}
