@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, RotateCcw, Users, Shield, FileText, ExternalLink } from "lucide-react";
+import { Play, RotateCcw, Users, Shield, FileText, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,24 +9,6 @@ import { cn } from "@/lib/utils";
 export default function HelpPage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Breadcrumb Navigation */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-3">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Link 
-              href="/" 
-              className="flex items-center hover:text-foreground transition-colors"
-              aria-label="Go back to home"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Home
-            </Link>
-            <span>/</span>
-            <span className="text-foreground font-medium">Help</span>
-          </nav>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Page Header */}
