@@ -14,7 +14,7 @@ export default function HelpPage() {
         {/* Page Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold tracking-tight mb-4">Help</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-xl max-w-2xl mx-auto">
             Get started with Justice Transcribe
           </p>
         </div>
@@ -81,8 +81,8 @@ export default function HelpPage() {
           {/* Mobile Recording Tips */}
           <section className="border rounded-lg p-6">
             <h3 className="text-lg font-semibold mb-4">Before you start recording on mobile</h3>
-            <p className="text-muted-foreground mb-3">Do these two things to avoid losing your recording:</p>
-            <ol className="text-muted-foreground space-y-2 ml-6 list-decimal">
+            <p className="mb-3">Do these two things to avoid losing your recording:</p>
+            <ol className="space-y-2 ml-6 list-decimal">
               <li>Turn on Do Not Disturb to stop calls or notifications from interrupting.</li>
               <li>Don't refresh the page as this will delete your recording.</li>
             </ol>
@@ -91,7 +91,7 @@ export default function HelpPage() {
           {/* Need additional support */}
           <section className="border rounded-lg p-6">
             <h3 className="text-lg font-semibold mb-2">Need additional support?</h3>
-            <p className="text-muted-foreground mb-3">
+            <p className="mb-3">
               Join our Microsoft Teams channel for real-time assistance from our support team.
             </p>
             <Button 
@@ -112,7 +112,7 @@ export default function HelpPage() {
           {/* Policies & Guidelines */}
           <section className="border rounded-lg p-6">
             <h3 className="text-lg font-semibold mb-2">Policies & Guidelines</h3>
-            <p className="text-muted-foreground mb-3">
+            <p className="mb-3">
               Review our organization's AI usage policies and best practices.
             </p>
             <Button 
@@ -133,7 +133,7 @@ export default function HelpPage() {
           {/* Probation Information Flyer */}
           <section className="border rounded-lg p-6">
             <h3 className="text-lg font-semibold mb-2">Probation Information Flyer</h3>
-            <p className="text-muted-foreground mb-3">
+            <p className="mb-3">
               Share this flyer with people on probation. It explains how our AI system works and our data compliance approach.
             </p>
             <Button 
