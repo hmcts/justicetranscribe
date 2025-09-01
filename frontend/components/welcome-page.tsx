@@ -136,6 +136,7 @@ function WelcomePage() {
             <p className="text-gray-600">
               Create a new meeting or continue with a recent one
             </p>
+            rd
           </>
         )}
       </div>

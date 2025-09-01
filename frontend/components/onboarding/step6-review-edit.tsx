@@ -42,21 +42,23 @@ export default function Step6ReviewEdit() {
 
         {showExample && (
           <div className="mt-4 space-y-4">
-            <p className="text-sm leading-relaxed">
-              AI can sometimes mishear things, such as names. For example, Louee
-              might actually be Louis or Louie. Always check and correct these
-              before finalising.
-            </p>
+            <div className="space-y-2 text-sm text-gray-700">
+              <p>• Verify names, pronouns, places, and acronyms.</p>
+              <p>• Add missing specifics (risk-relevant facts, DOBs).</p>
+              <p>• Stay under 4,000 characters for NDelius.</p>
+              <p className="font-medium">
+                You are the author! Don&apos;t copy and paste without review.
+              </p>
+            </div>
 
             {/* Placeholder Video */}
             <div className="rounded-lg bg-gray-100 p-6 text-center">
               <div className="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-blue-600">
                 <Play className="ml-1 size-5 text-white" />
               </div>
-              <h4 className="mb-1 font-medium">Example Edits Video</h4>
+              <h4 className="mb-1 font-medium">How to make edits</h4>
               <p className="text-xs text-gray-600">
-                Watch examples of common AI corrections and professional
-                judgement additions
+                Watch how to adjust these using the tool
               </p>
             </div>
           </div>

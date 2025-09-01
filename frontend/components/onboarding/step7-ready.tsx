@@ -26,50 +26,52 @@ export default function Step7Ready({
       <div className="space-y-6">
         {/* Step 1 */}
         <div className="flex items-start space-x-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-            <Mic className="h-5 w-5 text-blue-600" />
+          <div className="flex size-10 items-center justify-center rounded-full bg-blue-100">
+            <Mic className="size-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-semibold text-lg">Record the session</h4>
+            <h4 className="text-lg font-semibold">Record the session</h4>
             <p className="text-gray-600">
-              Click start and stop on your work mobile or laptop. You can also dictate after a session if recording isn&apos;t appropriate.
+              Click start and stop on your work mobile or laptop. You can also
+              dictate after a session if recording isn&apos;t appropriate.
             </p>
           </div>
         </div>
 
         {/* Step 2 */}
         <div className="flex items-start space-x-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
-            <Mail className="h-5 w-5 text-green-600" />
+          <div className="flex size-10 items-center justify-center rounded-full bg-green-100">
+            <Mail className="size-5 text-green-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-semibold text-lg">We&apos;ll email when it&apos;s ready</h4>
-            <p className="text-gray-600">
-              Open the summary from your inbox.
-            </p>
+            <h4 className="text-lg font-semibold">
+              We&apos;ll email when it&apos;s ready
+            </h4>
+            <p className="text-gray-600">Open the summary from your inbox.</p>
           </div>
         </div>
 
         {/* Step 3 */}
         <div className="flex items-start space-x-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
-            <Edit className="h-5 w-5 text-orange-600" />
+          <div className="flex size-10 items-center justify-center rounded-full bg-orange-100">
+            <Edit className="size-5 text-orange-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-semibold text-lg">Review & edit</h4>
+            <h4 className="text-lg font-semibold">Review & edit</h4>
             <p className="text-gray-600">
-              Add your professional judgement and correct anything the AI misheard or missed
+              Add your professional judgement and correct anything the AI
+              misheard or missed
             </p>
           </div>
         </div>
 
         {/* Step 4 */}
         <div className="flex items-start space-x-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100">
-            <Copy className="h-5 w-5 text-purple-600" />
+          <div className="flex size-10 items-center justify-center rounded-full bg-purple-100">
+            <Copy className="size-5 text-purple-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-semibold text-lg">Copy and paste 🎉</h4>
+            <h4 className="text-lg font-semibold">Copy and paste 🎉</h4>
             <p className="text-gray-600">
               You&apos;re all set to create professional case notes in minutes.
             </p>
@@ -92,10 +94,14 @@ export default function Step7Ready({
       <div className="space-y-6 pt-4">
         {/* Back button positioned absolutely left */}
         <div className="relative">
-          <Button onClick={onBack} variant="outline" className="absolute left-0">
+          <Button
+            onClick={onBack}
+            variant="outline"
+            className="absolute left-0"
+          >
             Back
           </Button>
-          
+
           {/* Centered main action */}
           <div className="flex justify-center">
             <Button
@@ -106,13 +112,13 @@ export default function Step7Ready({
             </Button>
           </div>
         </div>
-        
+
         {/* Help Link - Centered */}
         <div className="flex justify-center">
           <button
             type="button"
             onClick={onNeedHelp}
-            className="text-blue-600 hover:underline text-sm"
+            className="text-sm text-blue-600 hover:underline"
           >
             Questions? We&apos;re here to help
           </button>
