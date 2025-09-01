@@ -33,13 +33,12 @@ export default function HelpPage() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold tracking-tight mb-4">Help</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Get started with AI transcription
+            Get started with Justice Transcribe
           </p>
         </div>
 
         {/* Get Started Section */}
         <section className="mb-12">
-          <h2 className="text-2xl font-semibold mb-6 text-center">Get Started</h2>
           <div className="grid md:grid-cols-2 gap-6">
             {/* Tutorial Video Card */}
             <Card className="group hover:shadow-md transition-shadow">
@@ -64,9 +63,6 @@ export default function HelpPage() {
                   <Play className="w-4 h-4 mr-2" />
                   Play Tutorial
                 </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  We'll notify you when the video is ready
-                </p>
               </CardContent>
             </Card>
 
