@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button";
 interface Step7ReadyProps {
   onStartRecording: () => void;
   onNeedHelp: () => void;
+  onBack: () => void;
 }
 
-export default function Step7Ready({ onStartRecording, onNeedHelp }: Step7ReadyProps) {
+export default function Step7Ready({ onStartRecording, onNeedHelp, onBack }: Step7ReadyProps) {
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h3 className="text-2xl font-semibold">You&apos;re ready</h3>
         <p>
-          Start recording and focus on what matters most
+          Start today to spend less time note taking and more time listening
         </p>
       </div>
 
@@ -44,12 +45,21 @@ export default function Step7Ready({ onStartRecording, onNeedHelp }: Step7ReadyP
 
       {/* Action Buttons */}
       <div className="space-y-4 pt-4">
-        <Button 
-          onClick={onStartRecording}
-          className="w-full bg-black text-white hover:bg-black/90 py-6 text-lg"
-        >
-          Start first recording
-        </Button>
+        <div className="flex justify-between items-center">
+          <Button 
+            onClick={onBack}
+            variant="outline"
+          >
+            Back
+          </Button>
+          
+          <Button 
+            onClick={onStartRecording}
+            className="bg-black text-white hover:bg-black/90 py-6 text-lg px-8"
+          >
+            Start first recording
+          </Button>
+        </div>
         
         <button
           onClick={onNeedHelp}

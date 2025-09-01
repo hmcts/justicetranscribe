@@ -97,6 +97,7 @@ export default function OnboardingPage() {
           <Step7Ready 
             onStartRecording={handleStartRecording}
             onNeedHelp={handleNeedHelp}
+            onBack={handleBack}
           />
         );
       default:

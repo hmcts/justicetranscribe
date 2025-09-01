@@ -6,9 +6,6 @@ export default function Step1Welcome() {
       {/* Header and Description - Single Column */}
       <div className="text-center space-y-8">
         <h2 className="text-4xl font-bold tracking-tight">Welcome to Justice Transcribe</h2>
-        <p className="text-2xl font-light text-gray-900 max-w-2xl mx-auto">
-          Spend less time notetaking and more time listening.
-        </p>
         <p className="text-lg leading-relaxed text-gray-900 max-w-3xl mx-auto">
           Justice Transcribe is an AI assistant that transcribes and summarises meetings. 
           Turning conversations into clear case notes in minutes so you can stay fully present with people.

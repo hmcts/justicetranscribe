@@ -27,19 +27,19 @@ export default function Step4BasicTutorial() {
       {/* Steps */}
       <div className="space-y-3">
         <div className="flex items-start space-x-3">
-          <span className="text-lg">•</span>
+          <span className="text-lg font-semibold">1.</span>
           <span>Click start new meeting and select in person or virtual meeting</span>
         </div>
         <div className="flex items-start space-x-3">
-          <span className="text-lg">•</span>
+          <span className="text-lg font-semibold">2.</span>
           <span>Give permission to use your microphone</span>
         </div>
         <div className="flex items-start space-x-3">
-          <span className="text-lg">•</span>
+          <span className="text-lg font-semibold">3.</span>
           <span>Click start recording</span>
         </div>
         <div className="flex items-start space-x-3">
-          <span className="text-lg">•</span>
+          <span className="text-lg font-semibold">4.</span>
           <span>Click stop recording</span>
         </div>
       </div>
