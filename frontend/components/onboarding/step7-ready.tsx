@@ -17,7 +17,7 @@ export default function Step7Ready({
     <div className="space-y-8">
       <div className="space-y-2 text-center">
         <h3 className="text-[2.625rem] font-semibold">You&apos;re ready 🎉</h3>
-        <p>
+        <p className="text-black">
           Start today to spend less time note taking and more time listening
         </p>
       </div>
@@ -30,8 +30,8 @@ export default function Step7Ready({
             <Mic className="size-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h4 className="text-lg font-semibold">Record the session</h4>
-            <p className="text-gray-600">
+            <h4 className="text-lg font-semibold text-black">Record the session</h4>
+            <p className="text-black">
               Click start and stop on your work mobile or laptop. You can also
               dictate after a session if recording isn&apos;t appropriate.
             </p>
@@ -44,10 +44,10 @@ export default function Step7Ready({
             <Mail className="size-5 text-green-600" />
           </div>
           <div className="flex-1">
-            <h4 className="text-lg font-semibold">
+            <h4 className="text-lg font-semibold text-black">
               We&apos;ll email when it&apos;s ready
             </h4>
-            <p className="text-gray-600">Open the summary from your inbox.</p>
+            <p className="text-black">Open the summary from your inbox.</p>
           </div>
         </div>
 
@@ -57,8 +57,8 @@ export default function Step7Ready({
             <Edit className="size-5 text-orange-600" />
           </div>
           <div className="flex-1">
-            <h4 className="text-lg font-semibold">Review & edit</h4>
-            <p className="text-gray-600">
+            <h4 className="text-lg font-semibold text-black">Review & edit</h4>
+            <p className="text-black">
               Add your professional judgement and correct anything the AI
               misheard or missed
             </p>
@@ -71,8 +71,8 @@ export default function Step7Ready({
             <Copy className="size-5 text-purple-600" />
           </div>
           <div className="flex-1">
-            <h4 className="text-lg font-semibold">Copy and paste 🎉</h4>
-            <p className="text-gray-600">
+            <h4 className="text-lg font-semibold text-black">Copy and paste 🎉</h4>
+            <p className="text-black">
               You&apos;re all set to create professional case notes in minutes.
             </p>
           </div>

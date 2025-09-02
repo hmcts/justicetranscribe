@@ -4,8 +4,8 @@ import { Play } from "lucide-react";
 export default function Step6ReviewEdit() {
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div className="text-center space-y-4">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="text-center space-y-2">
         <h3 className="text-[2.625rem] font-semibold">Review and edit</h3>
         <h4 className="text-xl font-medium bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
           Your professional judgement is key
@@ -13,9 +13,9 @@ export default function Step6ReviewEdit() {
       </div>
 
       {/* Main Content */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         <p className="leading-relaxed text-black">
-          The AI summary is only a starting point. It captures what was said but it does not see body language, observations or understand the wider context. Edit the summary to make sure its accurate and useful.
+          The AI summary is only a starting point. It captures what was said but it does not see body language, observations or understand the wider context.
         </p>
       </div>
 
@@ -39,9 +39,6 @@ export default function Step6ReviewEdit() {
             <p>• Verify names, pronouns, places, and acronyms.</p>
             <p>• Add missing specifics (risk-relevant facts, DOBs).</p>
             <p>• Stay under 4,000 characters for NDelius.</p>
-            <p className="font-medium">
-              You are the author! Don&apos;t copy and paste without review.
-            </p>
           </div>
         </div>
       </div>
