@@ -7,9 +7,9 @@ export default function Step3DeviceSetup() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5 md:space-y-6 lg:space-y-8 xl:space-y-10">
       <div className="space-y-2 text-center">
-        <h3 className="text-[2.625rem] font-semibold">Device setup</h3>
+        <h3 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-semibold">Device setup</h3>
         <p>Optimise your device for the best recording experience.</p>
       </div>
 
@@ -47,7 +47,7 @@ export default function Step3DeviceSetup() {
       {selectedDevice === "desktop" && (
         <div className="space-y-4">
           <h4 className="text-lg font-semibold">
-            Bookmark {" "}
+            Bookmark{" "}
             <a
               href="https://transcription.service.justice.gov.uk/"
               target="_blank"

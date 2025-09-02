@@ -5,7 +5,7 @@ export default function Step1Welcome() {
     <div className="space-y-12">
       {/* Header and Description - Single Column */}
       <div className="space-y-8 text-center">
-        <h2 className="text-[2.625rem] font-bold tracking-tight">Welcome 👋</h2>
+        <h2 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-bold tracking-tight">Welcome 👋</h2>
         <p className="mx-auto max-w-3xl text-lg leading-relaxed text-gray-900">
           Justice Transcribe is an AI assistant that transcribes and summarises
           meetings. Turning conversations into clear case notes in minutes so

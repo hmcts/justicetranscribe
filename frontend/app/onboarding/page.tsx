@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
@@ -28,6 +28,11 @@ export default function OnboardingPage() {
     minutesSpent: "",
     acceptedPrivacy: false,
   });
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
 
   // Validation for step 2
   const isStep2Valid = () => {
@@ -151,10 +156,10 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-2xl px-4 py-8">
+      <div className="container mx-auto max-w-2xl px-4 pt-6 pb-12 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
         {/* Progress indicator - Hide when showing license check fail */}
         {hasValidLicense !== false && (
-          <div className="mb-8">
+          <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
             <div className="flex items-center justify-between">
               {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(
                 (stepNum) => (
@@ -173,11 +178,13 @@ export default function OnboardingPage() {
         )}
 
         {/* Step content */}
-        <div className="mb-8">{renderStep()}</div>
+        <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
+          {renderStep()}
+        </div>
 
         {/* Navigation - Only show for steps 1-5, step 6 has its own buttons, hide for license check fail */}
         {currentStep < 6 && hasValidLicense !== false && (
-          <div className="flex justify-between pt-6">
+          <div className="flex justify-between pt-4 sm:pt-5 md:pt-6 lg:pt-8 xl:pt-10">
             {currentStep > 1 && (
               <Button onClick={handleBack} variant="outline">
                 Back
@@ -205,7 +212,7 @@ export default function OnboardingPage() {
 
         {/* Back button for license check fail page */}
         {hasValidLicense === false && (
-          <div className="flex justify-center pt-6">
+          <div className="flex justify-center pt-4 sm:pt-5 md:pt-6 lg:pt-8 xl:pt-10">
             <Button onClick={handleBackFromLicenseCheck} variant="outline">
               Try Different Email
             </Button>

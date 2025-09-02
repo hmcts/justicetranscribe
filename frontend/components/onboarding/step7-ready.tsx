@@ -16,7 +16,7 @@ export default function Step7Ready({
   return (
     <div className="space-y-8">
       <div className="space-y-2 text-center">
-        <h3 className="text-[2.625rem] font-semibold">You&apos;re ready 🎉</h3>
+        <h3 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-semibold">You&apos;re ready 🎉</h3>
         <p className="text-black">
           Start today to spend less time note taking and more time listening
         </p>
@@ -30,7 +30,9 @@ export default function Step7Ready({
             <Mic className="size-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h4 className="text-lg font-semibold text-black">Record the session</h4>
+            <h4 className="text-lg font-semibold text-black">
+              Record the session
+            </h4>
             <p className="text-black">
               Click start and stop on your work mobile or laptop. You can also
               dictate after a session if recording isn&apos;t appropriate.
@@ -71,7 +73,9 @@ export default function Step7Ready({
             <Copy className="size-5 text-purple-600" />
           </div>
           <div className="flex-1">
-            <h4 className="text-lg font-semibold text-black">Copy and paste 🎉</h4>
+            <h4 className="text-lg font-semibold text-black">
+              Copy and paste 🎉
+            </h4>
             <p className="text-black">
               You&apos;re all set to create professional case notes in minutes.
             </p>

@@ -2,12 +2,11 @@ import React from "react";
 import { Play } from "lucide-react";
 
 export default function Step6ReviewEdit() {
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="text-center space-y-2">
-        <h3 className="text-[2.625rem] font-semibold">Review and edit</h3>
-        <h4 className="text-xl font-medium bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+      <div className="space-y-2 text-center">
+        <h3 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-semibold">Review and edit</h3>
+        <h4 className="bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-xl font-medium text-transparent">
           Your professional judgement is key
         </h4>
       </div>
@@ -15,7 +14,9 @@ export default function Step6ReviewEdit() {
       {/* Main Content */}
       <div className="space-y-4">
         <p className="leading-relaxed text-black">
-          The AI summary is only a starting point. It captures what was said but it does not see body language, observations or understand the wider context.
+          The AI summary is only a starting point. It captures what was said but
+          it does not see body language, observations or understand the wider
+          context.
         </p>
       </div>
 
@@ -34,7 +35,9 @@ export default function Step6ReviewEdit() {
 
         {/* Right Column - Examples */}
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold text-black">Examples of common edits needed</h4>
+          <h4 className="text-lg font-semibold text-black">
+            Common edits needed
+          </h4>
           <div className="space-y-2 text-black">
             <p>• Verify names, pronouns, places, and acronyms.</p>
             <p>• Add missing specifics (risk-relevant facts, DOBs).</p>
