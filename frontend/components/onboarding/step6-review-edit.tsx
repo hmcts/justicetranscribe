@@ -5,7 +5,9 @@ export default function Step6ReviewEdit() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="space-y-2 text-center">
-        <h3 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-semibold">Review and edit</h3>
+        <h3 className="text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
+          Review and edit
+        </h3>
         <h4 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
           Your professional judgement is key
         </h4>
@@ -13,8 +15,9 @@ export default function Step6ReviewEdit() {
 
       {/* Main Content */}
       <div className="space-y-4">
-        <p className="leading-relaxed text-black text-center">
-          The AI summary is only a starting point. Use your professional judgement to finalise summaries.
+        <p className="text-center leading-relaxed text-black">
+          The AI summary is only a starting point. Use your professional
+          judgement to finalise summaries.
         </p>
       </div>
 
@@ -33,24 +36,24 @@ export default function Step6ReviewEdit() {
 
         {/* Checklist Section */}
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold text-black text-center">
+          <h4 className="text-center text-lg font-semibold text-black">
             Common corrections
           </h4>
-          <div className="space-y-3 text-black max-w-lg mx-auto">
+          <div className="mx-auto max-w-lg space-y-3 text-black">
             <div className="flex items-start space-x-3">
-              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <Check className="mt-0.5 size-5 shrink-0 text-green-600" />
               <p>Verify names, pronouns, places, and acronyms.</p>
             </div>
             <div className="flex items-start space-x-3">
-              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <Check className="mt-0.5 size-5 shrink-0 text-green-600" />
               <p>Add missing specifics (risk-relevant facts, DOBs).</p>
             </div>
             <div className="flex items-start space-x-3">
-              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <Check className="mt-0.5 size-5 shrink-0 text-green-600" />
               <p>Stay under 4,000 characters for NDelius.</p>
             </div>
             <div className="flex items-start space-x-3">
-              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <Check className="mt-0.5 size-5 shrink-0 text-green-600" />
               <p>Describe body language, observations and wider context.</p>
             </div>
           </div>

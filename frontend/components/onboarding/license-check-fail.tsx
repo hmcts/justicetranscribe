@@ -22,7 +22,8 @@ export default function LicenseCheckFail() {
           </p>
 
           <p className="text-lg leading-relaxed text-gray-700">
-            If you&apos;re wanting early access, click below to join our waiting list.
+            If you&apos;re wanting early access, click below to join our waiting
+            list.
           </p>
         </div>
       </div>
@@ -32,9 +33,9 @@ export default function LicenseCheckFail() {
           onClick={handleSignUp}
           disabled={isSubmitted}
           className={`px-8 py-6 text-lg font-semibold transition-all ${
-            isSubmitted 
-              ? "bg-green-600 text-white cursor-default" 
-              : "bg-blue-600 hover:bg-blue-700 text-white"
+            isSubmitted
+              ? "cursor-default bg-green-600 text-white"
+              : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
         >
           {isSubmitted ? "You've signed up" : "Join the waiting list"}
