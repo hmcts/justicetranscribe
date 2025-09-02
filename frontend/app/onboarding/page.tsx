@@ -151,7 +151,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-2xl px-4 py-8">
+      <div className="container mx-auto max-w-[90rem] px-4 py-8">
         {/* Progress indicator - Hide when showing license check fail */}
         {hasValidLicense !== false && (
           <div className="mb-8">
