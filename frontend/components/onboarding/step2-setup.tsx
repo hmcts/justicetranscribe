@@ -41,11 +41,11 @@ export default function Step2Setup({
           />
         </div>
 
-        <div>
-          <Label className="text-base font-medium mb-3 block">
+        <fieldset>
+          <legend className="text-base font-medium mb-3 block">
             Please estimate your usual time to write a CRISSA note:
-          </Label>
-          <div className="space-y-3">
+          </legend>
+          <div className="space-y-3" role="radiogroup" aria-labelledby="crissa-time-legend">
             {[
               { value: "<5", label: "<5 min" },
               { value: "5-10", label: "5–10 min" },
@@ -53,7 +53,7 @@ export default function Step2Setup({
               { value: "21-30", label: "21–30 min" },
               { value: ">30", label: ">30 min" },
               { value: "n/a", label: "N/A" }
-            ].map((option) => (
+            ].map((option, index) => (
               <div key={option.value} className="flex items-center space-x-3">
                 <input
                   type="radio"
@@ -62,21 +62,27 @@ export default function Step2Setup({
                   value={option.value}
                   checked={crissaTime === option.value}
                   onChange={(e) => onCrissaTimeChange(e.target.value)}
-                  className="size-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="size-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  tabIndex={0}
+                  aria-describedby={`crissa-${option.value}-label`}
                 />
-                <Label htmlFor={`crissa-${option.value}`} className="text-sm font-normal cursor-pointer">
+                <Label 
+                  htmlFor={`crissa-${option.value}`} 
+                  id={`crissa-${option.value}-label`}
+                  className="text-sm font-normal cursor-pointer hover:text-blue-600 transition-colors select-none"
+                >
                   {option.label}
                 </Label>
               </div>
             ))}
           </div>
-        </div>
+        </fieldset>
 
-        <div>
-          <Label className="text-base font-medium mb-3 block">
+        <fieldset>
+          <legend className="text-base font-medium mb-3 block">
             In a typical week, how many appointments with People on Probation do you have?
-          </Label>
-          <div className="space-y-3">
+          </legend>
+          <div className="space-y-3" role="radiogroup" aria-labelledby="appointments-legend">
             {[
               { value: "0", label: "0" },
               { value: "1-5", label: "1–5" },
@@ -86,7 +92,7 @@ export default function Step2Setup({
               { value: "31-40", label: "31–40" },
               { value: "41+", label: "41+" },
               { value: "n/a", label: "N/A (I don't meet PoP in my role)" }
-            ].map((option) => (
+            ].map((option, index) => (
               <div key={option.value} className="flex items-center space-x-3">
                 <input
                   type="radio"
@@ -95,15 +101,21 @@ export default function Step2Setup({
                   value={option.value}
                   checked={appointmentsPerWeek === option.value}
                   onChange={(e) => onAppointmentsChange(e.target.value)}
-                  className="size-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="size-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  tabIndex={0}
+                  aria-describedby={`appointments-${option.value}-label`}
                 />
-                <Label htmlFor={`appointments-${option.value}`} className="text-sm font-normal cursor-pointer">
+                <Label 
+                  htmlFor={`appointments-${option.value}`} 
+                  id={`appointments-${option.value}-label`}
+                  className="text-sm font-normal cursor-pointer hover:text-blue-600 transition-colors select-none"
+                >
                   {option.label}
                 </Label>
               </div>
             ))}
           </div>
-        </div>
+        </fieldset>
       </div>
     </div>
   );
