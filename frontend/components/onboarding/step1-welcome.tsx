@@ -1,6 +1,11 @@
 import React from "react";
+import { Button } from "@/components/ui/button";
 
-export default function Step1Welcome() {
+interface Step1WelcomeProps {
+  onNoAuth?: () => void;
+}
+
+export default function Step1Welcome({ onNoAuth }: Step1WelcomeProps) {
   return (
     <div className="space-y-12">
       {/* Header and Description - Single Column */}
@@ -38,6 +43,18 @@ export default function Step1Welcome() {
           </div>
         </div>
       </div>
+
+      {/* No Auth Button */}
+      {onNoAuth && (
+        <div className="flex justify-center">
+          <Button
+            onClick={onNoAuth}
+            className="bg-pink-500 text-white hover:bg-pink-600 px-6 py-2"
+          >
+            no auth
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

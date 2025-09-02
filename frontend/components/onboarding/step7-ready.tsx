@@ -117,16 +117,7 @@ export default function Step7Ready({
           </div>
         </div>
 
-        {/* Help Link - Centered */}
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={onNeedHelp}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            Questions? We&apos;re here to help
-          </button>
-        </div>
+
       </div>
     </div>
   );

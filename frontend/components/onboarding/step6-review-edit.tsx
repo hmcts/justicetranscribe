@@ -34,9 +34,9 @@ export default function Step6ReviewEdit() {
         {/* Checklist Section */}
         <div className="space-y-4">
           <h4 className="text-lg font-semibold text-black text-center">
-            Common edits
+            Common corrections
           </h4>
-          <div className="space-y-3 text-black">
+          <div className="space-y-3 text-black max-w-lg mx-auto">
             <div className="flex items-start space-x-3">
               <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
               <p>Verify names, pronouns, places, and acronyms.</p>

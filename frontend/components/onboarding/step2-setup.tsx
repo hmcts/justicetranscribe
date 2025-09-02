@@ -26,20 +26,6 @@ export default function Step2Setup({
       </div>
 
       <div className="space-y-6">
-        <div>
-          <Label htmlFor="email" className="text-base font-medium">
-            Email address
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => onEmailChange(e.target.value)}
-            className="mt-2"
-            required
-          />
-        </div>
 
         <fieldset>
           <legend className="text-base font-medium mb-3 block">
@@ -62,7 +48,7 @@ export default function Step2Setup({
                   value={option.value}
                   checked={crissaTime === option.value}
                   onChange={(e) => onCrissaTimeChange(e.target.value)}
-                  className="size-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="size-4 text-blue-600 border-gray-300 focus:ring-0 focus:outline-none"
                   tabIndex={0}
                   aria-describedby={`crissa-${option.value}-label`}
                 />
@@ -101,7 +87,7 @@ export default function Step2Setup({
                   value={option.value}
                   checked={appointmentsPerWeek === option.value}
                   onChange={(e) => onAppointmentsChange(e.target.value)}
-                  className="size-4 text-blue-600 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="size-4 text-blue-600 border-gray-300 focus:ring-0 focus:outline-none"
                   tabIndex={0}
                   aria-describedby={`appointments-${option.value}-label`}
                 />

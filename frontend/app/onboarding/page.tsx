@@ -36,9 +36,7 @@ export default function OnboardingPage() {
 
   // Validation for step 2
   const isStep2Valid = () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return (
-      emailRegex.test(formData.email) &&
       formData.crissaTime &&
       formData.appointmentsPerWeek
     );
@@ -58,20 +56,13 @@ export default function OnboardingPage() {
   };
 
   const handleNext = () => {
-    if (currentStep === 2 && canContinue()) {
-      // Check license after step 2 (Get Started)
-      const licenseValid = checkLicense(formData.email);
-      setHasValidLicense(licenseValid);
-
-      if (!licenseValid) {
-        // Don't proceed to step 3, stay on license check fail page
-        return;
-      }
-    }
-
     if (currentStep < TOTAL_STEPS && canContinue()) {
       setCurrentStep(currentStep + 1);
     }
+  };
+
+  const handleNoAuth = () => {
+    setHasValidLicense(false);
   };
 
   const handleBack = () => {
@@ -128,7 +119,7 @@ export default function OnboardingPage() {
 
     switch (currentStep) {
       case 1:
-        return <Step1Welcome />;
+        return <Step1Welcome onNoAuth={handleNoAuth} />;
       case 2:
         return (
           <Step2Setup
@@ -215,14 +206,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Back button for license check fail page */}
-        {hasValidLicense === false && (
-          <div className="flex justify-center pt-4 sm:pt-5 md:pt-6 lg:pt-8 xl:pt-10">
-            <Button onClick={handleBackFromLicenseCheck} variant="outline">
-              Try Different Email
-            </Button>
-          </div>
-        )}
+
       </div>
     </div>
   );
