@@ -36,6 +36,19 @@ coverage report
 coverage html                       # HTML report at htmlcov/index.html
 ```
 
+### Network Request Isolation
+
+PyTest is configured to disable external network calls by default to ensure test isolation. Integration tests automatically enable network access.
+
+```bash
+cd backend/
+python -m pytest                   # Network calls blocked
+python -m pytest --integration     # Network calls enabled for integration tests
+python -m pytest --allow-network   # Enable network for specific tests
+```
+
+Use `httpx_mock` fixture for mocking HTTP requests in tests.
+
 ## Code Quality
 
 ### Pre-commit Checks
