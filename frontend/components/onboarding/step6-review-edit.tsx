@@ -1,5 +1,5 @@
 import React from "react";
-import { Play } from "lucide-react";
+import { Play, Check } from "lucide-react";
 
 export default function Step6ReviewEdit() {
   return (
@@ -13,10 +13,8 @@ export default function Step6ReviewEdit() {
 
       {/* Main Content */}
       <div className="space-y-4">
-        <p className="leading-relaxed text-black">
-          The AI summary is only a starting point. It captures what was said but
-          it does not see body language, observations or understand the wider
-          context.
+        <p className="leading-relaxed text-black text-center">
+          The AI summary is only a starting point. Use your professional judgement to finalise summaries.
         </p>
       </div>
 
@@ -36,12 +34,25 @@ export default function Step6ReviewEdit() {
         {/* Right Column - Examples */}
         <div className="space-y-4">
           <h4 className="text-lg font-semibold text-black">
-            Common edits needed
+            Common edits
           </h4>
-          <div className="space-y-2 text-black">
-            <p>• Verify names, pronouns, places, and acronyms.</p>
-            <p>• Add missing specifics (risk-relevant facts, DOBs).</p>
-            <p>• Stay under 4,000 characters for NDelius.</p>
+          <div className="space-y-3 text-black">
+            <div className="flex items-start space-x-3">
+              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <p>Verify names, pronouns, places, and acronyms.</p>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <p>Add missing specifics (risk-relevant facts, DOBs).</p>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <p>Stay under 4,000 characters for NDelius.</p>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Check className="size-5 text-green-600 mt-0.5 flex-shrink-0" />
+              <p>Describe body language, observations and wider context.</p>
+            </div>
           </div>
         </div>
       </div>
