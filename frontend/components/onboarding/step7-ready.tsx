@@ -4,19 +4,19 @@ import { Mic, Mail, Edit, Copy } from "lucide-react";
 
 interface Step7ReadyProps {
   onStartRecording: () => void;
-  onNeedHelp: () => void;
   onBack: () => void;
 }
 
 export default function Step7Ready({
   onStartRecording,
-  onNeedHelp,
   onBack,
 }: Step7ReadyProps) {
   return (
     <div className="space-y-8">
       <div className="space-y-2 text-center">
-        <h3 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-semibold">You&apos;re ready 🎉</h3>
+        <h3 className="text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
+          You&apos;re ready 🎉
+        </h3>
         <p className="text-black">
           Start today to spend less time note taking and more time listening
         </p>
@@ -116,8 +116,6 @@ export default function Step7Ready({
             </Button>
           </div>
         </div>
-
-
       </div>
     </div>
   );

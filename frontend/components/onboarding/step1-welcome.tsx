@@ -1,16 +1,13 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
 
-interface Step1WelcomeProps {
-  onNoAuth?: () => void;
-}
-
-export default function Step1Welcome({ onNoAuth }: Step1WelcomeProps) {
+export default function Step1Welcome() {
   return (
     <div className="space-y-12">
       {/* Header and Description - Single Column */}
       <div className="space-y-8 text-center">
-        <h2 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-bold tracking-tight">Welcome 👋</h2>
+        <h2 className="text-[2.625rem] font-bold tracking-tight sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
+          Welcome 👋
+        </h2>
         <p className="mx-auto max-w-3xl text-lg leading-relaxed text-gray-900">
           Justice Transcribe is an AI assistant that transcribes and summarises
           meetings. Turning conversations into clear case notes in minutes so
@@ -44,17 +41,7 @@ export default function Step1Welcome({ onNoAuth }: Step1WelcomeProps) {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-center items-center gap-4">
-        {onNoAuth && (
-          <Button
-            onClick={onNoAuth}
-            className="bg-pink-500 text-white hover:bg-pink-600 px-6 py-6 text-lg"
-          >
-            no auth
-          </Button>
-        )}
-      </div>
+      {/* Action Buttons moved to bottom navigation in onboarding/page.tsx */}
     </div>
   );
 }

@@ -14,8 +14,6 @@ import Step6ReviewEdit from "@/components/onboarding/step6-review-edit";
 import Step7Ready from "@/components/onboarding/step7-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
-const HELP_PAGE_ROUTE = "/help";
-
 const TOTAL_STEPS = 6;
 
 export default function OnboardingPage() {
@@ -23,7 +21,6 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [hasValidLicense, setHasValidLicense] = useState<boolean | null>(null);
   const [formData, setFormData] = useState({
-    email: "",
     crissaTime: "",
     appointmentsPerWeek: "",
     acceptedPrivacy: false,
@@ -31,15 +28,12 @@ export default function OnboardingPage() {
 
   // Scroll to top when step changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentStep]);
 
   // Validation for step 2
   const isStep2Valid = () => {
-    return (
-      formData.crissaTime &&
-      formData.appointmentsPerWeek
-    );
+    return formData.crissaTime && formData.appointmentsPerWeek;
   };
 
   const canContinue = () => {
@@ -47,12 +41,6 @@ export default function OnboardingPage() {
       return isStep2Valid();
     }
     return true;
-  };
-
-  // Check if user has valid license
-  const checkLicense = (email: string) => {
-    // Simulate license check - if email is 'fake@fake.com', deny access
-    return email.toLowerCase() !== "fake@fake.com";
   };
 
   const handleNext = () => {
@@ -75,17 +63,6 @@ export default function OnboardingPage() {
     router.push("/"); // Return to home to start recording
   };
 
-  const handleNeedHelp = () => {
-    router.push(HELP_PAGE_ROUTE);
-  };
-
-
-
-  const handleBackFromLicenseCheck = () => {
-    setHasValidLicense(null);
-    // Stay on step 2 to allow user to try different email
-  };
-
   const getStepClassName = (stepNum: number) => {
     if (stepNum === currentStep) {
       return "bg-black text-white";
@@ -94,10 +71,6 @@ export default function OnboardingPage() {
       return "bg-gray-200";
     }
     return "border";
-  };
-
-  const handleEmailChange = (email: string) => {
-    setFormData({ ...formData, email });
   };
 
   const handleCrissaTimeChange = (time: string) => {
@@ -116,14 +89,12 @@ export default function OnboardingPage() {
 
     switch (currentStep) {
       case 1:
-        return <Step1Welcome onNoAuth={handleNoAuth} />;
+        return <Step1Welcome />;
       case 2:
         return (
           <Step2Setup
-            email={formData.email}
             crissaTime={formData.crissaTime}
             appointmentsPerWeek={formData.appointmentsPerWeek}
-            onEmailChange={handleEmailChange}
             onCrissaTimeChange={handleCrissaTimeChange}
             onAppointmentsChange={handleAppointmentsChange}
           />
@@ -138,7 +109,6 @@ export default function OnboardingPage() {
         return (
           <Step7Ready
             onStartRecording={handleStartRecording}
-            onNeedHelp={handleNeedHelp}
             onBack={handleBack}
           />
         );
@@ -149,7 +119,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-2xl px-4 pt-6 pb-12 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
+      <div className="container mx-auto max-w-2xl px-4 pb-12 pt-6 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
         {/* Progress indicator - Hide when showing license check fail */}
         {hasValidLicense !== false && (
           <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
@@ -184,13 +154,21 @@ export default function OnboardingPage() {
               </Button>
             )}
             {currentStep === 1 ? (
-              <Button
-                onClick={handleNext}
-                disabled={!canContinue()}
-                className={`mx-auto px-12 py-6 text-lg ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
-              >
-                Continue
-              </Button>
+              <div className="flex w-full items-center justify-center gap-4">
+                <Button
+                  onClick={handleNoAuth}
+                  className="bg-pink-500 p-6 text-lg text-white hover:bg-pink-600"
+                >
+                  no auth
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  disabled={!canContinue()}
+                  className={`px-12 py-6 text-lg ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
+                >
+                  Continue
+                </Button>
+              </div>
             ) : (
               <Button
                 onClick={handleNext}
@@ -202,8 +180,6 @@ export default function OnboardingPage() {
             )}
           </div>
         )}
-
-
       </div>
     </div>
   );
