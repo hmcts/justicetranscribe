@@ -79,10 +79,7 @@ export default function OnboardingPage() {
     router.push(HELP_PAGE_ROUTE);
   };
 
-  const handleSignUpForEarlyAccess = () => {
-    // TODO: Replace with actual early access signup URL
-    window.open("https://example.com/early-access-signup", "_blank");
-  };
+
 
   const handleBackFromLicenseCheck = () => {
     setHasValidLicense(null);
@@ -114,7 +111,7 @@ export default function OnboardingPage() {
   const renderStep = () => {
     // Show license check fail page if license check failed
     if (hasValidLicense === false) {
-      return <LicenseCheckFail onSignUp={handleSignUpForEarlyAccess} />;
+      return <LicenseCheckFail />;
     }
 
     switch (currentStep) {

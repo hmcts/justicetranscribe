@@ -1,17 +1,11 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-interface LicenseCheckFailProps {
-  onSignUp: () => void;
-}
-
-export default function LicenseCheckFail({ onSignUp }: LicenseCheckFailProps) {
+export default function LicenseCheckFail() {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSignUp = () => {
     setIsSubmitted(true);
-    // Call the original onSignUp prop if needed for any additional logic
-    onSignUp();
   };
 
   return (
@@ -36,9 +30,10 @@ export default function LicenseCheckFail({ onSignUp }: LicenseCheckFailProps) {
       <div className="pt-4">
         <Button
           onClick={handleSignUp}
-          className={`px-8 py-6 text-lg font-semibold transition-colors ${
+          disabled={isSubmitted}
+          className={`px-8 py-6 text-lg font-semibold transition-all ${
             isSubmitted 
-              ? "bg-green-600 hover:bg-green-700 text-white" 
+              ? "bg-green-600 text-white cursor-default" 
               : "bg-blue-600 hover:bg-blue-700 text-white"
           }`}
         >

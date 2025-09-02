@@ -44,17 +44,17 @@ export default function Step1Welcome({ onNoAuth }: Step1WelcomeProps) {
         </div>
       </div>
 
-      {/* No Auth Button */}
-      {onNoAuth && (
-        <div className="flex justify-center">
+      {/* Action Buttons */}
+      <div className="flex justify-center items-center gap-4">
+        {onNoAuth && (
           <Button
             onClick={onNoAuth}
-            className="bg-pink-500 text-white hover:bg-pink-600 px-6 py-2"
+            className="bg-pink-500 text-white hover:bg-pink-600 px-6 py-6 text-lg"
           >
             no auth
           </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
