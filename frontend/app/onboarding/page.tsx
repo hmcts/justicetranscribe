@@ -14,8 +14,7 @@ import Step6ReviewEdit from "@/components/onboarding/step6-review-edit";
 import Step7Ready from "@/components/onboarding/step7-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
-// TODO: Update these placeholder routes once Help page PR is merged
-const HELP_PAGE_ROUTE = "/help"; // Will be updated after Help page PR merge
+const HELP_PAGE_ROUTE = "/help";
 
 const TOTAL_STEPS = 6;
 
@@ -85,7 +84,6 @@ export default function OnboardingPage() {
   };
 
   const handleNeedHelp = () => {
-    // TODO: Update this route once Help page PR is merged
     router.push(HELP_PAGE_ROUTE);
   };
 
