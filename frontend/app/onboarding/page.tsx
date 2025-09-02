@@ -24,7 +24,8 @@ export default function OnboardingPage() {
   const [hasValidLicense, setHasValidLicense] = useState<boolean | null>(null);
   const [formData, setFormData] = useState({
     email: "",
-    minutesSpent: "",
+    crissaTime: "",
+    appointmentsPerWeek: "",
     acceptedPrivacy: false,
   });
 
@@ -38,8 +39,8 @@ export default function OnboardingPage() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return (
       emailRegex.test(formData.email) &&
-      formData.minutesSpent &&
-      parseInt(formData.minutesSpent, 10) > 0
+      formData.crissaTime &&
+      formData.appointmentsPerWeek
     );
   };
 
@@ -111,8 +112,12 @@ export default function OnboardingPage() {
     setFormData({ ...formData, email });
   };
 
-  const handleMinutesChange = (minutes: string) => {
-    setFormData({ ...formData, minutesSpent: minutes });
+  const handleCrissaTimeChange = (time: string) => {
+    setFormData({ ...formData, crissaTime: time });
+  };
+
+  const handleAppointmentsChange = (appointments: string) => {
+    setFormData({ ...formData, appointmentsPerWeek: appointments });
   };
 
   const renderStep = () => {
@@ -128,9 +133,11 @@ export default function OnboardingPage() {
         return (
           <Step2Setup
             email={formData.email}
-            minutesSpent={formData.minutesSpent}
+            crissaTime={formData.crissaTime}
+            appointmentsPerWeek={formData.appointmentsPerWeek}
             onEmailChange={handleEmailChange}
-            onMinutesChange={handleMinutesChange}
+            onCrissaTimeChange={handleCrissaTimeChange}
+            onAppointmentsChange={handleAppointmentsChange}
           />
         );
       case 3:

@@ -6,7 +6,7 @@ export default function Step6ReviewEdit() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="space-y-2 text-center">
         <h3 className="text-[2.625rem] sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem] font-semibold">Review and edit</h3>
-        <h4 className="bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-xl font-medium text-transparent">
+        <h4 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
           Your professional judgement is key
         </h4>
       </div>
@@ -18,9 +18,9 @@ export default function Step6ReviewEdit() {
         </p>
       </div>
 
-      {/* Two Column Layout - Video Left, Examples Right */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Left Column - Video */}
+      {/* Single Column Layout */}
+      <div className="space-y-8">
+        {/* Video Section */}
         <div className="rounded-lg bg-gray-100 p-8 text-center">
           <div className="mb-4 inline-flex size-16 items-center justify-center rounded-full bg-blue-600">
             <Play className="ml-1 size-6 text-white" />
@@ -31,9 +31,9 @@ export default function Step6ReviewEdit() {
           </p>
         </div>
 
-        {/* Right Column - Examples */}
+        {/* Checklist Section */}
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold text-black">
+          <h4 className="text-lg font-semibold text-black text-center">
             Common edits
           </h4>
           <div className="space-y-3 text-black">
