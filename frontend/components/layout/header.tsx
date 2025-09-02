@@ -5,13 +5,16 @@
 /* eslint-disable react/require-default-props */
 /* eslint-disable react/react-in-jsx-scope */
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
-import { Home, ChevronLeft, ChevronRight } from "lucide-react";
+import { Home, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 export default function Header({ className }: { className?: string }) {
   const { newTranscription, selectedRecordingMode } = useTranscripts();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Use browser's built-in history navigation
   const goBack = useCallback(() => {
@@ -21,6 +24,16 @@ export default function Header({ className }: { className?: string }) {
   const goForward = useCallback(() => {
     window.history.forward();
   }, []);
+
+  const handleHomeClick = useCallback(() => {
+    if (pathname === "/help") {
+      // Navigate to root page when on help page
+      router.push("/");
+    } else {
+      // Use default new transcription behavior for other pages
+      newTranscription();
+    }
+  }, [pathname, router, newTranscription]);
 
   return (
     <>
@@ -84,7 +97,7 @@ export default function Header({ className }: { className?: string }) {
               <ChevronRight className="size-5" />
             </button>
             <button
-              onClick={() => newTranscription()}
+              onClick={handleHomeClick}
               className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
               aria-label="Go to home"
               title="Go to home"
@@ -92,6 +105,15 @@ export default function Header({ className }: { className?: string }) {
               <Home className="mr-1 size-4" />
               <span className="text-sm">Home</span>
             </button>
+            <Link
+              href="/help"
+              className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
+              aria-label="Go to help"
+              title="Go to help"
+            >
+              <HelpCircle className="mr-1 size-4" />
+              <span className="text-sm">Help</span>
+            </Link>
           </div>
         )}
       </div>
