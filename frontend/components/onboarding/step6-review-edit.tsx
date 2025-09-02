@@ -11,11 +11,12 @@ export default function Step6ReviewEdit() {
 
       {/* Main Content */}
       <div className="space-y-6">
-        <p className="leading-relaxed">
+        <p className="leading-relaxed text-black">
           The AI summary is only a starting point. It captures what was said but it does not see body language, observations or understand the wider context.{" "}
-          <span className="bg-yellow-200 px-1 font-medium">
-            Your professional judgement is essential and edit the summary to make sure its accurate and useful
-          </span>
+          <span className="font-bold text-blue-600">
+            Your professional judgement is key.
+          </span>{" "}
+          Edit the summary to make sure its accurate and useful.
         </p>
       </div>
 
@@ -34,8 +35,8 @@ export default function Step6ReviewEdit() {
 
         {/* Right Column - Examples */}
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold">Examples of common edits needed</h4>
-          <div className="space-y-2 text-gray-700">
+          <h4 className="text-lg font-semibold text-black">Examples of common edits needed</h4>
+          <div className="space-y-2 text-black">
             <p>• Verify names, pronouns, places, and acronyms.</p>
             <p>• Add missing specifics (risk-relevant facts, DOBs).</p>
             <p>• Stay under 4,000 characters for NDelius.</p>
