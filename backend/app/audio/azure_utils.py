@@ -33,92 +33,73 @@ def _validate_azure_account_key(account_name: str, account_key: str, conn_timeou
     
 
 
-def _extract_account_name_from_connection_string(
-    connection_string: str
+def _extract_parameter_from_connection_string(
+    connection_string: str, 
+    parameter_name: str
     ) -> str:
-    """Extract the account name from an Azure Storage connection string."""
+    """
+    Extract a parameter value from an Azure Storage connection string.
+    
+    Args:
+        connection_string: The Azure Storage connection string
+        parameter_name: The parameter name to extract (e.g., 'AccountName', 'AccountKey')
+        
+    Returns:
+        str: The parameter value extracted from the connection string
+        
+    Raises:
+        ValueError: If the connection string is empty, malformed, or missing the parameter
+    """
     if not connection_string:
         raise ValueError("Connection string cannot be empty")
     
     if not connection_string.strip():
         raise ValueError("Connection string cannot be whitespace only")
     
-    # Split by semicolon and look for AccountName parameter
-    account_name_found = False
-    account_name_value = None
+    # Split by semicolon and look for the specified parameter
+    parameter_found = False
+    parameter_value = None
+    parameter_prefix = f"{parameter_name}="
     
     for part in connection_string.split(";"):
         part = part.strip()  # Remove leading/trailing whitespace from each part
         
-        if part.startswith("AccountName="):
-            if account_name_found:
-                raise ValueError("Multiple AccountName parameters found in connection string")
+        if part.startswith(parameter_prefix):
+            if parameter_found:
+                raise ValueError(f"Multiple {parameter_name} parameters found in connection string")
             
-            account_name_found = True
+            parameter_found = True
             # Extract the value after the equals sign
-            if "=" not in part:
-                raise ValueError("Malformed AccountName parameter: missing equals sign")
+            parameter_value = part.split("=", 1)[1].strip()
             
-            account_name_value = part.split("=", 1)[1].strip()
-            
-        elif part == "AccountName":
-            # AccountName without equals sign
-            raise ValueError("Malformed AccountName parameter: missing equals sign")
-        elif part.lower().startswith("accountname=") and not part.startswith("AccountName="):
+        elif part == parameter_name:
+            # Parameter without equals sign
+            raise ValueError(f"Malformed {parameter_name} parameter: missing equals sign")
+        elif part.lower().startswith(parameter_name.lower() + "=") and not part.startswith(parameter_prefix):
             # Case sensitivity issue
-            raise ValueError("AccountName parameter must use exact case 'AccountName=' (found: '{}')".format(part.split("=")[0] + "="))
+            raise ValueError(f"{parameter_name} parameter must use exact case '{parameter_prefix}' (found: '{part.split('=')[0]}=')")
     
-    if not account_name_found:
-        raise ValueError("AccountName parameter not found in connection string")
+    if not parameter_found:
+        raise ValueError(f"{parameter_name} parameter not found in connection string")
     
-    if account_name_value == "":
-        raise ValueError("AccountName parameter cannot be empty")
+    if parameter_value == "":
+        raise ValueError(f"{parameter_name} parameter cannot be empty")
     
-    return account_name_value
+    return parameter_value
+
+
+def _extract_account_name_from_connection_string(
+    connection_string: str
+    ) -> str:
+    """Extract the account name from an Azure Storage connection string."""
+    return _extract_parameter_from_connection_string(connection_string, "AccountName")
 
 
 def _extract_account_key_from_connection_string(
     connection_string: str
     ) -> str:
     """Extract the account key from an Azure Storage connection string."""
-    if not connection_string:
-        raise ValueError("Connection string cannot be empty")
-    
-    if not connection_string.strip():
-        raise ValueError("Connection string cannot be whitespace only")
-    
-    # Split by semicolon and look for AccountKey parameter
-    account_key_found = False
-    account_key_value = None
-    
-    for part in connection_string.split(";"):
-        part = part.strip()  # Remove leading/trailing whitespace from each part
-        
-        if part.startswith("AccountKey="):
-            if account_key_found:
-                raise ValueError("Multiple AccountKey parameters found in connection string")
-            
-            account_key_found = True
-            # Extract the value after the equals sign
-            if "=" not in part:
-                raise ValueError("Malformed AccountKey parameter: missing equals sign")
-            
-            account_key_value = part.split("=", 1)[1].strip()
-            
-        elif part == "AccountKey":
-            # AccountKey without equals sign
-            raise ValueError("Malformed AccountKey parameter: missing equals sign")
-        elif part.lower().startswith("accountkey=") and not part.startswith("AccountKey="):
-            # Case sensitivity issue
-            raise ValueError("AccountKey parameter must use exact case 'AccountKey=' (found: '{}')".format(part.split("=")[0] + "="))
-    
-    if not account_key_found:
-        raise ValueError("AccountKey parameter not found in connection string")
-    
-    if account_key_value == "":
-        raise ValueError("AccountKey parameter cannot be empty")
-    
-    return account_key_value
+    return _extract_parameter_from_connection_string(connection_string, "AccountKey")
 
 
 def validate_azure_storage_config(

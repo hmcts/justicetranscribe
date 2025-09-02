@@ -51,3 +51,17 @@ cookiecutter_backend
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Coverage files
+.coverage
+.coverage.*
+backend/htmlcov/
+backend/coverage.xml
+backend/coverage.json
+
+# Coverage files
+**/.coverage
+**/.coverage.*
+**/htmlcov/
+**/coverage.xml
+**/coverage.json

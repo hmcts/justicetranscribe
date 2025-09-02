@@ -18,14 +18,13 @@ omit =
     */build_utils/*
     app/__pycache__/*
     .pytest_cache/*
-    */__init__.py
     **/__init__.py
 
 # Branch coverage - measure both line and branch coverage
 branch = True
 
-# Parallel mode for multiprocessing (useful for async tests)
-parallel = True
+# Parallel mode disabled - not needed for single-process tests
+# parallel = True
 
 # Include patterns - files to include in coverage (commented out because --source is used)
 # include = 

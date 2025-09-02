@@ -46,6 +46,18 @@ def multiple_equals_connection_string():
     return "AccountName=test=account=name;AccountKey=somekey"
 
 
+@pytest.fixture()
+def whitespace_only_connection_string():
+    """Connection string that is only whitespace."""
+    return "   \t\n  "
+
+
+@pytest.fixture()
+def multiple_account_name_connection_string():
+    """Connection string with multiple AccountName parameters."""
+    return "AccountName=first;AccountName=second;AccountKey=somekey"
+
+
 class TestExtractAccountNameFromConnectionString:
     """Test cases for _extract_account_name_from_connection_string."""
 
@@ -101,3 +113,13 @@ class TestExtractAccountNameFromConnectionString:
         # Test with exact match but spaces in value - whitespace should be stripped
         result = _extract_account_name_from_connection_string(whitespace_connection_string)
         assert result == "spacedname", f"Expected 'spacedname' but got '{result}' when AccountName value has spaces: {whitespace_connection_string}"
+
+    def test_extract_account_name_whitespace_only_string(self, whitespace_only_connection_string):
+        """Test with connection string that is only whitespace."""
+        with pytest.raises(ValueError, match="Connection string cannot be whitespace only"):
+            _extract_account_name_from_connection_string(whitespace_only_connection_string)
+
+    def test_extract_account_name_multiple_account_names(self, multiple_account_name_connection_string):
+        """Test with connection string containing multiple AccountName parameters."""
+        with pytest.raises(ValueError, match="Multiple AccountName parameters found in connection string"):
+            _extract_account_name_from_connection_string(multiple_account_name_connection_string)
