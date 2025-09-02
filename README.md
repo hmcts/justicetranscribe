@@ -1,3 +1,5 @@
+[![Tests and Coverage](https://github.com/JusticeAIUnit/justicetranscribe/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/JusticeAIUnit/justicetranscribe/actions/workflows/test-coverage.yml)
+
 # justicetranscribe
 
 A Next.js application deployed to Azure with Terraform
