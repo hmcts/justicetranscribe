@@ -26,9 +26,9 @@ export default function Header({ className }: { className?: string }) {
   }, []);
 
   const handleHomeClick = useCallback(() => {
-    if (pathname === '/help') {
+    if (pathname === "/help") {
       // Navigate to root page when on help page
-      router.push('/');
+      router.push("/");
     } else {
       // Use default new transcription behavior for other pages
       newTranscription();
