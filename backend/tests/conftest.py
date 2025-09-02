@@ -18,12 +18,18 @@ sys.path.insert(0, str(backend_dir))
 
 
 def pytest_addoption(parser):
-    """Add command line option to run integration tests."""
+    """Add command line options for test configuration."""
     parser.addoption(
         "--integration", 
         action="store_true", 
         default=False,
         help="Run integration tests (skipped by default)"
+    )
+    parser.addoption(
+        "--allow-network",
+        action="store_true",
+        default=False,
+        help="Allow tests that require network access (disabled by default)"
     )
 
 
@@ -174,7 +180,7 @@ def setup_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # Pytest configuration
 def pytest_configure(config: pytest.Config) -> None:
-    """Configure pytest with custom markers."""
+    """Configure pytest with custom markers and socket settings."""
     config.addinivalue_line(
         "markers", "unit: mark test as a unit test"
     )
@@ -193,12 +199,31 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "database: mark test as requiring database"
     )
+    config.addinivalue_line(
+        "markers", "network: mark test as requiring network access"
+    )
+    config.addinivalue_line(
+        "markers", "external_api: mark test as calling external APIs"
+    )
+    
+    # Configure socket blocking based on flags
+    allow_network = config.getoption("--allow-network")
+    run_integration = config.getoption("--integration")
+    
+    # Only enable socket blocking for pure unit tests
+    # Integration tests and network tests need sockets for async loops and network calls
+    if not allow_network and not run_integration:
+        # Only block network sockets, allow unix sockets for async loops
+        import pytest_socket
+        pytest_socket.disable_socket(allow_unix_socket=True)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Automatically mark tests based on their location and skip integration tests by default."""
     # Skip integration tests by default unless --integration flag is used
     skip_integration = not config.getoption("--integration")
+    # Skip network tests by default unless --allow-network flag is used
+    allow_network = config.getoption("--allow-network")
     
     for item in items:
         # Get the test file path relative to tests directory
@@ -214,3 +239,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                 item.add_marker(pytest.mark.skip(reason="Integration test skipped. Use --integration to run."))
         elif test_path.parts[0] == "e2e":
             item.add_marker(pytest.mark.e2e)
+        
+        # Skip network tests if they're marked and network is not allowed
+        if not allow_network:
+            for marker in item.iter_markers():
+                if marker.name in ("network", "external_api"):
+                    item.add_marker(pytest.mark.skip(reason="Network test skipped. Use --allow-network to run."))
