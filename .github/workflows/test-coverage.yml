@@ -35,7 +35,6 @@ jobs:
     - name: Run unit tests with coverage
       run: |
         echo "🧪 Running unit tests with coverage..."
-        cd backend
         uv run coverage run -m pytest tests/unit/ -vv
 
     - name: Generate coverage report
