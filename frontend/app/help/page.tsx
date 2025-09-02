@@ -143,7 +143,7 @@ export default function HelpPage() {
             </p>
             <Button variant="outline" asChild>
               <a
-                href="https://example.com/ai-policy"
+                href="https://ai.justice.gov.uk/action-plan"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="View AI Policy & Guidance - opens in new tab"
