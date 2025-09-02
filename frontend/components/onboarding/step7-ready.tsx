@@ -16,7 +16,7 @@ export default function Step7Ready({
   return (
     <div className="space-y-8">
       <div className="space-y-2 text-center">
-        <h3 className="text-2xl font-semibold">You&apos;re ready 🎉</h3>
+        <h3 className="text-[2.625rem] font-semibold">You&apos;re ready 🎉</h3>
         <p>
           Start today to spend less time note taking and more time listening
         </p>

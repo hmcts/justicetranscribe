@@ -6,7 +6,7 @@ export default function Step4BasicTutorial() {
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
-        <h3 className="text-2xl font-semibold">Basic Tutorial</h3>
+        <h3 className="text-[2.625rem] font-semibold">Basic Tutorial</h3>
         <p>Using Justice Transcribe is simple</p>
       </div>
 
