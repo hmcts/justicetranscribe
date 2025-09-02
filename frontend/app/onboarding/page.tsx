@@ -9,7 +9,7 @@ import Step1Welcome from "@/components/onboarding/step1-welcome";
 import Step2Setup from "@/components/onboarding/step2-setup";
 import Step3DeviceSetup from "@/components/onboarding/step3-device-setup";
 import Step4BasicTutorial from "@/components/onboarding/step4-basic-tutorial";
-import Step5EmailNotifications from "@/components/onboarding/step5-email-notifications";
+
 import Step6ReviewEdit from "@/components/onboarding/step6-review-edit";
 import Step7Ready from "@/components/onboarding/step7-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
@@ -17,7 +17,7 @@ import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 // TODO: Update these placeholder routes once Help page PR is merged
 const HELP_PAGE_ROUTE = "/help"; // Will be updated after Help page PR merge
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -135,10 +135,8 @@ export default function OnboardingPage() {
       case 4:
         return <Step4BasicTutorial />;
       case 5:
-        return <Step5EmailNotifications email={formData.email} />;
-      case 6:
         return <Step6ReviewEdit />;
-      case 7:
+      case 6:
         return (
           <Step7Ready
             onStartRecording={handleStartRecording}
@@ -177,8 +175,8 @@ export default function OnboardingPage() {
         {/* Step content */}
         <div className="mb-8">{renderStep()}</div>
 
-        {/* Navigation - Only show for steps 1-6, step 7 has its own buttons, hide for license check fail */}
-        {currentStep < 7 && hasValidLicense !== false && (
+        {/* Navigation - Only show for steps 1-5, step 6 has its own buttons, hide for license check fail */}
+        {currentStep < 6 && hasValidLicense !== false && (
           <div className="flex justify-between pt-6">
             {currentStep > 1 && (
               <Button onClick={handleBack} variant="outline">

@@ -42,6 +42,10 @@ export default function Step4BasicTutorial() {
           <span className="text-lg font-semibold">4.</span>
           <span>Click stop recording</span>
         </div>
+        <div className="flex items-start space-x-3">
+          <span className="text-lg font-semibold">5.</span>
+          <span>We&apos;ll email you when your summary is ready for review</span>
+        </div>
       </div>
     </div>
   );

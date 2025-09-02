@@ -46,8 +46,18 @@ export default function Step3DeviceSetup() {
       {/* Desktop Content */}
       {selectedDevice === "desktop" && (
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold">Save as bookmark</h4>
-          <p>Save as bookmark to find JT easily</p>
+          <h4 className="text-lg font-semibold">
+            Bookmark this link{" "}
+            <a
+              href="https://transcription.service.justice.gov.uk/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              https://transcription.service.justice.gov.uk/
+            </a>{" "}
+            to find it easily
+          </h4>
           <div className="space-y-2">
             <div className="flex items-start space-x-3">
               <span className="text-lg">•</span>
