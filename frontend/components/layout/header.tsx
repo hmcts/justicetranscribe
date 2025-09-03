@@ -68,7 +68,7 @@ export default function Header({ className }: { className?: string }) {
       </header>
 
       {/* Navigation buttons below header */}
-      <div className="sticky top-14 z-40 flex h-10 w-full items-center justify-between bg-white px-4 shadow-sm">
+      <div className="sticky top-14 z-40 flex h-10 w-full items-center justify-between bg-white px-4">
         {!selectedRecordingMode && (
           <div className="flex items-center space-x-2">
             <button
