@@ -19,7 +19,7 @@ MAX_RETRIES = 3
 langfuse = Langfuse(
     secret_key=os.environ["LANGFUSE_SECRET_KEY"],
     public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-    host="https://cloud.langfuse.com",
+    host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
     environment=settings_instance.ENVIRONMENT,
 )
 

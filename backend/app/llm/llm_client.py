@@ -10,6 +10,7 @@ from langfuse import Langfuse
 from langfuse.decorators import langfuse_context, observe
 from litellm import acompletion
 from pydantic import BaseModel
+
 from utils.settings import settings_instance
 
 
@@ -31,7 +32,7 @@ ALL_LLM_MODELS = [
 langfuse_client = Langfuse(
     public_key=settings_instance.LANGFUSE_PUBLIC_KEY,
     secret_key=settings_instance.LANGFUSE_SECRET_KEY,
-    host="https://cloud.langfuse.com",
+    host=settings_instance.LANGFUSE_HOST,
     environment=settings_instance.ENVIRONMENT,
 )
 # langfuse_client.auth_check()
@@ -54,20 +55,14 @@ def _load_vertex_credentials() -> str:
             with Path(credentials_path).open("r") as f:
                 return f.read()
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to read credentials file at {credentials_path}. Error: {e!s}"
-            )
+            raise RuntimeError(f"Failed to read credentials file at {credentials_path}. Error: {e!s}")
 
     # Fall back to environment variable
     try:
-        vertex_credentials = (
-            settings_instance.GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT
-        )
+        vertex_credentials = settings_instance.GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT
         return vertex_credentials
     except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"Failed to parse Google Cloud credentials from environment variable. Error: {e!s}"
-        )
+        raise RuntimeError(f"Failed to parse Google Cloud credentials from environment variable. Error: {e!s}")
 
 
 # Create a pre-configured version of acompletion with Azure Grok defaults
@@ -139,9 +134,7 @@ def _is_content_filtering_error(error: Exception) -> bool:
     return any(indicator in error_str for indicator in csam_filtering_indicators)
 
 
-async def _gemini_completion_with_multi_fallback(
-    *, model: str, messages: list, **kwargs
-):
+async def _gemini_completion_with_multi_fallback(*, model: str, messages: list, **kwargs):
     """
     Gemini completion with automatic multi-level fallbacks:
     1. Try Gemini first
@@ -160,11 +153,7 @@ async def _gemini_completion_with_multi_fallback(
                 "fallback_reason": None,
             }
         )
-        if (
-            not result.choices
-            or result.choices[0].message.content is None
-            or result.choices[0].message.content == ""
-        ):
+        if not result.choices or result.choices[0].message.content is None or result.choices[0].message.content == "":
             print("GEMINI RETURNED NO CONTENT")  # noqa: T201
             raise Exception("Gemini returned no content")  # noqa: EM101, TRY002
         return result
@@ -173,9 +162,7 @@ async def _gemini_completion_with_multi_fallback(
             try:
                 # Fall back to Azure Grok
                 print("FALLING BACK TO GROK")  # noqa: T201
-                result = await azure_grok_acompletion(
-                    model=LLMModel.AZURE_GROK_3, messages=messages, **kwargs
-                )
+                result = await azure_grok_acompletion(model=LLMModel.AZURE_GROK_3, messages=messages, **kwargs)
                 # Update observation to track Grok fallback usage
                 langfuse_context.update_current_observation(
                     metadata={
@@ -189,9 +176,7 @@ async def _gemini_completion_with_multi_fallback(
                 return result
             except Exception as grok_error:
                 # If Grok also fails, fall back to Azure OpenAI GPT-4o as final fallback
-                result = await azure_acompletion(
-                    model=LLMModel.AZURE_GPT_4O, messages=messages, **kwargs
-                )
+                result = await azure_acompletion(model=LLMModel.AZURE_GPT_4O, messages=messages, **kwargs)
                 # Update observation to track final fallback usage
                 langfuse_context.update_current_observation(
                     metadata={
@@ -215,17 +200,13 @@ def with_structured_output(completion_func: Callable) -> Callable:
     Retries up to 5 times if JSON validation fails by requesting a new completion.
     """
 
-    async def wrapped(
-        messages: list, response_format: type[BaseModel] | None = None, **kwargs: Any
-    ):
+    async def wrapped(messages: list, response_format: type[BaseModel] | None = None, **kwargs: Any):
         max_attempts = 5
         attempt = 0
 
         while attempt < max_attempts:
             try:
-                response = await completion_func(
-                    messages=messages, response_format=response_format, **kwargs
-                )
+                response = await completion_func(messages=messages, response_format=response_format, **kwargs)
                 content = response.choices[0].message.content
 
                 if response_format:
@@ -243,9 +224,7 @@ def with_structured_output(completion_func: Callable) -> Callable:
 
 
 structured_azure_completion = with_structured_output(azure_acompletion)
-structured_gemini_completion = with_structured_output(
-    _gemini_completion_with_multi_fallback
-)
+structured_gemini_completion = with_structured_output(_gemini_completion_with_multi_fallback)
 structured_azure_grok_completion = with_structured_output(azure_grok_acompletion)
 
 
@@ -269,9 +248,7 @@ async def llm_completion(*, model: str, messages: list, **kwargs):
     elif backend == "azure_grok":
         result = await azure_grok_acompletion(model=model, messages=messages, **kwargs)
     elif backend == "vertex":
-        result = await _gemini_completion_with_multi_fallback(
-            model=model, messages=messages, **kwargs
-        )
+        result = await _gemini_completion_with_multi_fallback(model=model, messages=messages, **kwargs)
     else:
         raise ValueError(f"Unsupported backend: {backend}")
 

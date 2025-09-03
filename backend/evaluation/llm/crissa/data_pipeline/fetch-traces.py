@@ -17,7 +17,7 @@ MAX_OBSERVATIONS = None  # Set to None for unlimited, or specify a number to lim
 langfuse = Langfuse(
     secret_key=os.environ["LANGFUSE_SECRET_KEY"],
     public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-    host="https://cloud.langfuse.com",  # 🇪🇺 EU region
+    host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),  # Use env var or fallback
     environment=settings_instance.ENVIRONMENT,
 )
 
