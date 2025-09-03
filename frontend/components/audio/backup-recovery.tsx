@@ -175,8 +175,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
               <Alert>
                 <AlertDescription>
                   These recordings were automatically backed up but haven&apos;t
-                  been uploaded yet. You can retry uploading them or delete
-                  them.
+                  been uploaded yet.
                 </AlertDescription>
               </Alert>
 
