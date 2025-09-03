@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
-import { Home, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import { Home, HelpCircle } from "lucide-react";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
@@ -15,15 +15,6 @@ export default function Header({ className }: { className?: string }) {
   const { newTranscription, selectedRecordingMode } = useTranscripts();
   const router = useRouter();
   const pathname = usePathname();
-
-  // Use browser's built-in history navigation
-  const goBack = useCallback(() => {
-    window.history.back();
-  }, []);
-
-  const goForward = useCallback(() => {
-    window.history.forward();
-  }, []);
 
   const handleHomeClick = useCallback(() => {
     if (pathname === "/help") {
@@ -80,22 +71,6 @@ export default function Header({ className }: { className?: string }) {
       <div className="sticky top-14 z-40 flex h-10 w-full items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
         {!selectedRecordingMode && (
           <div className="flex items-center space-x-2">
-            <button
-              onClick={goBack}
-              className="flex size-8 items-center justify-center rounded-full hover:bg-gray-100"
-              aria-label="Go back"
-              title="Go back"
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-            <button
-              onClick={goForward}
-              className="flex size-8 items-center justify-center rounded-full hover:bg-gray-100"
-              aria-label="Go forward"
-              title="Go forward"
-            >
-              <ChevronRight className="size-5" />
-            </button>
             <button
               onClick={handleHomeClick}
               className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
