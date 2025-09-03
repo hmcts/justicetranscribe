@@ -26,6 +26,8 @@ import {
   FileAudio,
   ChevronDown,
   ChevronRight,
+  Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { audioBackupDB, AudioBackup } from "@/lib/indexeddb-backup";
 import AudioPlayerComponent from "./audio-player";
@@ -109,7 +111,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="size-6 animate-spin text-gray-400" />
+            <Loader2 className="size-6 animate-spin text-gray-400" />
             <span className="ml-2 text-gray-600">
               Loading backed up recordings...
             </span>
@@ -125,7 +127,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
         <AlertDescription className="flex items-center justify-between">
           <span>{error}</span>
           <Button variant="outline" size="sm" onClick={loadBackups}>
-            <RefreshCw className="mr-1 size-4" />
+            <RotateCcw className="mr-1 size-4" />
             Retry
           </Button>
         </AlertDescription>
