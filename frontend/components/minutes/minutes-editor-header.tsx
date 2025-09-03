@@ -174,7 +174,7 @@ export default function MinutesEditorHeader({
               ) : (
                 <Button
                   onClick={onEditClick}
-                  className="flex h-12 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-white shadow-sm hover:bg-blue-700"
+                  className="flex h-12 w-full items-center justify-center rounded-md bg-black px-4 text-white shadow-sm hover:bg-gray-800"
                   disabled={isGenerating || !currentVersion}
                 >
                   <Edit className="size-5 md:mr-2" />
@@ -185,7 +185,7 @@ export default function MinutesEditorHeader({
               {currentVersion && (
                 <>
                   <Button
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-rose-600 px-4 text-white shadow-sm hover:bg-rose-700"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-black px-4 text-white shadow-sm hover:bg-gray-800"
                     disabled={isGenerating}
                     onClick={() => {
                       if (isEditing) {
