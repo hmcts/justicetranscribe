@@ -21,13 +21,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Upload,
+  RefreshCw,
   Trash2,
-  FileAudio,
+  Upload,
   ChevronDown,
   ChevronRight,
-  Loader2,
-  RotateCcw,
 } from "lucide-react";
 import { audioBackupDB, AudioBackup } from "@/lib/indexeddb-backup";
 import AudioPlayerComponent from "./audio-player";
@@ -41,6 +39,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+
 
   const loadBackups = useCallback(async () => {
     try {
@@ -105,13 +104,13 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileAudio className="size-5" />
+            <Upload className="size-5" />
             Backed Up Recordings
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="size-6 animate-spin text-gray-400" />
+            <RefreshCw className="size-6 animate-spin text-gray-400" />
             <span className="ml-2 text-gray-600">
               Loading backed up recordings...
             </span>
@@ -127,7 +126,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
         <AlertDescription className="flex items-center justify-between">
           <span>{error}</span>
           <Button variant="outline" size="sm" onClick={loadBackups}>
-            <RotateCcw className="mr-1 size-4" />
+            <RefreshCw className="mr-1 size-4" />
             Retry
           </Button>
         </AlertDescription>
@@ -147,7 +146,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-4 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
             <div className="flex items-center gap-3">
-              <FileAudio className="size-5 text-gray-600" />
+              <Upload className="size-5 text-gray-600" />
               <div>
                 <h3 className="font-medium text-gray-900">
                   Reupload Recordings
@@ -203,7 +202,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
                         onClick={() => handleRetryUpload(backup)}
                         className="flex-1 sm:flex-initial"
                       >
-                        <Upload className="mr-1 size-3" />
+                        <RefreshCw className="mr-1 size-3" />
                         Retry Upload
                       </Button>
 
