@@ -1,16 +1,14 @@
 # ruff: noqa: T201
 
 import asyncio
-import sys
-from pathlib import Path
-
-# Add the project root to the Python path
-sys.path.append(str(Path(__file__).parent.parent))
+import pytest
 
 from app.minutes.templates.crissa import generate_full_crissa
-from shared_utils.database.postgres_models import DialogueEntry
+from app.database.postgres_models import DialogueEntry
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_generate_full_crissa():
     """Test the generate_full_crissa function with sample data."""
 

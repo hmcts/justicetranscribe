@@ -1,3 +1,7 @@
+"""Tests for markdown utilities."""
+
+import pytest
+
 from utils.markdown import html_to_markdown, markdown_to_html
 
 

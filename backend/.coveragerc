@@ -1,0 +1,95 @@
+[run]
+# Source code to analyze
+source = app, api, utils
+
+# Directories to exclude from coverage
+omit = 
+    */tests/*
+    */test_*
+    */__pycache__/*
+    */migrations/*
+    */alembic/*
+    */venv/*
+    */.venv/*
+    */build/*
+    */dist/*
+    */htmlcov/*
+    */evaluation/*
+    */build_utils/*
+    app/__pycache__/*
+    .pytest_cache/*
+    **/__init__.py
+
+# Branch coverage - measure both line and branch coverage
+branch = True
+
+# Parallel mode disabled - not needed for single-process tests
+# parallel = True
+
+# Include patterns - files to include in coverage (commented out because --source is used)
+# include = 
+#     app/*
+#     api/*
+#     utils/*
+
+[report]
+# Coverage reporting configuration
+
+# Minimum coverage percentage to pass (disabled while building test coverage)
+# fail_under = 80
+
+# Show missing lines in terminal output
+show_missing = True
+
+# Skip covered files in output
+skip_covered = False
+
+# Skip empty files
+skip_empty = False
+
+# Sort results by coverage percentage
+sort = Cover
+
+# Exclude these lines from coverage calculation
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+    
+    # Don't complain about missing debug-only code:
+    def __repr__
+    if self\.debug
+    
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+    
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if __name__ .__main__.:
+    if __name__ == .__main__.:
+    
+    # Don't complain about abstract methods
+    @(abc\.)?abstractmethod
+    
+    # Don't complain about type checking imports
+    if TYPE_CHECKING:
+    
+    # Don't complain about protocol methods
+    \.\.\.
+
+# Precision for coverage percentages
+precision = 1
+
+[html]
+# HTML report configuration
+directory = htmlcov
+title = JusticeTranscribe Backend Coverage Report
+
+[xml]
+# XML report configuration (useful for CI/CD)
+output = coverage.xml
+
+[json]
+# JSON report configuration
+output = coverage.json
+pretty_print = true
