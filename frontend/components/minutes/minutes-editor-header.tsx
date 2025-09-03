@@ -178,7 +178,7 @@ export default function MinutesEditorHeader({
                   disabled={isGenerating || !currentVersion}
                 >
                   <Edit className="size-5 md:mr-2" />
-                  <span className="hidden md:inline">Edit</span>
+                  <span className="hidden md:inline">Manual Edit</span>
                 </Button>
               )}
 
@@ -195,7 +195,7 @@ export default function MinutesEditorHeader({
                     }}
                   >
                     <Sparkles className="mr-2 size-4" />
-                    <span className="hidden md:inline">Update Summary</span>
+                    <span className="hidden md:inline">AI Edit</span>
                   </Button>
 
                   <DownloadStyleCopyButton
