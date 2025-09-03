@@ -30,7 +30,7 @@ export default function Header({ className }: { className?: string }) {
     <>
       <header
         className={cn(
-          "z-50 border-b border-gray-200 bg-white dark:border-gray-800",
+          "z-50 bg-white dark:border-gray-800",
           className,
         )}
       >
@@ -68,7 +68,7 @@ export default function Header({ className }: { className?: string }) {
       </header>
 
       {/* Navigation buttons below header */}
-      <div className="sticky top-14 z-40 flex h-10 w-full items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
+      <div className="sticky top-14 z-40 flex h-10 w-full items-center justify-between bg-white px-4 shadow-sm">
         {!selectedRecordingMode && (
           <div className="flex items-center space-x-2">
             <button
