@@ -5,6 +5,7 @@
 /* eslint-disable react/require-default-props */
 /* eslint-disable react/react-in-jsx-scope */
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
 import { Home, HelpCircle } from "lucide-react";
@@ -27,69 +28,64 @@ export default function Header({ className }: { className?: string }) {
   }, [pathname, router, newTranscription]);
 
   return (
-    <>
-      <header
-        className={cn(
-          "z-50 bg-white dark:border-gray-800",
-          className,
-        )}
-      >
-        <div className="mx-auto max-w-full">
-          <div className="flex h-14 items-center justify-between px-4">
-            <div className={cn("flex items-center", "pl-0 ")}>
-              <Link
-                href="/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-black"
+    <header className={cn("z-50 bg-white dark:border-gray-800", className)}>
+      <div className="mx-auto max-w-full">
+        <div className="flex h-14 items-center justify-between px-4">
+          <div className={cn("flex items-center", "pl-0 ")}>
+            <Link
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-black"
+            >
+              <span
+                className="font-medium text-black"
+                style={{ fontSize: "1.4rem" }}
               >
-                <span className="font-medium text-black" style={{ fontSize: '1.4rem' }}>
-                  Transcriber
-                </span>
-              </Link>
-            </div>
-            <div className="flex items-center gap-4">
-              {!selectedRecordingMode && (
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleHomeClick}
-                    className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
-                    aria-label="Go to home"
-                    title="Go to home"
-                  >
-                    <Home className="mr-1 size-4" />
-                    <span className="text-sm">Home</span>
-                  </button>
-                  <Link
-                    href="/help"
-                    className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
-                    aria-label="Go to help"
-                    title="Go to help"
-                  >
-                    <HelpCircle className="mr-1 size-4" />
-                    <span className="text-sm">Help</span>
-                  </Link>
-                </div>
-              )}
-              <Link
-                href="https://ai.justice.gov.uk/"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <img
-                  src="/justice-ai-logo-bnw.png"
-                  width="160"
-                  height="100"
-                  alt="Justice AI"
-                  className="h-20 w-auto object-contain"
-                />
-              </Link>
-            </div>
+                Transcriber
+              </span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-4">
+            {!selectedRecordingMode && (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleHomeClick}
+                  className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
+                  aria-label="Go to home"
+                  title="Go to home"
+                >
+                  <Home className="mr-1 size-4" />
+                  <span className="text-sm">Home</span>
+                </button>
+                <Link
+                  href="/help"
+                  className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
+                  aria-label="Go to help"
+                  title="Go to help"
+                >
+                  <HelpCircle className="mr-1 size-4" />
+                  <span className="text-sm">Help</span>
+                </Link>
+              </div>
+            )}
+            <Link
+              href="https://ai.justice.gov.uk/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Image
+                src="/justice-ai-logo-bnw.png"
+                width={160}
+                height={100}
+                alt="Justice AI"
+                className="h-20 w-auto object-contain"
+                priority
+              />
+            </Link>
           </div>
         </div>
-      </header>
-
-
-    </>
+      </div>
+    </header>
   );
 }

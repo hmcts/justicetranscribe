@@ -40,7 +40,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-
   const loadBackups = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -54,7 +53,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       setIsOpen(allBackups.length <= 1);
     } catch (err) {
       setError("Failed to load backed up recordings");
-      console.error("Failed to load backups:", err);
     } finally {
       setIsLoading(false);
     }
@@ -70,7 +68,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       setBackups((prev) => prev.filter((backup) => backup.id !== backupId));
     } catch (err) {
       setError("Failed to delete backup");
-      console.error("Failed to delete backup:", err);
     }
   };
 
@@ -141,8 +138,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   return (
     <Card>
       <CardContent className="pt-6">
-
-
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-4 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
             <div className="flex items-center gap-3">
