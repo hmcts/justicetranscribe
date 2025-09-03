@@ -21,13 +21,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  RefreshCw,
+  Upload,
   Trash2,
   FileAudio,
   ChevronDown,
   ChevronRight,
-  CheckCircle,
-  X,
 } from "lucide-react";
 import { audioBackupDB, AudioBackup } from "@/lib/indexeddb-backup";
 import AudioPlayerComponent from "./audio-player";
@@ -41,7 +39,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(true);
 
   const loadBackups = useCallback(async () => {
     try {
@@ -143,26 +140,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   return (
     <Card>
       <CardContent className="pt-6">
-        {/* Success message for offline recordings */}
-        {showSuccessMessage && (
-          <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-            <CheckCircle className="size-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>
-                Your recordings are safely saved offline and ready for upload
-                when you&apos;re ready.
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSuccessMessage(false)}
-                className="h-auto p-1 text-green-600 hover:text-green-800"
-              >
-                <X className="size-4" />
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+
 
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-4 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
@@ -223,7 +201,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
                         onClick={() => handleRetryUpload(backup)}
                         className="flex-1 sm:flex-initial"
                       >
-                        <RefreshCw className="mr-1 size-3" />
+                        <Upload className="mr-1 size-3" />
                         Retry Upload
                       </Button>
 
