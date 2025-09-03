@@ -41,14 +41,36 @@ export default function Header({ className }: { className?: string }) {
                 href="/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-gds-transport flex items-center gap-2 text-3xl text-black"
+                className="flex items-center gap-2 text-black"
               >
-                <span className="font-gds-transport text-3xl text-black">
+                <span className="font-medium text-black" style={{ fontSize: '1.4rem' }}>
                   Transcriber
                 </span>
               </Link>
             </div>
-            <div>
+            <div className="flex items-center gap-4">
+              {!selectedRecordingMode && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleHomeClick}
+                    className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
+                    aria-label="Go to home"
+                    title="Go to home"
+                  >
+                    <Home className="mr-1 size-4" />
+                    <span className="text-sm">Home</span>
+                  </button>
+                  <Link
+                    href="/help"
+                    className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
+                    aria-label="Go to help"
+                    title="Go to help"
+                  >
+                    <HelpCircle className="mr-1 size-4" />
+                    <span className="text-sm">Help</span>
+                  </Link>
+                </div>
+              )}
               <Link
                 href="https://ai.justice.gov.uk/"
                 target="_blank"
@@ -67,31 +89,7 @@ export default function Header({ className }: { className?: string }) {
         </div>
       </header>
 
-      {/* Navigation buttons below header */}
-      <div className="sticky top-14 z-40 flex h-10 w-full items-center justify-between bg-white px-4">
-        {!selectedRecordingMode && (
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleHomeClick}
-              className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
-              aria-label="Go to home"
-              title="Go to home"
-            >
-              <Home className="mr-1 size-4" />
-              <span className="text-sm">Home</span>
-            </button>
-            <Link
-              href="/help"
-              className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
-              aria-label="Go to help"
-              title="Go to help"
-            >
-              <HelpCircle className="mr-1 size-4" />
-              <span className="text-sm">Help</span>
-            </Link>
-          </div>
-        )}
-      </div>
+
     </>
   );
 }
