@@ -43,12 +43,12 @@ jobs:
         uv run coverage report --show-missing
         uv run coverage xml
 
-    # - name: Upload coverage reports to Codecov
-    #   uses: codecov/codecov-action@fdcc8476540edceab3de004e990f80d881c6cc00 #v5.5.0
-    #   with:
-    #     file: backend/coverage.xml
-    #     directory: backend/
-    #     fail_ci_if_error: false
-    #     verbose: true
-    #   env:
-    #     CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@fdcc8476540edceab3de004e990f80d881c6cc00 #v5.5.0
+      with:
+        file: backend/coverage.xml
+        directory: backend/
+        fail_ci_if_error: false
+        verbose: true
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
