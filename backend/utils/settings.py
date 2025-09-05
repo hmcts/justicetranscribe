@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from pydantic import field_validator
@@ -51,9 +52,9 @@ class Settings(BaseSettings):
     ENABLE_JWT_VERIFICATION: bool = True
     JWT_VERIFICATION_STRICT: bool = True
 
-    # Uncomment the below to run alembic commands locally, or to run the db interface independently of fastapi
-    # from pydantic_settings import SettingsConfigDict
-    if ENVIRONMENT == "local":
+    # Load from .env file for local development only
+    # Check actual environment variable, not class default
+    if os.getenv("ENVIRONMENT", "local") == "local":
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

@@ -1,7 +1,7 @@
 version: "3.8"
 
-# To run Azure configuration validation:
-# docker-compose --profile validation up azure-config-validator
+# To run configuration validation (Azure + Langfuse):
+# docker-compose --profile validation up config-validator
 #
 # To run validation + full stack:
 # docker-compose --profile full up
@@ -25,7 +25,7 @@ services:
       timeout: 5s
       retries: 5
 
-  azure-config-validator:
+  config-validator:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -33,7 +33,7 @@ services:
       - .env # Load all variables from .env
     environment:
       - ENVIRONMENT=local
-    command: ["uv", "run", "python", "build_utils/validate_azure_config.py"]
+    command: ["uv", "run", "python", "build_utils/validate_config.py"]
     networks:
       - app-network
     profiles:
