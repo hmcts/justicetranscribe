@@ -46,7 +46,7 @@ jobs:
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@fdcc8476540edceab3de004e990f80d881c6cc00 #v5.5.0
       with:
-        file: backend/coverage.xml
+        files: backend/coverage.xml
         directory: backend/
         fail_ci_if_error: false
         verbose: true
