@@ -11,7 +11,7 @@ from langfuse.decorators import langfuse_context, observe
 from litellm import acompletion
 from pydantic import BaseModel
 
-from utils.settings import settings_instance
+from utils.settings import get_settings
 
 
 class LLMModel(str, Enum):
@@ -29,14 +29,47 @@ ALL_LLM_MODELS = [
     LLMModel.VERTEX_GEMINI_20_FLASH,
     LLMModel.VERTEX_GEMINI_25_FLASH,
 ]
+settings_instance = get_settings()
 langfuse_client = Langfuse(
     public_key=settings_instance.LANGFUSE_PUBLIC_KEY,
     secret_key=settings_instance.LANGFUSE_SECRET_KEY,
     host=settings_instance.LANGFUSE_HOST,
     environment=settings_instance.ENVIRONMENT,
 )
-# langfuse_client.auth_check()
+
 langfuse_context.configure(environment=settings_instance.ENVIRONMENT)
+
+
+class LangfuseAuthManager:
+    """Manages Langfuse authentication state and lazy initialization."""
+
+    def __init__(self):
+        self._authenticated = False
+
+    def ensure_authenticated(self):
+        """
+        Ensure Langfuse client is authenticated.
+
+        This is called lazily on first use rather than at import time
+        to avoid authentication failures during test collection.
+        """
+        if not self._authenticated:
+            auth_result = langfuse_client.auth_check()
+            if not auth_result:
+                raise RuntimeError(
+                    f"Langfuse authentication failed for host: {settings_instance.LANGFUSE_HOST}. "
+                    f"Please verify your LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are correct."
+                )
+            self._authenticated = True
+
+
+# Create singleton instance
+_auth_manager = LangfuseAuthManager()
+
+
+def _ensure_langfuse_authenticated():
+    """Convenience function to ensure Langfuse authentication."""
+    _auth_manager.ensure_authenticated()
 
 
 def _load_vertex_credentials() -> str:
@@ -241,6 +274,9 @@ def get_backend_for_model(model: str) -> str:
 
 @observe(name="llm_completion", as_type="generation")
 async def llm_completion(*, model: str, messages: list, **kwargs):
+    # Ensure Langfuse is authenticated before any LLM operations
+    _ensure_langfuse_authenticated()
+
     backend = get_backend_for_model(model)
 
     if backend == "azure":
@@ -257,6 +293,9 @@ async def llm_completion(*, model: str, messages: list, **kwargs):
 
 def structured_output_llm_completion_builder_func(response_format):
     async def wrapped(*, model: str, messages: list, **kwargs):
+        # Ensure Langfuse is authenticated before any LLM operations
+        _ensure_langfuse_authenticated()
+
         backend = get_backend_for_model(model)
         if backend == "azure":
             return await structured_azure_completion(
