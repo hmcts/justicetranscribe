@@ -87,35 +87,54 @@ def test_unordered_lists():
     assert result.strip() == expected_html.strip()
 
 
-def _to_structure(node):
-    """Convert a BeautifulSoup node into a normalized, comparable structure."""
-    if isinstance(node, NavigableString):
-        text = node.strip()
-        return ("#text", text) if text else None
+def _normalise_html_structure(actual_html: str) -> tuple:
+    """Normalise a HTML string for robust comparison.
 
-    if isinstance(node, Tag):
-        children = []
-        for child in node.children:
-            struct = _to_structure(child)
+    This utility normalises HTML by parsing it into a tree structure for
+    comparing the logical DOM hierarchy rather than exact string
+    formatting. It strips whitespace from text nodes and ignores
+    formatting differences like indentation. Mainly to avoid brittle
+    tests.
+
+    Parameters
+    ----------
+    actual_html : str
+        The HTML string to test
+
+    Returns
+    -------
+    tuple
+        The normalised HTML structure
+    """
+
+    def _node_to_structure(node):
+        """Convert a BeautifulSoup node into a normalized structure."""
+        if isinstance(node, NavigableString):
+            text = node.strip()
+            return ("#text", text) if text else None
+
+        if isinstance(node, Tag):
+            children = []
+            for child in node.children:
+                struct = _node_to_structure(child)
+                if struct is not None:
+                    children.append(struct)
+            # Ignore attributes for simpler comparison - extend if needed
+            return (node.name, tuple(children))
+
+        return None  # Comments, Doctype, etc.
+
+    def _html_to_structure(html: str):
+        """Parse HTML string into a normalized structure tuple."""
+        soup = BeautifulSoup(html, "html.parser")
+        result = []
+        for element in soup.contents:
+            struct = _node_to_structure(element)
             if struct is not None:
-                children.append(struct)
-        # We ignore attributes here; add sorted(node.attrs.items()) if needed
-        return (node.name, tuple(children))
+                result.append(struct)
+        return tuple(result)
 
-    return None  # Comments, Doctype, etc.
-
-
-def _normalize_html_structure(html: str):
-    soup = BeautifulSoup(html, "html.parser")
-    # grab the first element node (e.g., <ol>...</ol>)
-    # if your renderer sometimes wraps with <p>, adjust accordingly
-    # Here we flatten to a list of top-level element structures.
-    result = []
-    for el in soup.contents:
-        struct = _to_structure(el)
-        if struct is not None:
-            result.append(struct)
-    return tuple(result)
+    return _html_to_structure(actual_html)
 
 
 def test_html_to_markdown_ordered_lists():
@@ -139,11 +158,9 @@ def test_html_to_markdown_ordered_lists():
       <li>Third item</li>
     </ol>"""
 
-    html = markdown_to_html(markdown_text, strip=True)
+    actual_html = markdown_to_html(markdown_text, strip=True)
 
-    assert (
-        _normalize_html_structure(html) == _normalize_html_structure(expected_html)
-    ), "Returned HTML does not match expected HTML, examine the diff with `pytest -k 'test_html_to_markdown_ordered_lists' -vv`"
+    assert _normalise_html_structure(actual_html) == _normalise_html_structure(expected_html)
 
 
 # def test_mixed_lists():
