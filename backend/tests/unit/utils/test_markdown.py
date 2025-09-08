@@ -165,18 +165,26 @@ def test_html_to_markdown_ordered_lists():
     ), "Returned HTML does not match expected HTML, examine the diff with `pytest -k 'test_html_to_markdown_ordered_lists' -vv`"
 
 
-# def test_mixed_lists():
-#     """Test conversion of mixed ordered and unordered lists"""
-#     markdown_text = """
-# * Unordered item
-#   1. Nested ordered item
-#   2. Second nested ordered item
-# * Another unordered item
-# """
-#     expected_html = """<ul>
-# <li>Unordered item
-# 1. Nested ordered item
-# 2. Second nested ordered item</li>
-# <li>Another unordered item</li>
-# </ul>"""
-#     assert markdown_to_html(markdown_text.strip()).strip() == expected_html.strip()
+def test_markdown_to_html_mixed_lists():
+    """Test conversion of mixed ordered and unordered lists"""
+    markdown_text = """
+    * Unordered item
+        1. Nested ordered item
+        2. Second nested ordered item
+    * Another unordered item
+    """
+
+    expected_html = """
+    <ul>
+      <li>Unordered item
+        <ol>
+          <li>Nested ordered item</li>
+          <li>Second nested ordered item</li>
+        </ol>
+      </li>
+      <li>Another unordered item</li>
+    </ul>
+    """
+    assert (
+        _normalise_html_structure(markdown_to_html(markdown_text)) == _normalise_html_structure(expected_html)
+    ), "Returned HTML does not match expected HTML, examine the diff with `pytest -k 'test_markdown_to_html_mixed_lists' -vv`"
