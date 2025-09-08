@@ -10,6 +10,7 @@ from app.audio.process_audio_fully import transcribe_and_generate_llm_output
 from app.audio.utils import (
     get_file_blob_path,
     generate_blob_upload_url,
+    validate_current_azure_storage_config,
 )
 from app.llm.llm_client import (
     langfuse_client,
@@ -62,6 +63,32 @@ UK_TIMEZONE = pytz.timezone("Europe/London")
 @router.get("/healthcheck")
 async def health_check():
     return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@router.get("/healthcheck/azure-storage")
+async def azure_storage_health_check():
+    """
+    Health check endpoint to validate Azure Storage configuration and account key.
+    This helps detect if the storage account key has been cycled and needs updating.
+    """
+    validation_result = validate_current_azure_storage_config()
+    
+    if validation_result["valid"]:
+        return JSONResponse(
+            status_code=200, 
+            content={
+                "status": "ok",
+                "azure_storage": validation_result
+            }
+        )
+    else:
+        return JSONResponse(
+            status_code=503,  # Service Unavailable
+            content={
+                "status": "error",
+                "azure_storage": validation_result
+            }
+        )
 
 
 @router.post("/get-upload-url", response_model=UploadUrlResponse)

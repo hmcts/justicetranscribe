@@ -9,10 +9,15 @@ from uuid import UUID
 import ffmpeg
 import httpx
 from azure.storage.blob import BlobSasPermissions, generate_blob_sas
-from azure.storage.blob.aio import BlobServiceClient
+from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 
 from app.database.postgres_models import DialogueEntry
 from app.logger import logger
+from app.audio.azure_utils import (
+    _validate_azure_account_key,
+    validate_azure_storage_config,
+    _extract_account_key_from_connection_string,
+)
 from utils.settings import settings_instance
 
 
@@ -22,7 +27,7 @@ async def get_blob_service_client():
     # Always use the real Azure Storage connection string
     connection_string = settings_instance.AZURE_STORAGE_CONNECTION_STRING
 
-    async with BlobServiceClient.from_connection_string(connection_string) as blob_service_client:
+    async with AsyncBlobServiceClient.from_connection_string(connection_string) as blob_service_client:
         yield blob_service_client
 
 
@@ -31,6 +36,21 @@ def is_rate_limit_error(exception):
     """Check if the exception is due to rate limiting (HTTP 429)"""
     return (
         isinstance(exception, httpx.HTTPStatusError) and exception.response.status_code == 429  # noqa: PLR2004
+    )
+
+
+
+
+
+def validate_current_azure_storage_config() -> dict:
+    """
+    Validate the current Azure Storage configuration from settings.
+    
+    Returns:
+        dict: Validation results with status and details
+    """
+    return validate_azure_storage_config(
+        connection_string=settings_instance.AZURE_STORAGE_CONNECTION_STRING
     )
 
 
@@ -62,16 +82,15 @@ def generate_blob_upload_url(container_name: str, blob_name: str, expiry_hours: 
     """
     # Extract account key from connection string
     connection_string = settings_instance.AZURE_STORAGE_CONNECTION_STRING
-    account_key = None
-
-    # Parse connection string to extract account key
-    for part in connection_string.split(";"):
-        if part.startswith("AccountKey="):
-            account_key = part.split("=", 1)[1]
-            break
+    account_key = _extract_account_key_from_connection_string(connection_string)
 
     if not account_key:
         error_msg = "Could not extract account key from connection string"
+        raise ValueError(error_msg)
+
+    # Validate that the account key is current and active
+    if not _validate_azure_account_key(settings_instance.AZURE_STORAGE_ACCOUNT_NAME, account_key):
+        error_msg = f"Azure Storage account key is invalid for account: {settings_instance.AZURE_STORAGE_ACCOUNT_NAME}"
         raise ValueError(error_msg)
 
     # Generate SAS token for upload (write permission)
