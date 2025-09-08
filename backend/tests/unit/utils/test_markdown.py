@@ -160,7 +160,9 @@ def test_html_to_markdown_ordered_lists():
 
     actual_html = markdown_to_html(markdown_text, strip=True)
 
-    assert _normalise_html_structure(actual_html) == _normalise_html_structure(expected_html)
+    assert (
+        _normalise_html_structure(actual_html) == _normalise_html_structure(expected_html)
+    ), "Returned HTML does not match expected HTML, examine the diff with `pytest -k 'test_html_to_markdown_ordered_lists' -vv`"
 
 
 # def test_mixed_lists():
