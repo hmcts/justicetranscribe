@@ -1,6 +1,6 @@
 """Tests for markdown utilities."""
 
-import pytest
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 from utils.markdown import html_to_markdown, markdown_to_html
 
@@ -87,27 +87,63 @@ def test_unordered_lists():
     assert result.strip() == expected_html.strip()
 
 
-# def test_ordered_lists():
-#     """Test conversion of ordered lists"""
-#     markdown_text = """
-# 1. First item
-# 2. Second item
-#    1. Nested item
-#    2. Another nested item
-# 3. Third item
-# """
-#     expected_html = """<ol>
-# <li>First item</li>
-# <li>Second item</li>
-# <li>
-# <ol>
-# <li>Nested item</li>
-# <li>Another nested item</li>
-# </ol>
-# </li>
-# <li>Third item</li>
-# </ol>"""
-#     assert markdown_to_html(markdown_text.strip()).strip() == expected_html.strip()
+def _to_structure(node):
+    """Convert a BeautifulSoup node into a normalized, comparable structure."""
+    if isinstance(node, NavigableString):
+        text = node.strip()
+        return ("#text", text) if text else None
+
+    if isinstance(node, Tag):
+        children = []
+        for child in node.children:
+            struct = _to_structure(child)
+            if struct is not None:
+                children.append(struct)
+        # We ignore attributes here; add sorted(node.attrs.items()) if needed
+        return (node.name, tuple(children))
+
+    return None  # Comments, Doctype, etc.
+
+
+def _normalize_html_structure(html: str):
+    soup = BeautifulSoup(html, "html.parser")
+    # grab the first element node (e.g., <ol>...</ol>)
+    # if your renderer sometimes wraps with <p>, adjust accordingly
+    # Here we flatten to a list of top-level element structures.
+    result = []
+    for el in soup.contents:
+        struct = _to_structure(el)
+        if struct is not None:
+            result.append(struct)
+    return tuple(result)
+
+
+def test_html_to_markdown_ordered_lists():
+    """Test conversion of ordered lists (structural compare)"""
+    markdown_text = """
+    1. First item
+    2. Second item
+       1. Nested item
+       2. Another nested item
+    3. Third item
+    """
+
+    expected_html = """<ol>
+      <li>First item</li>
+      <li>Second item
+        <ol>
+          <li>Nested item</li>
+          <li>Another nested item</li>
+        </ol>
+      </li>
+      <li>Third item</li>
+    </ol>"""
+
+    html = markdown_to_html(markdown_text, strip=True)
+
+    assert (
+        _normalize_html_structure(html) == _normalize_html_structure(expected_html)
+    ), "Returned HTML does not match expected HTML, examine the diff with `pytest -k 'test_html_to_markdown_ordered_lists' -vv`"
 
 
 # def test_mixed_lists():
