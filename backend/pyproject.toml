@@ -61,6 +61,7 @@ fastapi = [
 ]
 
 dev = [
+    "beautifulsoup4==4.13.5",
     "bumpversion>=0.6.0",
     "pytest>=8.4.1",
     "pytest-env>=1.1.1",
