@@ -1,10 +1,11 @@
+import os
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-
     API_PORT: int = 8080
 
     APP_URL: str
@@ -32,15 +33,28 @@ class Settings(BaseSettings):
     GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT: str
     LANGFUSE_HOST: str
 
+    @field_validator("LANGFUSE_HOST")
+    @classmethod
+    def validate_langfuse_host(cls, v):
+        """Validate that only the approved Justice AI Unit Langfuse instance is used."""
+        allowed_host = "https://langfuse-ai.justice.gov.uk"
+        if v != allowed_host:
+            error_msg = (
+                f"Disallowed Langfuse host '{v}'. Only {allowed_host} is permitted. "
+                f"This prevents accidental data leakage to unauthorized instances."
+            )
+            raise ValueError(error_msg)
+        return v
+
     # JWT Verification Settings - Strict by default
     AZURE_AD_TENANT_ID: str
     AZURE_AD_CLIENT_ID: str
     ENABLE_JWT_VERIFICATION: bool = True
     JWT_VERIFICATION_STRICT: bool = True
 
-    # Uncomment the below to run alembic commands locally, or to run the db interface independently of fastapi
-    # from pydantic_settings import SettingsConfigDict
-    if ENVIRONMENT == "local":
+    # Load from .env file for local development only
+    # Check actual environment variable, not class default
+    if os.getenv("ENVIRONMENT", "local") == "local":
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
