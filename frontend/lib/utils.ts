@@ -32,8 +32,8 @@ export function replaceSpeakerInDialogueEntries(
 }
 
 export const langfuseWeb = new LangfuseWeb({
-  publicKey: "pk-lf-16763a4a-2b6e-4705-89c5-ef25239a4ccf",
-  baseUrl: "https://cloud.langfuse.com", // 🇪🇺 EU region
+  publicKey: process.env.NEXT_PUBLIC_LANGFUSE_PUBLIC_KEY || "",
+  baseUrl: process.env.NEXT_PUBLIC_LANGFUSE_HOST || "https://cloud.langfuse.com",
 });
 
 export const findExistingMinuteVersionForTemplate = (
