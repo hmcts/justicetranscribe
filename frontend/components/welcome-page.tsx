@@ -235,13 +235,15 @@ function WelcomePage() {
 
       <BackupRecovery onRetryUpload={handleRetryUpload} />
 
-      <MeetingsList
+      <div className="mt-8">
+        <MeetingsList
         showAllMeetings={showAllMeetings}
         setShowAllMeetings={setShowAllMeetings}
         handleNewMeeting={handleNewMeeting}
         isLoading={isLoading}
         meetings={filteredMeetings}
-      />
+        />
+      </div>
     </div>
   );
 }
