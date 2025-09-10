@@ -1,9 +1,10 @@
-import os
-from sqlmodel import SQLModel, create_engine, Session, select
-from typing import Generator
 import logging
+from collections.abc import Generator
+
 from dotenv import load_dotenv
-from utils.settings import settings_instance
+from sqlmodel import Session, create_engine, select
+
+from utils.settings import get_settings
 
 # Load environment variables from .env file
 load_dotenv()
@@ -13,10 +14,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Database URL from environment variable
-DATABASE_URL = settings_instance.DATABASE_CONNECTION_STRING
+DATABASE_URL = get_settings().DATABASE_CONNECTION_STRING
 
 if not DATABASE_URL:
-    raise ValueError("DATABASE_CONNECTION_STRING is not set")
+    msg = "DATABASE_CONNECTION_STRING is not set"
+    raise ValueError(msg)
 
 # Create engine
 engine = create_engine(
@@ -53,9 +55,9 @@ def test_db_connection():
     try:
         with Session(engine) as session:
             # Simple query to test connection
-            result = session.execute(select(1))
+            session.execute(select(1))
             logger.info("Database connection test successful")
             return True
-    except Exception as e:
-        logger.error(f"Database connection test failed: {e}")
+    except Exception:
+        logger.exception("Database connection test failed")
         return False
