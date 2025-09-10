@@ -1,7 +1,7 @@
-"""Unit tests for Langfuse configuration validation.
+"""Unit tests for settings configuration and validation.
 
 These tests use mocked settings and do not make network calls.
-They focus on validation logic, host allowlisting, and configuration parsing.
+They focus on settings validation logic, host allowlisting, and configuration parsing.
 """
 
 import os
@@ -18,8 +18,8 @@ from build_utils.validate_config import (
 from utils.settings import Settings, get_settings
 
 
-class TestLangfuseConfigurationValidation:
-    """Unit tests for Langfuse configuration validation."""
+class TestSettingsConfigurationValidation:
+    """Unit tests for settings configuration validation."""
 
     def test_settings_validation_with_mocked_env_file(self):
         """Test that Settings class properly validates mocked .env configuration."""
@@ -183,8 +183,8 @@ class TestLangfuseConfigurationValidation:
             ), f"Frontend public key should start with 'pk-lf-', got: {frontend_key[:10]}..."
 
 
-class TestLangfuseSecurityCompliance:
-    """Unit tests for security-focused validation."""
+class TestSettingsSecurityCompliance:
+    """Unit tests for security-focused settings validation."""
 
     def test_unauthorized_hosts_rejected_by_settings(self):
         """Test that attempting to use unauthorized hosts fails fast."""
@@ -238,3 +238,68 @@ class TestLangfuseSecurityCompliance:
                 # Validation should fail
                 result = validate_langfuse_host()
                 assert not result, f"Validation should reject host: {bad_host}"
+
+
+class TestSettingsRefactoring:
+    """Unit tests for the refactored settings architecture."""
+
+    def test_get_settings_with_environment_override(self):
+        """Test that get_settings respects environment parameter."""
+        mock_env = {
+            "APP_URL": "http://test.com",
+            "AZURE_STORAGE_ACCOUNT_NAME": "test",
+            "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test",
+            "AZURE_STORAGE_CONTAINER_NAME": "test",
+            "AZURE_STORAGE_TRANSCRIPTION_CONTAINER": "test",
+            "DATABASE_CONNECTION_STRING": "postgresql://test",
+            "AZURE_OPENAI_API_KEY": "test",
+            "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com/",
+            "AZURE_SPEECH_KEY": "test",
+            "AZURE_SPEECH_REGION": "test",
+            "AZURE_GROK_API_KEY": "test",
+            "AZURE_GROK_ENDPOINT": "https://test.com",
+            "SENTRY_DSN": "https://test@sentry.io/test",
+            "GOV_NOTIFY_API_KEY": "test",
+            "LANGFUSE_PUBLIC_KEY": "pk-lf-test",
+            "LANGFUSE_SECRET_KEY": "sk-lf-test",
+            "LANGFUSE_HOST": "https://langfuse-ai.justice.gov.uk",
+            "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT": "{}",
+            "AZURE_AD_TENANT_ID": "test",
+            "AZURE_AD_CLIENT_ID": "test",
+        }
+
+        with patch.dict(os.environ, mock_env, clear=True):
+            # Test that get_settings works with environment override
+            settings = get_settings(environment="production")
+            assert settings.LANGFUSE_HOST == "https://langfuse-ai.justice.gov.uk"
+
+    def test_settings_functional_purity(self):
+        """Test that settings can be created independently for testing (functional purity)."""
+        # This demonstrates how tests can now create isolated settings
+        test_settings = Settings(
+            APP_URL="http://test.com",
+            AZURE_STORAGE_ACCOUNT_NAME="test",
+            AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test",
+            AZURE_STORAGE_CONTAINER_NAME="test",
+            AZURE_STORAGE_TRANSCRIPTION_CONTAINER="test",
+            DATABASE_CONNECTION_STRING="postgresql://test",
+            AZURE_OPENAI_API_KEY="test",
+            AZURE_OPENAI_ENDPOINT="https://test.openai.azure.com/",
+            AZURE_SPEECH_KEY="test",
+            AZURE_SPEECH_REGION="test",
+            AZURE_GROK_API_KEY="test",
+            AZURE_GROK_ENDPOINT="https://test.com",
+            SENTRY_DSN="https://test@sentry.io/test",
+            GOV_NOTIFY_API_KEY="test",
+            LANGFUSE_PUBLIC_KEY="pk-lf-test",
+            LANGFUSE_SECRET_KEY="sk-lf-test",
+            LANGFUSE_HOST="https://langfuse-ai.justice.gov.uk",
+            GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT="{}",
+            AZURE_AD_TENANT_ID="test",
+            AZURE_AD_CLIENT_ID="test",
+            ENVIRONMENT="test"
+        )
+
+        # Verify settings work independently
+        assert test_settings.ENVIRONMENT == "test"
+        assert test_settings.LANGFUSE_HOST == "https://langfuse-ai.justice.gov.uk"
