@@ -53,8 +53,7 @@ class Settings(BaseSettings):
     JWT_VERIFICATION_STRICT: bool = True
 
     # Load from .env file for local development only
-    # Check actual environment variable, not class default
-    if os.getenv("ENVIRONMENT", "local") == "local":
+    if os.getenv("ENVIRONMENT") == "local":
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
