@@ -208,17 +208,18 @@ function WelcomePage() {
       {!showAllMeetings && allSpeakers.length > 0 && (
         <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
           <div className="mb-2">
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-            <label
+            <div
               id="speaker-filter-label"
-              htmlFor="speaker-filter"
               className="text-sm font-medium text-gray-700"
             >
               Filter by Speaker
-            </label>
+            </div>
           </div>
           <Select value={speakerFilter} onValueChange={setSpeakerFilter}>
-            <SelectTrigger id="speaker-filter" className="w-full">
+            <SelectTrigger 
+              className="w-full"
+              aria-labelledby="speaker-filter-label"
+            >
               <SelectValue placeholder="All speakers" />
             </SelectTrigger>
             <SelectContent>
