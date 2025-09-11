@@ -290,11 +290,11 @@ export default function MinutesEditorHeader({
               <div className="text-center">
                 <p className="text-xs text-gray-500">
                   Press{" "}
-                  <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+                  <kbd className="rounded bg-gray-800 px-1 py-0.5 text-xs text-white">
                     ⌘
                   </kbd>{" "}
                   +{" "}
-                  <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+                  <kbd className="rounded bg-gray-800 px-1 py-0.5 text-xs text-white">
                     Enter
                   </kbd>{" "}
                   to update
