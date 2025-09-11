@@ -164,9 +164,9 @@ function MeetingsList({
       )}
 
       <div>
-        <h2 className="mb-4 text-xl font-semibold">
-          {showAllMeetings ? "All Meetings" : "Recent Meetings"}
-        </h2>
+        {!showAllMeetings && (
+          <h2 className="mb-4 text-xl font-semibold">Recent Meetings</h2>
+        )}
         {isLoading && (
           <div className="py-8 text-center">Loading your meetings...</div>
         )}
