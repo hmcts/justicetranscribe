@@ -87,14 +87,14 @@ export default function DialogueHeader({
             }}
           />
         ) : (
-          <CardTitle
+          <h1
             className="mb-0 rounded-md px-2 py-1 text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
             role="button"
             tabIndex={0}
             onClick={() => setIsEditing(true)}
           >
             {currentTranscription?.title}
-          </CardTitle>
+          </h1>
         )}
         <button
           className="text-muted-foreground hover:text-foreground"
