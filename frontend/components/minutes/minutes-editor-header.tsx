@@ -224,9 +224,9 @@ export default function MinutesEditorHeader({
         <div className="rounded-lg border bg-white p-6 shadow-sm">
           <div className="space-y-4">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-gray-900">
                 What would you like to change?
-              </h3>
+              </h2>
               <p className="text-sm text-gray-600">
                 Tell AI exactly what to change in your summary
               </p>
