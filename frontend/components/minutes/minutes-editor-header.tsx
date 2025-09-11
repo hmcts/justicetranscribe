@@ -238,6 +238,7 @@ export default function MinutesEditorHeader({
                 value={aiEditInstructions}
                 onChange={(e) => setAIEditInstructions(e.target.value)}
                 className="min-h-[80px] resize-none"
+                aria-label="Describe the changes you want to make to the meeting summary"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                     handleSubmitAIEdit();
