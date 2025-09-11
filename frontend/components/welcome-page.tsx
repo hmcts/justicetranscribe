@@ -67,7 +67,7 @@ function WelcomePage() {
       return transcriptsMetadata;
     }
     return transcriptsMetadata.filter((meeting) =>
-      meeting.speakers.includes(speakerFilter),
+      meeting.speakers.includes(speakerFilter)
     );
   }, [transcriptsMetadata, speakerFilter]);
 
@@ -143,7 +143,7 @@ function WelcomePage() {
           {isMobile ? (
             <Button
               onClick={handleNewMeeting}
-              className="flex w-full items-center justify-center gap-2 bg-blue-500 py-6 text-lg hover:bg-blue-600"
+              className="flex w-full items-center justify-center gap-2 bg-blue-600 py-6 text-lg hover:bg-blue-700"
             >
               <Plus className="size-5" />
               Start New Meeting
@@ -151,7 +151,7 @@ function WelcomePage() {
           ) : (
             <Popover>
               <PopoverTrigger asChild>
-                <Button className="flex w-full items-center justify-center gap-2 bg-blue-500 py-6 text-lg hover:bg-blue-600">
+                <Button className="flex w-full items-center justify-center gap-2 bg-blue-600 py-6 text-lg hover:bg-blue-700">
                   <Plus className="size-5" />
                   Start New Meeting
                 </Button>
@@ -237,11 +237,11 @@ function WelcomePage() {
 
       <div className="mt-8">
         <MeetingsList
-        showAllMeetings={showAllMeetings}
-        setShowAllMeetings={setShowAllMeetings}
-        handleNewMeeting={handleNewMeeting}
-        isLoading={isLoading}
-        meetings={filteredMeetings}
+          showAllMeetings={showAllMeetings}
+          setShowAllMeetings={setShowAllMeetings}
+          handleNewMeeting={handleNewMeeting}
+          isLoading={isLoading}
+          meetings={filteredMeetings}
         />
       </div>
     </div>
