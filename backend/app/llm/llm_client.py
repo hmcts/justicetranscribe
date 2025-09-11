@@ -29,15 +29,16 @@ ALL_LLM_MODELS = [
     LLMModel.VERTEX_GEMINI_20_FLASH,
     LLMModel.VERTEX_GEMINI_25_FLASH,
 ]
-settings_instance = get_settings()
+# Create langfuse client with settings
+_settings = get_settings()
 langfuse_client = Langfuse(
-    public_key=settings_instance.LANGFUSE_PUBLIC_KEY,
-    secret_key=settings_instance.LANGFUSE_SECRET_KEY,
-    host=settings_instance.LANGFUSE_HOST,
-    environment=settings_instance.ENVIRONMENT,
+    public_key=_settings.LANGFUSE_PUBLIC_KEY,
+    secret_key=_settings.LANGFUSE_SECRET_KEY,
+    host=_settings.LANGFUSE_HOST,
+    environment=_settings.ENVIRONMENT,
 )
 
-langfuse_context.configure(environment=settings_instance.ENVIRONMENT)
+langfuse_context.configure(environment=_settings.ENVIRONMENT)
 
 
 class LangfuseAuthManager:
@@ -57,7 +58,7 @@ class LangfuseAuthManager:
             auth_result = langfuse_client.auth_check()
             if not auth_result:
                 raise RuntimeError(
-                    f"Langfuse authentication failed for host: {settings_instance.LANGFUSE_HOST}. "
+                    f"Langfuse authentication failed for host: {get_settings().LANGFUSE_HOST}. "
                     f"Please verify your LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are correct."
                 )
             self._authenticated = True
@@ -92,30 +93,38 @@ def _load_vertex_credentials() -> str:
 
     # Fall back to environment variable
     try:
-        vertex_credentials = settings_instance.GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT
+        vertex_credentials = get_settings().GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT
         return vertex_credentials
     except json.JSONDecodeError as e:
         raise RuntimeError(f"Failed to parse Google Cloud credentials from environment variable. Error: {e!s}")
 
 
 # Create a pre-configured version of acompletion with Azure Grok defaults
-azure_grok_acompletion = partial(
-    acompletion,
-    api_base=settings_instance.AZURE_GROK_ENDPOINT,
-    api_version="2024-05-01-preview",
-    api_key=settings_instance.AZURE_GROK_API_KEY,
-    num_retries=25,
-)
+def _get_azure_grok_acompletion():
+    settings = get_settings()
+    return partial(
+        acompletion,
+        api_base=settings.AZURE_GROK_ENDPOINT,
+        api_version="2024-05-01-preview",
+        api_key=settings.AZURE_GROK_API_KEY,
+        num_retries=25,
+    )
+
+azure_grok_acompletion = _get_azure_grok_acompletion()
 
 
 # Create a pre-configured version of acompletion with Azure defaults
-azure_acompletion = partial(
-    acompletion,
-    api_base=settings_instance.AZURE_OPENAI_ENDPOINT,
-    api_version="2025-03-01-preview",
-    api_key=settings_instance.AZURE_OPENAI_API_KEY,
-    num_retries=25,
-)
+def _get_azure_acompletion():
+    settings = get_settings()
+    return partial(
+        acompletion,
+        api_base=settings.AZURE_OPENAI_ENDPOINT,
+        api_version="2025-03-01-preview",
+        api_key=settings.AZURE_OPENAI_API_KEY,
+        num_retries=25,
+    )
+
+azure_acompletion = _get_azure_acompletion()
 
 # Create a pre-configured version of completion with Vertex AI defaults
 gemini_completion = partial(

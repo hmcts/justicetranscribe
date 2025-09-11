@@ -21,7 +21,7 @@ from backend.app.audio.transcription import (
 # from backend.app.audio.utils import cleanup_files # No longer directly needed
 from backend.app.logger import logger
 from backend.app.minutes.types import DialogueEntry
-from shared_utils.settings import settings_instance
+from shared_utils.settings import get_settings
 
 # Import the speaker processing function
 from backend.app.audio.speakers import process_speakers_and_dialogue_entries
@@ -242,18 +242,19 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if not settings_instance.DEEPGRAM_API_KEY:
+    settings = get_settings()
+    if not settings.DEEPGRAM_API_KEY:
         logger.error("DEEPGRAM_API_KEY not set in settings.")
         exit(1)
     if (
-        not settings_instance.AZURE_SPEECH_KEY
+        not settings.AZURE_SPEECH_KEY
     ):  # Azure key is still needed for the attempt
         logger.error("AZURE_SPEECH_KEY not set in settings.")
         exit(1)
     # AWS keys for transcribe and S3 will be picked up by boto3 from environment/config
-    # if settings_instance.AWS_ACCESS_KEY_ID is not set, etc.
+    # if settings.AWS_ACCESS_KEY_ID is not set, etc.
     # but DATA_S3_BUCKET is crucial.
-    if not settings_instance.DATA_S3_BUCKET:
+    if not settings.DATA_S3_BUCKET:
         logger.error("DATA_S3_BUCKET not set in settings.")
         exit(1)
 
