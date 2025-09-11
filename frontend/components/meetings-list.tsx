@@ -9,6 +9,7 @@ import { Clock, Plus, Pencil, Trash2 } from "lucide-react";
 import { format, isToday, isYesterday, formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useTranscripts } from "@/providers/transcripts";
+import { DEFAULT_MEETING_TITLE } from "@/lib/utils";
 import posthog from "posthog-js";
 
 function MeetingsList({
@@ -187,7 +188,7 @@ function MeetingsList({
                     onClick={() => handleMeetingClick(meeting.id)}
                   >
                     <div className="mb-1 font-medium">
-                      {meeting.title || "Untitled Meeting"}
+                      {meeting.title || DEFAULT_MEETING_TITLE}
                     </div>
                     <div className="flex items-center text-sm text-gray-500">
                       <Clock className="mr-1.5 size-3.5" />

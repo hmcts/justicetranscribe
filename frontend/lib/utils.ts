@@ -9,6 +9,9 @@ import { twMerge } from "tailwind-merge";
 import { LangfuseWeb } from "langfuse";
 import { getMinuteVersionById, MinuteVersion } from "@/lib/database";
 
+// Constant for fallback when no meeting title is available
+export const DEFAULT_MEETING_TITLE = "Untitled Meeting";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
