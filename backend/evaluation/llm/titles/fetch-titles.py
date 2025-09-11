@@ -8,7 +8,7 @@ from datetime import datetime
 from langfuse import Langfuse
 from langfuse.api.core.api_error import ApiError
 
-from shared_utils.settings import settings_instance
+from shared_utils.settings import get_settings
 
 # Configuration
 BATCH_SIZE = 50
@@ -20,7 +20,7 @@ langfuse = Langfuse(
     secret_key=os.environ["LANGFUSE_SECRET_KEY"],
     public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
     host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
-    environment=settings_instance.ENVIRONMENT,
+    environment=get_settings().ENVIRONMENT,
 )
 
 

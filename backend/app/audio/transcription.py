@@ -1,7 +1,4 @@
-import asyncio
-import json
 import tempfile
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -21,9 +18,9 @@ from app.audio.utils import (
     convert_input_dialogue_entries_to_dialogue_entries,
     get_blob_service_client,
 )
-from app.logger import logger
 from app.database.postgres_models import DialogueEntry
-from utils.settings import settings_instance
+from app.logger import logger
+from utils.settings import get_settings
 
 TOO_MANY_REQUESTS = 429
 
@@ -57,7 +54,7 @@ async def perform_transcription_steps_with_azure_and_aws(
             # Use async Azure Blob client
             async with get_blob_service_client() as blob_service_client:
                 blob_client = blob_service_client.get_blob_client(
-                    container=settings_instance.AZURE_STORAGE_CONTAINER_NAME,
+                    container=get_settings().AZURE_STORAGE_CONTAINER_NAME,
                     blob=user_upload_blob_path,
                 )
 
@@ -112,9 +109,10 @@ async def transcribe_audio_with_azure(audio_file_path: Path):
     Async version of transcribe audio using Azure Speech-to-Text API
     """
     url = "https://production-justice-ai.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2024-11-15"
-    if not settings_instance.AZURE_SPEECH_KEY:
+    settings = get_settings()
+    if not settings.AZURE_SPEECH_KEY:
         raise HTTPException(status_code=500, detail="AZURE_SPEECH_KEY not set")
-    headers = {"Ocp-Apim-Subscription-Key": settings_instance.AZURE_SPEECH_KEY}
+    headers = {"Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY}
     async with aiofiles.open(audio_file_path, "rb") as audio_file:
         audio_content = await audio_file.read()
         files: Any = {

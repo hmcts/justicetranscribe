@@ -1,8 +1,8 @@
 from notifications_python_client.notifications import NotificationsAPIClient
 
-from utils.settings import settings_instance
+from utils.settings import get_settings
 
-notifications_client = NotificationsAPIClient(settings_instance.GOV_NOTIFY_API_KEY)
+notifications_client = NotificationsAPIClient(get_settings().GOV_NOTIFY_API_KEY)
 
 
 def send_email(user_email: str, meeting_link: str, meeting_title: str):
