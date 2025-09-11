@@ -118,7 +118,7 @@ function MeetingsList({
                 Cancel
               </button>
               <button
-                className="rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600"
+                className="rounded px-3 py-2 text-sm text-white hover:bg-red-700" style={{backgroundColor: '#B21010'}}
                 onClick={() => handleDelete(showDeleteModal)}
               >
                 Delete
@@ -210,7 +210,7 @@ function MeetingsList({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="size-8 p-0 text-red-500 hover:text-red-600"
+                      className="size-8 p-0 hover:bg-red-100" style={{color: '#B21010'}}
                       onClick={() => setShowDeleteModal(meeting.id)}
                     >
                       <span className="sr-only">Delete</span>
