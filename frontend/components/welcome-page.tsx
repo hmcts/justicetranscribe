@@ -73,7 +73,8 @@ function WelcomePage() {
   }, [transcriptsMetadata, speakerFilter]);
 
   const handleNewMeeting = () => {
-    if (isMobile) {
+    if (isMobile || showAllMeetings) {
+      // On mobile or when viewing all meetings, default to mic recording
       setSelectedRecordingMode("mic");
       newTranscription();
     }

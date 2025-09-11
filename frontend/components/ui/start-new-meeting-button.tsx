@@ -27,10 +27,7 @@ const StartNewMeetingButton = React.forwardRef<HTMLButtonElement, StartNewMeetin
   return (
     <Button
       ref={ref}
-      onClick={(e) => {
-        console.log("StartNewMeetingButton clicked", onClick);
-        onClick?.(e);
-      }}
+      onClick={onClick}
       disabled={disabled}
       className={`${baseClasses} ${sizeClasses} ${widthClasses} ${className}`}
       {...props}
