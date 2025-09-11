@@ -53,10 +53,11 @@ export default function ProcessingLoader({
 
   return (
     <div className="mx-auto max-w-md py-12 text-center">
+      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-gray-100">Upload Complete</h1>
       <div className="rounded-lg border border-blue-100 bg-blue-50 p-6 dark:border-blue-900/30 dark:bg-blue-900/10">
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           Your meeting is safely saved
-        </h3>
+        </h2>
         <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
           We&apos;ll send you an email once your meeting is ready.
         </p>
