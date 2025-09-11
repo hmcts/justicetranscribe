@@ -105,7 +105,7 @@ function MeetingsList({
             onClick={() => setShowDeleteModal(null)}
           />
           <div className="relative rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="mb-4 text-lg font-medium">Delete Meeting</h3>
+            <h2 className="mb-4 text-lg font-medium">Delete Meeting</h2>
             <p className="mb-6 text-sm text-gray-600">
               Are you sure you want to delete this meeting? This action cannot
               be undone.
