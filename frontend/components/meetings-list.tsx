@@ -10,6 +10,7 @@ import { format, isToday, isYesterday, formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useTranscripts } from "@/providers/transcripts";
 import { DEFAULT_MEETING_TITLE } from "@/lib/utils";
+import StartNewMeetingButton from "@/components/ui/start-new-meeting-button";
 import posthog from "posthog-js";
 
 function MeetingsList({
@@ -233,13 +234,10 @@ function MeetingsList({
             )}
 
             {showAllMeetings && (
-              <Button
+              <StartNewMeetingButton
                 onClick={handleNewMeeting}
-                className="mt-4 w-full bg-blue-500 hover:bg-blue-600"
-              >
-                <Plus className="mr-2 size-4" />
-                Start New Meeting
-              </Button>
+                className="mt-4"
+              />
             )}
           </div>
         )}

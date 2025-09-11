@@ -24,6 +24,7 @@ import {
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { getFirstName } from "@/lib/utils";
 import { AudioBackup } from "@/lib/indexeddb-backup";
+import StartNewMeetingButton from "@/components/ui/start-new-meeting-button";
 import AudioUploader from "./audio/audio-uploader";
 import MeetingsList from "./meetings-list";
 import BackupRecovery from "./audio/backup-recovery";
@@ -144,20 +145,16 @@ function WelcomePage() {
       {!showAllMeetings && (
         <div className="mb-8">
           {isMobile ? (
-            <Button
+            <StartNewMeetingButton
               onClick={handleNewMeeting}
-              className="flex w-full items-center justify-center gap-2 bg-blue-600 py-6 text-lg hover:bg-blue-700"
-            >
-              <Plus className="size-5" />
-              Start New Meeting
-            </Button>
+              size="large"
+            />
           ) : (
             <Popover>
               <PopoverTrigger asChild>
-                <Button className="flex w-full items-center justify-center gap-2 bg-blue-600 py-6 text-lg hover:bg-blue-700">
-                  <Plus className="size-5" />
-                  Start New Meeting
-                </Button>
+                <StartNewMeetingButton
+                  size="large"
+                />
               </PopoverTrigger>
               <PopoverContent
                 className="w-[--radix-popover-trigger-width] p-3"

@@ -1,6 +1,7 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
 import { useTranscripts } from "@/providers/transcripts";
+import StartNewMeetingButton from "@/components/ui/start-new-meeting-button";
 
 export type AudioProcessingStatus =
   | "idle"
@@ -59,15 +60,14 @@ export default function ProcessingLoader({
         <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
           We&apos;ll send you an email once your meeting is ready.
         </p>
-        <button
-          onClick={handleNewTranscription}
-          className="mt-6 rounded-lg bg-blue-500 px-4 py-2 text-white shadow-md
-            transition-all duration-200 hover:scale-105 hover:bg-blue-600 hover:shadow-lg
-            active:scale-95"
-          type="button"
-        >
-          Start New Meeting
-        </button>
+        <div className="mt-6 flex justify-center">
+          <StartNewMeetingButton
+            onClick={handleNewTranscription}
+            className="hover:scale-105 active:scale-95 transition-all duration-200 shadow-md hover:shadow-lg px-4"
+            fullWidth={false}
+            showIcon={false}
+          />
+        </div>
       </div>
     </div>
   );
