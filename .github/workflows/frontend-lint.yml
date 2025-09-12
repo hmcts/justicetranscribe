@@ -36,7 +36,7 @@ jobs:
         continue-on-error: true
         run: |
           echo "::notice title=ESLint Check::Running ESLint - violations are advisory only"
-          npx eslint . --ext .ts,.tsx,.js,.jsx --format=github || true
+          npx eslint . --ext .ts,.tsx,.js,.jsx || true
 
       - name: Run TypeScript Check (Advisory)
         working-directory: ./frontend
