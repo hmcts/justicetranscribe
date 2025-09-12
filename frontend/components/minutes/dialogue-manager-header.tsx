@@ -7,6 +7,7 @@ import { Transcription, DialogueEntry } from "@/src/api/generated";
 import {
   concatenateDialogueEntriesInTranscriptionJobs,
   replaceSpeakerInDialogueEntries,
+  DEFAULT_MEETING_TITLE,
 } from "@/lib/utils";
 
 interface DialogueHeaderProps {
@@ -21,12 +22,10 @@ export default function DialogueHeader({
   const [isEditing, setIsEditing] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<string>("");
   const [newSpeakerName, setNewSpeakerName] = useState<string>("");
-  const [newTitle, setNewTitle] = useState(currentTranscription?.title || "");
+  const [newTitle, setNewTitle] = useState(currentTranscription?.title || DEFAULT_MEETING_TITLE);
 
   useEffect(() => {
-    if (currentTranscription?.title) {
-      setNewTitle(currentTranscription.title);
-    }
+    setNewTitle(currentTranscription?.title || DEFAULT_MEETING_TITLE);
   }, [currentTranscription?.title]);
 
   const dialogueEntries =
@@ -79,7 +78,7 @@ export default function DialogueHeader({
                 onTitleEdit();
               } else if (e.key === "Escape") {
                 setIsEditing(false);
-                setNewTitle(currentTranscription?.title || "");
+                setNewTitle(currentTranscription?.title || DEFAULT_MEETING_TITLE);
               }
             }}
             onBlur={() => {
@@ -87,14 +86,14 @@ export default function DialogueHeader({
             }}
           />
         ) : (
-          <CardTitle
+          <h1
             className="mb-0 rounded-md px-2 py-1 text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
             role="button"
             tabIndex={0}
             onClick={() => setIsEditing(true)}
           >
-            {currentTranscription?.title}
-          </CardTitle>
+            {currentTranscription?.title || DEFAULT_MEETING_TITLE}
+          </h1>
         )}
         <button
           className="text-muted-foreground hover:text-foreground"

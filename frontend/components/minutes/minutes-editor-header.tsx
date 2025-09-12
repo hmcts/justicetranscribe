@@ -224,9 +224,9 @@ export default function MinutesEditorHeader({
         <div className="rounded-lg border bg-white p-6 shadow-sm">
           <div className="space-y-4">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-gray-900">
                 What would you like to change?
-              </h3>
+              </h2>
               <p className="text-sm text-gray-600">
                 Tell AI exactly what to change in your summary
               </p>
@@ -238,6 +238,7 @@ export default function MinutesEditorHeader({
                 value={aiEditInstructions}
                 onChange={(e) => setAIEditInstructions(e.target.value)}
                 className="min-h-[80px] resize-none"
+                aria-label="Describe the changes you want to make to the meeting summary"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                     handleSubmitAIEdit();
@@ -289,11 +290,11 @@ export default function MinutesEditorHeader({
               <div className="text-center">
                 <p className="text-xs text-gray-500">
                   Press{" "}
-                  <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+                  <kbd className="rounded bg-gray-800 px-1 py-0.5 text-xs text-white">
                     ⌘
                   </kbd>{" "}
                   +{" "}
-                  <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+                  <kbd className="rounded bg-gray-800 px-1 py-0.5 text-xs text-white">
                     Enter
                   </kbd>{" "}
                   to update

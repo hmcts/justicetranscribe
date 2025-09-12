@@ -25,6 +25,7 @@ export default function HelpPage() {
 
         {/* Tutorial Cards */}
         <section className="mb-12">
+          <h2 className="mb-8 text-center text-2xl font-semibold">Tutorials</h2>
           <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
             {/* Basic Tutorial Card */}
             <Card className="group transition-shadow hover:shadow-md">

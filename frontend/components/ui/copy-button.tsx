@@ -51,7 +51,7 @@ export default function DownloadStyleCopyButton({
       className={`flex items-center justify-center gap-2 
                 rounded-md px-4 py-2 text-white
                 shadow-sm transition-all duration-200 
-                ${showCopied ? "bg-green-600" : "bg-green-600 hover:bg-green-700"}`}
+                ${showCopied ? "bg-green-600" : "bg-green-700 hover:bg-green-800"}`}
       onClick={handleCopy}
       title="Copy content"
       type="button"

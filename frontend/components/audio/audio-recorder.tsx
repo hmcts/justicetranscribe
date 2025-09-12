@@ -314,9 +314,9 @@ function AudioRecorderComponent({
           {!showProcessingRecording && (
             <>
               <div className="my-6 text-center">
-                <h2 className="text-2xl font-semibold">
+                <h1 className="text-2xl font-semibold">
                   In-Person Meeting Recorder
-                </h2>
+                </h1>
               </div>
 
               {/* Do Not Disturb Notification - One line below header */}
