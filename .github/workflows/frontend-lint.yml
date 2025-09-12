@@ -1,0 +1,57 @@
+name: Frontend Code Quality (Advisory)
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+    branches: [main, dev, preprod]
+  push:
+    paths:
+      - 'frontend/**'
+    branches: [main, dev, preprod]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    # Make this job advisory - it can fail without blocking the PR
+    continue-on-error: true
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run ESLint (Advisory)
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          echo "::notice title=ESLint Check::Running ESLint - violations are advisory only"
+          npx eslint . --ext .ts,.tsx,.js,.jsx --format=github || true
+
+      - name: Run TypeScript Check (Advisory)
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          echo "::notice title=TypeScript Check::Running TypeScript check - errors are advisory only"
+          npx tsc --noEmit || true
+
+      - name: Run Prettier Check (Advisory)
+        working-directory: ./frontend
+        continue-on-error: true
+        run: |
+          echo "::notice title=Prettier Check::Running Prettier check - formatting issues are advisory only"
+          npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}" || echo "::notice::Run 'npm run format' to auto-fix formatting issues"
+
+      - name: Summary
+        run: |
+          echo "::notice title=Code Quality Summary::All code quality checks completed. Any issues found are advisory and do not block deployment."
