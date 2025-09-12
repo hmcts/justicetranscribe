@@ -42,12 +42,12 @@ frontend: ## Run development server
 	cd frontend && npm run dev
 
 database:
-	docker-compose up database
+	docker compose up database
 	make db-upgrade
 
 db-reset: ## Reset database (destroy and recreate)
-	docker-compose down -v
-	docker-compose up -d database
+	docker compose down -v
+	docker compose up -d database
 	sleep 5
 	$(MAKE) db-upgrade
 
