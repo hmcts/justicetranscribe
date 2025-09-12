@@ -18,14 +18,9 @@ export default function Header({ className }: { className?: string }) {
   const pathname = usePathname();
 
   const handleHomeClick = useCallback(() => {
-    if (pathname === "/help") {
-      // Navigate to root page when on help page
-      router.push("/");
-    } else {
-      // Use default new transcription behavior for other pages
-      newTranscription();
-    }
-  }, [pathname, router, newTranscription]);
+    // Always navigate to home/welcome page
+    window.location.href = "/";
+  }, []);
 
   return (
     <header className={cn("z-50 bg-white dark:border-gray-800", className)}>

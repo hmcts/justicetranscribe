@@ -398,6 +398,7 @@ export default function RecordingControl({
             onClick={handleStopRecording}
             variant="destructive"
             className="min-w-0 flex-1"
+            style={{backgroundColor: '#B21010', color: 'white'}}
           >
             <Square className="mr-2 size-4 sm:mr-2" />
             <span className="hidden sm:inline">Stop Recording</span>

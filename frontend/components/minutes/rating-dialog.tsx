@@ -76,10 +76,11 @@ function RatingDialog({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label htmlFor="feedback-textarea" className="text-sm font-medium text-gray-700">
               Any specific feedback? (Optional)
             </label>
             <Textarea
+              id="feedback-textarea"
               value={localComment ?? ""}
               onChange={(e) => setLocalComment(e.target.value)}
               className="min-h-[100px] resize-none"

@@ -187,6 +187,7 @@ function SimpleEditor({
                       onClick={() => editorObject.chain().focus().undo().run()}
                       disabled={!editorObject.can().undo()}
                       type="button"
+                      aria-label="Undo"
                     >
                       <RotateLeft size={20} />
                     </button>
@@ -201,6 +202,7 @@ function SimpleEditor({
                       onClick={() => editorObject.chain().focus().redo().run()}
                       disabled={!editorObject.can().redo()}
                       type="button"
+                      aria-label="Redo"
                     >
                       <RotateRight size={20} />
                     </button>
@@ -225,6 +227,7 @@ function SimpleEditor({
                       )}
                       onClick={toggleBold}
                       type="button"
+                      aria-label="Bold"
                     >
                       <BoldIcon size={20} />
                     </button>
@@ -244,6 +247,7 @@ function SimpleEditor({
                       )}
                       onClick={toggleItalic}
                       type="button"
+                      aria-label="Italic"
                     >
                       <ItalicIcon size={20} />
                     </button>
@@ -268,6 +272,7 @@ function SimpleEditor({
                       )}
                       onClick={toggleBulletList}
                       type="button"
+                      aria-label="Bullet List"
                     >
                       <UnorderedListIcon size={20} />
                     </button>
@@ -287,6 +292,7 @@ function SimpleEditor({
                       )}
                       onClick={toggleOrderedList}
                       type="button"
+                      aria-label="Numbered List"
                     >
                       <OrderedListIcon size={20} />
                     </button>
