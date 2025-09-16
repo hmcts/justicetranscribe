@@ -67,6 +67,7 @@ class MinuteVersion(BaseTable, table=True):
 class User(BaseTable, table=True):
     email: str = Field(index=True)
     azure_user_id: str = Field(unique=True, index=True)
+    has_completed_onboarding: bool = Field(default=False)
     transcriptions: list["Transcription"] = Relationship(back_populates="user")
 
 
