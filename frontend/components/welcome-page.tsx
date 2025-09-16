@@ -207,17 +207,6 @@ function WelcomePage() {
         </div>
       )}
 
-      {/* Temporary onboarding test button for development */}
-      {!showAllMeetings && (
-        <div className="mb-6 flex justify-center">
-          <Button
-            onClick={() => router.push("/onboarding")}
-            className="bg-pink-500 px-8 py-4 text-lg font-semibold text-white hover:bg-pink-600"
-          >
-            Test Onboarding Flow
-          </Button>
-        </div>
-      )}
 
       {!showAllMeetings && allSpeakers.length > 0 && (
         <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
