@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api-client";
 
 // Step Components
 import Step1Welcome from "@/components/onboarding/step1-welcome";
@@ -43,9 +44,33 @@ export default function OnboardingPage() {
     return true;
   };
 
-  const handleNext = () => {
-    if (currentStep < TOTAL_STEPS && canContinue()) {
-      setCurrentStep(currentStep + 1);
+  const handleNext = async () => {
+    // If we're on step 1 (Welcome), check authentication before proceeding
+    if (currentStep === 1) {
+      try {
+        // Try to get current user - this will check Easy Auth
+        const response = await apiClient.request("/user/onboarding-status");
+        
+        if (response.error || !response.data) {
+          // No valid authentication - show sorry message
+          setHasValidLicense(false);
+          return;
+        }
+        
+        // Authentication is valid - continue to step 2
+        setCurrentStep(2);
+        
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        // Authentication failed - show sorry message
+        setHasValidLicense(false);
+        return;
+      }
+    } else {
+      // For all other steps, use normal logic
+      if (currentStep < TOTAL_STEPS && canContinue()) {
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -59,7 +84,21 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleStartRecording = () => {
+  const handleStartRecording = async () => {
+    try {
+      // Mark onboarding as complete
+      const response = await apiClient.request("/user/complete-onboarding", {
+        method: "POST",
+      });
+      
+      if (response.data?.success) {
+        console.log("Onboarding marked as complete:", response.data.message);
+      }
+    } catch (error) {
+      console.error("Failed to mark onboarding as complete:", error);
+      // Continue to home page even if API call fails
+    }
+    
     router.push("/"); // Return to home to start recording
   };
 
@@ -154,13 +193,7 @@ export default function OnboardingPage() {
               </Button>
             )}
             {currentStep === 1 ? (
-              <div className="flex w-full items-center justify-center gap-4">
-                <Button
-                  onClick={handleNoAuth}
-                  className="bg-pink-500 p-6 text-lg text-white hover:bg-pink-600"
-                >
-                  no auth
-                </Button>
+              <div className="flex w-full items-center justify-center">
                 <Button
                   onClick={handleNext}
                   disabled={!canContinue()}
