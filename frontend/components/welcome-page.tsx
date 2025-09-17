@@ -6,7 +6,6 @@
 
 import React from "react";
 import { Plus, ChevronLeft, Mic, MonitorPlay } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
 import { useUserSettings } from "@/providers/user-settings";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ import BackupRecovery from "./audio/backup-recovery";
 import BackupUploader from "./audio/backup-uploader";
 
 function WelcomePage() {
-  const router = useRouter();
   const {
     newTranscription,
     isLoading,
@@ -206,7 +204,6 @@ function WelcomePage() {
           )}
         </div>
       )}
-
 
       {!showAllMeetings && allSpeakers.length > 0 && (
         <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">

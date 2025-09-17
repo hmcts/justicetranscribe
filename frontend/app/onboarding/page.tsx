@@ -50,32 +50,24 @@ export default function OnboardingPage() {
       try {
         // Try to get current user - this will check Easy Auth
         const response = await apiClient.request("/user/onboarding-status");
-        
+
         if (response.error || !response.data) {
           // No valid authentication - show sorry message
           setHasValidLicense(false);
           return;
         }
-        
+
         // Authentication is valid - continue to step 2
         setCurrentStep(2);
-        
       } catch (error) {
         console.error("Auth check failed:", error);
         // Authentication failed - show sorry message
         setHasValidLicense(false);
-        return;
       }
-    } else {
+    } else if (currentStep < TOTAL_STEPS && canContinue()) {
       // For all other steps, use normal logic
-      if (currentStep < TOTAL_STEPS && canContinue()) {
-        setCurrentStep(currentStep + 1);
-      }
+      setCurrentStep(currentStep + 1);
     }
-  };
-
-  const handleNoAuth = () => {
-    setHasValidLicense(false);
   };
 
   const handleBack = () => {
@@ -87,10 +79,14 @@ export default function OnboardingPage() {
   const handleStartRecording = async () => {
     try {
       // Mark onboarding as complete
-      const response = await apiClient.request("/user/complete-onboarding", {
+      const response = await apiClient.request<{
+        success: boolean;
+        message: string;
+        has_completed_onboarding: boolean;
+      }>("/user/complete-onboarding", {
         method: "POST",
       });
-      
+
       if (response.data?.success) {
         console.log("Onboarding marked as complete:", response.data.message);
       }
@@ -98,7 +94,6 @@ export default function OnboardingPage() {
       console.error("Failed to mark onboarding as complete:", error);
       // Continue to home page even if API call fails
     }
-    
     router.push("/"); // Return to home to start recording
   };
 

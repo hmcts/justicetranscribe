@@ -19,29 +19,32 @@ interface OnboardingStatus {
 function MainParentComponent() {
   const { currentParams } = useBrowserNavigation();
   const router = useRouter();
-  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
+  const [onboardingStatus, setOnboardingStatus] =
+    useState<OnboardingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Check if we're directly accessing a transcript via URL
   const transcriptId = currentParams?.get("id");
 
-  useEffect(() => {
-    checkOnboardingStatus();
-  }, []);
-
   const checkOnboardingStatus = async () => {
     try {
-      const response = await apiClient.request<OnboardingStatus>("/user/onboarding-status");
-      
+      const response = await apiClient.request<OnboardingStatus>(
+        "/user/onboarding-status",
+      );
+
       if (response.data) {
         setOnboardingStatus(response.data);
-        
+
         // Only redirect to onboarding if we're not already there and should show onboarding
-        const isOnOnboardingPage = window.location.pathname.includes("/onboarding");
-        
-        if (response.data.should_show_onboarding && !isOnOnboardingPage && !transcriptId) {
+        const isOnOnboardingPage =
+          window.location.pathname.includes("/onboarding");
+
+        if (
+          response.data.should_show_onboarding &&
+          !isOnOnboardingPage &&
+          !transcriptId
+        ) {
           router.push("/onboarding");
-          return;
         }
       }
     } catch (error) {
@@ -51,6 +54,10 @@ function MainParentComponent() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    checkOnboardingStatus();
+  }, [checkOnboardingStatus]);
 
   // Show loading while checking onboarding status
   if (isLoading) {
@@ -65,7 +72,7 @@ function MainParentComponent() {
     <div className="flex">
       {/* Show warning modal if dev override is active */}
       {onboardingStatus?.force_onboarding_override && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-orange-100 border border-orange-400 text-orange-800 px-4 py-3 rounded-lg shadow-lg z-50">
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border border-orange-400 bg-orange-100 px-4 py-3 text-orange-800 shadow-lg">
           <div className="flex items-center justify-between">
             <span className="font-medium">
               ⚠️ Warning: Onboarding flow override is active (dev mode)
@@ -76,7 +83,7 @@ function MainParentComponent() {
           </div>
         </div>
       )}
-      
+
       <div className="mx-auto flex w-full items-center justify-center">
         {!transcriptId && (
           <div className="w-full">
