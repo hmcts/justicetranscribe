@@ -24,36 +24,36 @@ function MainParentComponent() {
   // Check if we're directly accessing a transcript via URL
   const transcriptId = currentParams?.get("id");
 
-  const checkOnboardingStatus = async () => {
-    try {
-      const response = await apiClient.request<OnboardingStatus>(
-        "/user/onboarding-status",
-      );
-
-      if (response.data) {
-        // Only redirect to onboarding if we're not already there and should show onboarding
-        const isOnOnboardingPage =
-          window.location.pathname.includes("/onboarding");
-
-        if (
-          response.data.should_show_onboarding &&
-          !isOnOnboardingPage &&
-          !transcriptId
-        ) {
-          router.push("/onboarding");
-        }
-      }
-    } catch (error) {
-      console.error("Failed to check onboarding status:", error);
-      // Continue without onboarding check on error
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        const response = await apiClient.request<OnboardingStatus>(
+          "/user/onboarding-status",
+        );
+
+        if (response.data) {
+          // Only redirect to onboarding if we're not already there and should show onboarding
+          const isOnOnboardingPage =
+            window.location.pathname.includes("/onboarding");
+
+          if (
+            response.data.should_show_onboarding &&
+            !isOnOnboardingPage &&
+            !transcriptId
+          ) {
+            router.push("/onboarding");
+          }
+        }
+      } catch (error) {
+        console.error("Failed to check onboarding status:", error);
+        // Continue without onboarding check on error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     checkOnboardingStatus();
-  }, [checkOnboardingStatus]);
+  }, [router, transcriptId]);
 
   // Show loading while checking onboarding status
   if (isLoading) {
