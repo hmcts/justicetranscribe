@@ -19,8 +19,6 @@ interface OnboardingStatus {
 function MainParentComponent() {
   const { currentParams } = useBrowserNavigation();
   const router = useRouter();
-  const [onboardingStatus, setOnboardingStatus] =
-    useState<OnboardingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Check if we're directly accessing a transcript via URL
@@ -33,8 +31,6 @@ function MainParentComponent() {
       );
 
       if (response.data) {
-        setOnboardingStatus(response.data);
-
         // Only redirect to onboarding if we're not already there and should show onboarding
         const isOnOnboardingPage =
           window.location.pathname.includes("/onboarding");
@@ -70,20 +66,6 @@ function MainParentComponent() {
 
   return (
     <div className="flex">
-      {/* Show warning modal if dev override is active */}
-      {onboardingStatus?.force_onboarding_override && (
-        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border border-orange-400 bg-orange-100 px-4 py-3 text-orange-800 shadow-lg">
-          <div className="flex items-center justify-between">
-            <span className="font-medium">
-              ⚠️ Warning: Onboarding flow override is active (dev mode)
-            </span>
-            <span className="ml-4 text-sm opacity-75">
-              Environment: {onboardingStatus.environment}
-            </span>
-          </div>
-        </div>
-      )}
-
       <div className="mx-auto flex w-full items-center justify-center">
         {!transcriptId && (
           <div className="w-full">

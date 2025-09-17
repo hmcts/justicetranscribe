@@ -21,6 +21,10 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [hasValidLicense, setHasValidLicense] = useState<boolean | null>(null);
+  const [onboardingStatus, setOnboardingStatus] = useState<{
+    force_onboarding_override?: boolean;
+    environment?: string;
+  } | null>(null);
   const [formData, setFormData] = useState({
     crissaTime: "",
     appointmentsPerWeek: "",
@@ -31,6 +35,22 @@ export default function OnboardingPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentStep]);
+
+  // Fetch onboarding status on page load to show warning banner
+  useEffect(() => {
+    const fetchOnboardingStatus = async () => {
+      try {
+        const response = await apiClient.request("/user/onboarding-status");
+        if (response.data) {
+          setOnboardingStatus(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch onboarding status:", error);
+      }
+    };
+
+    fetchOnboardingStatus();
+  }, []);
 
   // Validation for step 2
   const isStep2Valid = () => {
@@ -56,6 +76,9 @@ export default function OnboardingPage() {
           setHasValidLicense(false);
           return;
         }
+
+        // Store onboarding status for warning banner
+        setOnboardingStatus(response.data);
 
         // Authentication is valid - continue to step 2
         setCurrentStep(2);
@@ -153,6 +176,20 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Show warning banner if dev override is active */}
+      {onboardingStatus?.force_onboarding_override && (
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border border-orange-400 bg-orange-100 px-4 py-3 text-orange-800 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="font-medium">
+              ⚠️ Warning: Onboarding flow override is active (dev mode)
+            </span>
+            <span className="ml-4 text-sm opacity-75">
+              Environment: {onboardingStatus.environment}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="container mx-auto max-w-2xl px-4 pb-12 pt-6 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
         {/* Progress indicator - Hide when showing license check fail */}
         {hasValidLicense !== false && (
