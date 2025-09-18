@@ -1,3 +1,8 @@
+[![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)<br>
+[![Tests and Coverage](https://github.com/JusticeAIUnit/justicetranscribe/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/JusticeAIUnit/justicetranscribe/actions/workflows/test-coverage.yml)
+[![codecov](https://codecov.io/github/justiceaiunit/justicetranscribe/graph/badge.svg?token=DVNAHD4G2O)](https://codecov.io/github/justiceaiunit/justicetranscribe)
+
 # justicetranscribe
 
 A Next.js application deployed to Azure with Terraform

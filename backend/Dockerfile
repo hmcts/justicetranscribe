@@ -15,6 +15,9 @@ COPY . /app
 WORKDIR /app
 RUN uv sync --frozen --no-cache --group fastapi --no-group dev
 
+# Make the unified validation script executable
+RUN chmod +x /app/build_utils/validate_config.py
+
 # Copy and make the startup script executable
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh

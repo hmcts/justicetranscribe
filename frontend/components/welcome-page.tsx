@@ -24,6 +24,7 @@ import {
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { getFirstName } from "@/lib/utils";
 import { AudioBackup } from "@/lib/indexeddb-backup";
+import StartNewMeetingButton from "@/components/ui/start-new-meeting-button";
 import AudioUploader from "./audio/audio-uploader";
 import MeetingsList from "./meetings-list";
 import BackupRecovery from "./audio/backup-recovery";
@@ -67,12 +68,13 @@ function WelcomePage() {
       return transcriptsMetadata;
     }
     return transcriptsMetadata.filter((meeting) =>
-      meeting.speakers.includes(speakerFilter),
+      meeting.speakers.includes(speakerFilter)
     );
   }, [transcriptsMetadata, speakerFilter]);
 
   const handleNewMeeting = () => {
-    if (isMobile) {
+    if (isMobile || showAllMeetings) {
+      // On mobile or when viewing all meetings, default to mic recording
       setSelectedRecordingMode("mic");
       newTranscription();
     }
@@ -118,16 +120,19 @@ function WelcomePage() {
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-8 text-center">
         {showAllMeetings ? (
-          <div className="mb-4 flex items-center justify-center">
-            <Button
-              variant="ghost"
-              className="flex items-center gap-1"
-              onClick={() => setShowAllMeetings(false)}
-            >
-              <ChevronLeft className="size-4" />
-              Back to Welcome
-            </Button>
-          </div>
+          <>
+            <h1 className="mb-4 text-3xl font-bold">All Meetings</h1>
+            <div className="mb-4 flex items-center justify-center">
+              <Button
+                variant="ghost"
+                className="flex items-center gap-1"
+                onClick={() => setShowAllMeetings(false)}
+              >
+                <ChevronLeft className="size-4" />
+                Back to Welcome
+              </Button>
+            </div>
+          </>
         ) : (
           <>
             <h1 className="mb-2 text-3xl font-bold">{heading}</h1>
@@ -141,20 +146,16 @@ function WelcomePage() {
       {!showAllMeetings && (
         <div className="mb-8">
           {isMobile ? (
-            <Button
+            <StartNewMeetingButton
               onClick={handleNewMeeting}
-              className="flex w-full items-center justify-center gap-2 bg-blue-500 py-6 text-lg hover:bg-blue-600"
-            >
-              <Plus className="size-5" />
-              Start New Meeting
-            </Button>
+              size="large"
+            />
           ) : (
             <Popover>
               <PopoverTrigger asChild>
-                <Button className="flex w-full items-center justify-center gap-2 bg-blue-500 py-6 text-lg hover:bg-blue-600">
-                  <Plus className="size-5" />
-                  Start New Meeting
-                </Button>
+                <StartNewMeetingButton
+                  size="large"
+                />
               </PopoverTrigger>
               <PopoverContent
                 className="w-[--radix-popover-trigger-width] p-3"
@@ -208,17 +209,18 @@ function WelcomePage() {
       {!showAllMeetings && allSpeakers.length > 0 && (
         <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
           <div className="mb-2">
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-            <label
+            <div
               id="speaker-filter-label"
-              htmlFor="speaker-filter"
               className="text-sm font-medium text-gray-700"
             >
               Filter by Speaker
-            </label>
+            </div>
           </div>
           <Select value={speakerFilter} onValueChange={setSpeakerFilter}>
-            <SelectTrigger id="speaker-filter" className="w-full">
+            <SelectTrigger 
+              className="w-full"
+              aria-labelledby="speaker-filter-label"
+            >
               <SelectValue placeholder="All speakers" />
             </SelectTrigger>
             <SelectContent>
@@ -235,13 +237,15 @@ function WelcomePage() {
 
       <BackupRecovery onRetryUpload={handleRetryUpload} />
 
-      <MeetingsList
-        showAllMeetings={showAllMeetings}
-        setShowAllMeetings={setShowAllMeetings}
-        handleNewMeeting={handleNewMeeting}
-        isLoading={isLoading}
-        meetings={filteredMeetings}
-      />
+      <div className="mt-8">
+        <MeetingsList
+          showAllMeetings={showAllMeetings}
+          setShowAllMeetings={setShowAllMeetings}
+          handleNewMeeting={handleNewMeeting}
+          isLoading={isLoading}
+          meetings={filteredMeetings}
+        />
+      </div>
     </div>
   );
 }

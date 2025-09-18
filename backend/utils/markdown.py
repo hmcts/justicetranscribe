@@ -1,3 +1,5 @@
+import textwrap
+
 import commonmark
 import html2text
 from langfuse.decorators import observe
@@ -15,12 +17,12 @@ def markdown_to_html(markdown_text: str, strip: bool = True) -> str:
     Returns:
         str: The converted HTML
     """
-    # Use CommonMark for better handling of nested lists
+    # Remove uniform indent from all lines of the markdown text
+    markdown_text = textwrap.dedent(markdown_text)
     parser = commonmark.Parser()
     renderer = commonmark.HtmlRenderer()
     ast = parser.parse(markdown_text)
     html = renderer.render(ast)
-
     return html.strip() if strip else html
 
 

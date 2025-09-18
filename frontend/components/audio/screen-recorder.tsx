@@ -493,7 +493,7 @@ function ScreenRecorder({
   return (
     <div className="space-y-4">
       <div className="my-6 text-center">
-        <h2 className="text-2xl font-semibold">Virtual Meeting Recorder</h2>
+        <h1 className="text-2xl font-semibold">Virtual Meeting Recorder</h1>
         <p className="text-sm text-muted-foreground">
           Record audio by sharing your screen with Justice Transcribe
         </p>

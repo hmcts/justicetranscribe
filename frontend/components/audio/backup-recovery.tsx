@@ -23,11 +23,9 @@ import {
 import {
   RefreshCw,
   Trash2,
-  FileAudio,
+  Upload,
   ChevronDown,
   ChevronRight,
-  CheckCircle,
-  X,
 } from "lucide-react";
 import { audioBackupDB, AudioBackup } from "@/lib/indexeddb-backup";
 import AudioPlayerComponent from "./audio-player";
@@ -41,7 +39,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(true);
 
   const loadBackups = useCallback(async () => {
     try {
@@ -56,7 +53,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       setIsOpen(allBackups.length <= 1);
     } catch (err) {
       setError("Failed to load backed up recordings");
-      console.error("Failed to load backups:", err);
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +68,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       setBackups((prev) => prev.filter((backup) => backup.id !== backupId));
     } catch (err) {
       setError("Failed to delete backup");
-      console.error("Failed to delete backup:", err);
     }
   };
 
@@ -106,7 +101,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileAudio className="size-5" />
+            <Upload className="size-5" />
             Backed Up Recordings
           </CardTitle>
         </CardHeader>
@@ -143,31 +138,10 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
   return (
     <Card>
       <CardContent className="pt-6">
-        {/* Success message for offline recordings */}
-        {showSuccessMessage && (
-          <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-            <CheckCircle className="size-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>
-                Your recordings are safely saved offline and ready for upload
-                when you&apos;re ready.
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSuccessMessage(false)}
-                className="h-auto p-1 text-green-600 hover:text-green-800"
-              >
-                <X className="size-4" />
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-
         <Collapsible open={isOpen} onOpenChange={setIsOpen}>
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-4 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
             <div className="flex items-center gap-3">
-              <FileAudio className="size-5 text-gray-600" />
+              <Upload className="size-5 text-gray-600" />
               <div>
                 <h3 className="font-medium text-gray-900">
                   Reupload Recordings
@@ -196,8 +170,7 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
               <Alert>
                 <AlertDescription>
                   These recordings were automatically backed up but haven&apos;t
-                  been uploaded yet. You can retry uploading them or delete
-                  them.
+                  been uploaded yet.
                 </AlertDescription>
               </Alert>
 

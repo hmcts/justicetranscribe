@@ -1,3 +1,11 @@
+"""
+Validation tests for the uwotm8 third-party library.
+
+This module contains tests that validate the behavior of the external uwotm8 library
+used for American-to-British spelling conversion. These tests ensure the library
+behaves as expected for our use cases but are not unit tests of our own code.
+"""
+
 # ruff: noqa: S101
 from uwotm8 import convert_american_to_british_spelling
 
@@ -83,10 +91,10 @@ def test_markdown_syntax():
         # Inline code
         ("Use `color = 'red'` here", "Use `color = 'red'` here"),
         # Links
-        # (
-        #     "[color guide](http://example.com/color)",
-        #     "[colour guide](http://example.com/color)",
-        # ),
+        (
+            "[color guide](http://example.com/color)",
+            "[colour guide](http://example.com/color)",
+        ),
         # Emphasis
         ("*color* and **theater**", "*colour* and **theatre**"),
         # Lists

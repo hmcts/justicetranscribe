@@ -3,32 +3,15 @@ import uuid
 from uuid import UUID
 
 import pytz
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse
 
 from app.audio.process_audio_fully import transcribe_and_generate_llm_output
 from app.audio.utils import (
-    get_file_blob_path,
     generate_blob_upload_url,
+    get_file_blob_path,
+    validate_current_azure_storage_config,
 )
-from app.llm.llm_client import (
-    langfuse_client,
-)
-from app.logger import logger
-from app.minutes.llm_calls import ai_edit_task, generate_llm_output_task
-from app.minutes.templates.templates_metadata import (
-    get_all_templates,
-)
-from app.minutes.types import (
-    GenerateMinutesRequest,
-    StartTranscriptionJobRequest,
-    TemplateResponse,
-    TranscriptionMetadata,
-    UpdateUserRequest,
-    UploadUrlRequest,
-    UploadUrlResponse,
-)
-from utils.dependencies import get_current_user
 from app.database.interface_functions import (
     delete_transcription_by_id,
     fetch_transcriptions_metadata,
@@ -49,12 +32,30 @@ from app.database.postgres_models import (
     TranscriptionJob,
     User,
 )
-from utils.settings import settings_instance
+from app.llm.llm_client import (
+    langfuse_client,
+)
+from app.logger import logger
+from app.minutes.llm_calls import ai_edit_task, generate_llm_output_task
+from app.minutes.templates.templates_metadata import (
+    get_all_templates,
+)
+from app.minutes.types import (
+    GenerateMinutesRequest,
+    StartTranscriptionJobRequest,
+    TemplateResponse,
+    TranscriptionMetadata,
+    UpdateUserRequest,
+    UploadUrlRequest,
+    UploadUrlResponse,
+)
+from utils.dependencies import get_current_user
+from utils.settings import get_settings
 
 router = APIRouter()
 
 
-# Azure Blob Storage configuration is handled through settings_instance
+# Azure Blob Storage configuration is handled through get_settings()
 
 
 UK_TIMEZONE = pytz.timezone("Europe/London")
@@ -70,19 +71,20 @@ async def get_onboarding_status(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
     """Get user's onboarding status and check for dev override"""
-    
+
     # Check if onboarding should be forced in development
+    settings = get_settings()
     force_onboarding = (
-        settings_instance.FORCE_ONBOARDING_DEV and 
-        settings_instance.ENVIRONMENT in ["local", "dev"]
+        settings.FORCE_ONBOARDING_DEV and
+        settings.ENVIRONMENT in ["local", "dev"]
     )
-    
+
     return {
         "has_completed_onboarding": current_user.has_completed_onboarding,
         "force_onboarding_override": force_onboarding,
         "should_show_onboarding": not current_user.has_completed_onboarding or force_onboarding,
         "user_id": str(current_user.id),
-        "environment": settings_instance.ENVIRONMENT,
+        "environment": settings.ENVIRONMENT,
     }
 
 
@@ -91,21 +93,46 @@ async def complete_onboarding(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
     """Mark user's onboarding as complete"""
-    
+
     # Don't update in dev override mode to preserve testing ability
-    if not (settings_instance.FORCE_ONBOARDING_DEV and settings_instance.ENVIRONMENT in ["local", "dev"]):
+    settings = get_settings()
+    if not (settings.FORCE_ONBOARDING_DEV and settings.ENVIRONMENT in ["local", "dev"]):
         updated_user = mark_user_onboarding_complete(current_user.id)
         return {
-            "success": True, 
+            "success": True,
             "message": "Onboarding marked as complete",
             "has_completed_onboarding": updated_user.has_completed_onboarding
         }
     else:
         return {
-            "success": True, 
+            "success": True,
             "message": "Onboarding completion skipped (dev override mode active)",
             "has_completed_onboarding": current_user.has_completed_onboarding
         }
+@router.get("/healthcheck/azure-storage")
+async def azure_storage_health_check():
+    """
+    Health check endpoint to validate Azure Storage configuration and account key.
+    This helps detect if the storage account key has been cycled and needs updating.
+    """
+    validation_result = validate_current_azure_storage_config()
+
+    if validation_result["valid"]:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "ok",
+                "azure_storage": validation_result
+            }
+        )
+    else:
+        return JSONResponse(
+            status_code=503,  # Service Unavailable
+            content={
+                "status": "error",
+                "azure_storage": validation_result
+            }
+        )
 
 
 @router.post("/get-upload-url", response_model=UploadUrlResponse)
@@ -116,10 +143,10 @@ async def get_upload_url(
     file_name_uuid = uuid.uuid4()
     file_name = f"{file_name_uuid}.{request.file_extension}"
     user_upload_blob_path = get_file_blob_path(current_user.email, file_name)
-    
+
     # Generate presigned URL for Azure Blob Storage upload
     presigned_url = generate_blob_upload_url(
-        container_name=settings_instance.AZURE_STORAGE_CONTAINER_NAME,
+        container_name=get_settings().AZURE_STORAGE_CONTAINER_NAME,
         blob_name=user_upload_blob_path,
         expiry_hours=1,
     )

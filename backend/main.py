@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
-from utils.settings import settings_instance
+from utils.settings import get_settings
 
 log = logging.getLogger("uvicorn")
 
@@ -21,9 +21,10 @@ async def lifespan(app_: FastAPI):  # noqa: ARG001
     log.info("Shutting down...")
 
 
+settings = get_settings()
 sentry_sdk.init(
-    dsn=settings_instance.SENTRY_DSN,
-    environment=settings_instance.ENVIRONMENT,
+    dsn=settings.SENTRY_DSN,
+    environment=settings.ENVIRONMENT,
     send_default_pii=False,
     # Set traces_sample_rate to 1.0 to capture 100%
     # of transactions for tracing.
@@ -41,7 +42,7 @@ app = FastAPI(lifespan=lifespan, openapi_url="/api/openapi.json")
 # Configure CORS for local development only
 # Note: In production (Azure App Service), CORS is handled at the infrastructure level
 # through Azure's CORS configuration, so we don't need this middleware there
-if settings_instance.ENVIRONMENT == "local":
+if settings.ENVIRONMENT == "local":
     origins = [
         "http://localhost:3000",  # Local frontend development
         "http://127.0.0.1:3000",  # Alternative localhost

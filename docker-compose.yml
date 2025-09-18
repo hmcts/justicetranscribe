@@ -1,5 +1,13 @@
 version: "3.8"
 
+# Configuration validation (Azure + Langfuse) runs automatically on every build
+#
+# To run the full stack:
+# docker compose up
+#
+# To run validation only:
+# docker compose up config-validator
+
 services:
   database:
     image: postgres:16
@@ -19,6 +27,18 @@ services:
       timeout: 5s
       retries: 5
 
+  config-validator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env # Load all variables from .env
+    environment:
+      - ENVIRONMENT=local
+    command: ["uv", "run", "python", "build_utils/validate_config.py"]
+    networks:
+      - app-network
+
   backend:
     build:
       context: ./backend
@@ -32,6 +52,8 @@ services:
       - ENVIRONMENT=local
       - NODE_ENV=production
     depends_on:
+      config-validator:
+        condition: service_completed_successfully
       database:
         condition: service_healthy
     networks:
@@ -51,11 +73,15 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=http://localhost:8000
         - ENVIRONMENT=development
+        - NEXT_PUBLIC_LANGFUSE_PUBLIC_KEY=${NEXT_PUBLIC_LANGFUSE_PUBLIC_KEY}
+        - NEXT_PUBLIC_LANGFUSE_HOST=${NEXT_PUBLIC_LANGFUSE_HOST}
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
     depends_on:
+      config-validator:
+        condition: service_completed_successfully
       backend:
         condition: service_healthy
     networks:

@@ -9,6 +9,8 @@ import { Clock, Plus, Pencil, Trash2 } from "lucide-react";
 import { format, isToday, isYesterday, formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useTranscripts } from "@/providers/transcripts";
+import { DEFAULT_MEETING_TITLE } from "@/lib/utils";
+import StartNewMeetingButton from "@/components/ui/start-new-meeting-button";
 import posthog from "posthog-js";
 
 function MeetingsList({
@@ -105,7 +107,7 @@ function MeetingsList({
             onClick={() => setShowDeleteModal(null)}
           />
           <div className="relative rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="mb-4 text-lg font-medium">Delete Meeting</h3>
+            <h2 className="mb-4 text-lg font-medium">Delete Meeting</h2>
             <p className="mb-6 text-sm text-gray-600">
               Are you sure you want to delete this meeting? This action cannot
               be undone.
@@ -118,7 +120,7 @@ function MeetingsList({
                 Cancel
               </button>
               <button
-                className="rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600"
+                className="rounded px-3 py-2 text-sm text-white hover:bg-red-700" style={{backgroundColor: '#B21010'}}
                 onClick={() => handleDelete(showDeleteModal)}
               >
                 Delete
@@ -163,9 +165,9 @@ function MeetingsList({
       )}
 
       <div>
-        <h2 className="mb-4 text-xl font-semibold">
-          {showAllMeetings ? "All Meetings" : "Recent Meetings"}
-        </h2>
+        {!showAllMeetings && (
+          <h2 className="mb-4 text-xl font-semibold">Recent Meetings</h2>
+        )}
         {isLoading && (
           <div className="py-8 text-center">Loading your meetings...</div>
         )}
@@ -187,7 +189,7 @@ function MeetingsList({
                     onClick={() => handleMeetingClick(meeting.id)}
                   >
                     <div className="mb-1 font-medium">
-                      {meeting.title || "Untitled Meeting"}
+                      {meeting.title || DEFAULT_MEETING_TITLE}
                     </div>
                     <div className="flex items-center text-sm text-gray-500">
                       <Clock className="mr-1.5 size-3.5" />
@@ -210,7 +212,7 @@ function MeetingsList({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="size-8 p-0 text-red-500 hover:text-red-600"
+                      className="size-8 p-0 hover:bg-red-100" style={{color: '#B21010'}}
                       onClick={() => setShowDeleteModal(meeting.id)}
                     >
                       <span className="sr-only">Delete</span>
@@ -232,13 +234,10 @@ function MeetingsList({
             )}
 
             {showAllMeetings && (
-              <Button
+              <StartNewMeetingButton
                 onClick={handleNewMeeting}
-                className="mt-4 w-full bg-blue-500 hover:bg-blue-600"
-              >
-                <Plus className="mr-2 size-4" />
-                Start New Meeting
-              </Button>
+                className="mt-4"
+              />
             )}
           </div>
         )}

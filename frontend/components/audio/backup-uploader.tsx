@@ -140,7 +140,7 @@ function BackupUploader({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="mt-1 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 dark:bg-red-900/10 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+              className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30" style={{color: '#B21010'}}
             >
               Close
               <svg

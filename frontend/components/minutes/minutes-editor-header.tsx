@@ -174,18 +174,18 @@ export default function MinutesEditorHeader({
               ) : (
                 <Button
                   onClick={onEditClick}
-                  className="flex h-12 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-white shadow-sm hover:bg-blue-700"
+                  className="flex h-12 w-full items-center justify-center rounded-md bg-black px-4 text-white shadow-sm hover:bg-gray-800"
                   disabled={isGenerating || !currentVersion}
                 >
                   <Edit className="size-5 md:mr-2" />
-                  <span className="hidden md:inline">Edit</span>
+                  <span className="hidden md:inline">Manual Edit</span>
                 </Button>
               )}
 
               {currentVersion && (
                 <>
                   <Button
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-rose-600 px-4 text-white shadow-sm hover:bg-rose-700"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-black px-4 text-white shadow-sm hover:bg-gray-800"
                     disabled={isGenerating}
                     onClick={() => {
                       if (isEditing) {
@@ -195,7 +195,7 @@ export default function MinutesEditorHeader({
                     }}
                   >
                     <Sparkles className="mr-2 size-4" />
-                    <span className="hidden md:inline">Update Summary</span>
+                    <span className="hidden md:inline">AI Edit</span>
                   </Button>
 
                   <DownloadStyleCopyButton
@@ -224,9 +224,9 @@ export default function MinutesEditorHeader({
         <div className="rounded-lg border bg-white p-6 shadow-sm">
           <div className="space-y-4">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-gray-900">
                 What would you like to change?
-              </h3>
+              </h2>
               <p className="text-sm text-gray-600">
                 Tell AI exactly what to change in your summary
               </p>
@@ -238,6 +238,7 @@ export default function MinutesEditorHeader({
                 value={aiEditInstructions}
                 onChange={(e) => setAIEditInstructions(e.target.value)}
                 className="min-h-[80px] resize-none"
+                aria-label="Describe the changes you want to make to the meeting summary"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                     handleSubmitAIEdit();
@@ -289,11 +290,11 @@ export default function MinutesEditorHeader({
               <div className="text-center">
                 <p className="text-xs text-gray-500">
                   Press{" "}
-                  <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+                  <kbd className="rounded bg-gray-800 px-1 py-0.5 text-xs text-white">
                     ⌘
                   </kbd>{" "}
                   +{" "}
-                  <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+                  <kbd className="rounded bg-gray-800 px-1 py-0.5 text-xs text-white">
                     Enter
                   </kbd>{" "}
                   to update

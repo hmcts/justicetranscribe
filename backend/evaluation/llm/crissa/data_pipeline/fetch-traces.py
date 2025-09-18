@@ -7,7 +7,7 @@ from typing import List, Any
 
 from langfuse import Langfuse
 from langfuse.api.core.api_error import ApiError
-from shared_utils.settings import settings_instance
+from shared_utils.settings import get_settings
 
 BATCH_SIZE = 50  # Reduced batch size to be gentler on API
 REQUEST_DELAY = 0.5  # Delay between requests in seconds
@@ -17,8 +17,8 @@ MAX_OBSERVATIONS = None  # Set to None for unlimited, or specify a number to lim
 langfuse = Langfuse(
     secret_key=os.environ["LANGFUSE_SECRET_KEY"],
     public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-    host="https://cloud.langfuse.com",  # 🇪🇺 EU region
-    environment=settings_instance.ENVIRONMENT,
+    host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),  # Use env var or fallback
+    environment=get_settings().ENVIRONMENT,
 )
 
 

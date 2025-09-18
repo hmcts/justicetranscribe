@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "format": "next lint --fix && prettier '**/*.{json,yaml}' --write --ignore-path .gitignore",
+    "type-check": "tsc --noEmit",
     "generate-api": "ts-node scripts/generate-api.ts",
     "test": "vitest"
   },
