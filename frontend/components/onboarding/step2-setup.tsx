@@ -18,9 +18,9 @@ export default function Step2Setup({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="mb-6 text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
+        <h2 className="mb-6 text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
           Get started
-        </h3>
+        </h2>
       </div>
 
       <div className="space-y-6">

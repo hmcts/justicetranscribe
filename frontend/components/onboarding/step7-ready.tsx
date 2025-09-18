@@ -14,9 +14,9 @@ export default function Step7Ready({
   return (
     <div className="space-y-8">
       <div className="space-y-2 text-center">
-        <h3 className="text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
+        <h2 className="text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
           You&apos;re ready 🎉
-        </h3>
+        </h2>
         <p className="text-black">
           Start today to spend less time note taking and more time listening
         </p>
