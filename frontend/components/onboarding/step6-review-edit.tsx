@@ -28,7 +28,7 @@ export default function Step6ReviewEdit() {
           <div className="mb-4 inline-flex size-16 items-center justify-center rounded-full bg-blue-600">
             <Play className="ml-1 size-6 text-white" />
           </div>
-          <h4 className="mb-2 text-lg font-medium">How to make edits</h4>
+          <h3 className="mb-2 text-lg font-medium">How to make edits</h3>
           <p className="text-sm text-gray-600">
             Watch how to adjust these using the tool
           </p>
@@ -36,9 +36,9 @@ export default function Step6ReviewEdit() {
 
         {/* Checklist Section */}
         <div className="space-y-4">
-          <h4 className="text-center text-lg font-semibold text-black">
+          <h3 className="text-center text-lg font-semibold text-black">
             Common corrections
-          </h4>
+          </h3>
           <div className="mx-auto max-w-lg space-y-3 text-black">
             <div className="flex items-start space-x-3">
               <Check className="mt-0.5 size-5 shrink-0 text-green-600" />
