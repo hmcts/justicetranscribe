@@ -24,6 +24,13 @@ docker compose up       # Run the full stack
 compilation and production-ready linting. This catches type errors and
 formatting issues that would break CI/CD.
 
+When making changes to the frontend, please check the accessibility of your
+amendments with a tool like WAVE. They provide
+[Browser Extensions](https://wave.webaim.org/extension/) for testing
+accessibility in localhost. This helps our users who rely on screen readers to
+navigate the app and ensures we are compliant with Government Digital Service
+Standard.
+
 ## Testing
 
 ### Important: Working Directory for Tests
