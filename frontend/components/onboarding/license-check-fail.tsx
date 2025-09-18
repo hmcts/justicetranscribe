@@ -1,11 +1,24 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export default function LicenseCheckFail() {
+interface LicenseCheckFailProps {
+  onRetry?: () => void;
+}
+
+export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSignUp = () => {
     setIsSubmitted(true);
+  };
+
+  const handleRetry = () => {
+    if (onRetry) {
+      onRetry();
+    } else {
+      // Fallback: reload the page
+      window.location.reload();
+    }
   };
 
   return (
@@ -28,7 +41,7 @@ export default function LicenseCheckFail() {
         </div>
       </div>
 
-      <div className="pt-4">
+      <div className="pt-4 space-y-4">
         <Button
           onClick={handleSignUp}
           disabled={isSubmitted}
@@ -40,6 +53,17 @@ export default function LicenseCheckFail() {
         >
           {isSubmitted ? "You've signed up" : "Join the waiting list"}
         </Button>
+        
+        <div className="text-sm text-gray-500">
+          <p>Having trouble? Try refreshing or check your connection.</p>
+          <Button
+            onClick={handleRetry}
+            variant="outline"
+            className="mt-2 px-4 py-2 text-sm"
+          >
+            Retry License Check
+          </Button>
+        </div>
       </div>
     </div>
   );
