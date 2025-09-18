@@ -20,6 +20,7 @@ from app.database.interface_functions import (
     get_transcription_by_id,
     get_transcription_jobs,
     get_user_by_id,
+    mark_user_onboarding_complete,
     save_minute_version,
     save_transcription,
     save_transcription_job,
@@ -63,6 +64,75 @@ UK_TIMEZONE = pytz.timezone("Europe/London")
 @router.get("/healthcheck")
 async def health_check():
     return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@router.get("/user/onboarding-status")
+async def get_onboarding_status(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Get user's onboarding status and check for dev override"""
+
+    # Check if onboarding should be forced in development
+    settings = get_settings()
+    force_onboarding = (
+        settings.FORCE_ONBOARDING_DEV and
+        settings.ENVIRONMENT in ["local", "dev"]
+    )
+
+    return {
+        "has_completed_onboarding": current_user.has_completed_onboarding,
+        "force_onboarding_override": force_onboarding,
+        "should_show_onboarding": not current_user.has_completed_onboarding or force_onboarding,
+        "user_id": str(current_user.id),
+        "environment": settings.ENVIRONMENT,
+    }
+
+
+@router.post("/user/complete-onboarding")
+async def complete_onboarding(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Mark user's onboarding as complete"""
+
+    # Don't update in dev override mode to preserve testing ability
+    settings = get_settings()
+    if not (settings.FORCE_ONBOARDING_DEV and settings.ENVIRONMENT in ["local", "dev"]):
+        updated_user = mark_user_onboarding_complete(current_user.id)
+        return {
+            "success": True,
+            "message": "Onboarding marked as complete",
+            "has_completed_onboarding": updated_user.has_completed_onboarding
+        }
+    else:
+        return {
+            "success": True,
+            "message": "Onboarding completion skipped (dev override mode active)",
+            "has_completed_onboarding": current_user.has_completed_onboarding
+        }
+@router.post("/user/reset-onboarding")
+async def reset_onboarding(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Reset user's onboarding status (dev only)"""
+    
+    # Only allow in local/dev environments
+    settings = get_settings()
+    if settings.ENVIRONMENT not in ["local", "dev"]:
+        raise HTTPException(
+            status_code=403, 
+            detail="This endpoint is only available in local/dev environments"
+        )
+    
+    # Reset onboarding status
+    updated_user = update_user(current_user.id, has_completed_onboarding=False)
+    
+    return {
+        "success": True,
+        "message": "Onboarding status reset successfully",
+        "has_completed_onboarding": updated_user.has_completed_onboarding,
+        "user_id": str(updated_user.id),
+        "email": updated_user.email
+    }
 
 
 @router.get("/healthcheck/azure-storage")

@@ -1,0 +1,254 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api-client";
+
+// Step Components
+import Step1Welcome from "@/components/onboarding/step1-welcome";
+import Step2Setup from "@/components/onboarding/step2-setup";
+import Step3DeviceSetup from "@/components/onboarding/step3-device-setup";
+import Step4BasicTutorial from "@/components/onboarding/step4-basic-tutorial";
+
+import Step6ReviewEdit from "@/components/onboarding/step6-review-edit";
+import Step7Ready from "@/components/onboarding/step7-ready";
+import LicenseCheckFail from "@/components/onboarding/license-check-fail";
+
+const TOTAL_STEPS = 6;
+
+export default function OnboardingPage() {
+  const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [hasValidLicense, setHasValidLicense] = useState<boolean | null>(null);
+  const [onboardingStatus, setOnboardingStatus] = useState<{
+    force_onboarding_override?: boolean;
+    environment?: string;
+  } | null>(null);
+  const [formData, setFormData] = useState({
+    crissaTime: "",
+    appointmentsPerWeek: "",
+    acceptedPrivacy: false,
+  });
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentStep]);
+
+  // Fetch onboarding status on page load to show warning banner
+  useEffect(() => {
+    const fetchOnboardingStatus = async () => {
+      try {
+        const response = await apiClient.request("/user/onboarding-status");
+        if (response.data) {
+          setOnboardingStatus(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch onboarding status:", error);
+      }
+    };
+
+    fetchOnboardingStatus();
+  }, []);
+
+  // Validation for step 2
+  const isStep2Valid = () => {
+    return formData.crissaTime && formData.appointmentsPerWeek;
+  };
+
+  const canContinue = () => {
+    if (currentStep === 2) {
+      return isStep2Valid();
+    }
+    return true;
+  };
+
+  const handleNext = async () => {
+    // If we're on step 1 (Welcome), check authentication before proceeding
+    if (currentStep === 1) {
+      try {
+        // Try to get current user - this will check Easy Auth
+        const response = await apiClient.request("/user/onboarding-status");
+
+        if (response.error || !response.data) {
+          // No valid authentication - show sorry message
+          setHasValidLicense(false);
+          return;
+        }
+
+        // Store onboarding status for warning banner
+        setOnboardingStatus(response.data);
+
+        // Authentication is valid - continue to step 2
+        setCurrentStep(2);
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        // Authentication failed - show sorry message
+        setHasValidLicense(false);
+      }
+    } else if (currentStep < TOTAL_STEPS && canContinue()) {
+      // For all other steps, use normal logic
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleStartRecording = async () => {
+    try {
+      // Mark onboarding as complete
+      const response = await apiClient.request<{
+        success: boolean;
+        message: string;
+        has_completed_onboarding: boolean;
+      }>("/user/complete-onboarding", {
+        method: "POST",
+      });
+
+      if (response.data?.success) {
+        console.log("Onboarding marked as complete:", response.data.message);
+      }
+    } catch (error) {
+      console.error("Failed to mark onboarding as complete:", error);
+      // Continue to home page even if API call fails
+    }
+    router.push("/"); // Return to home to start recording
+  };
+
+  const getStepClassName = (stepNum: number) => {
+    if (stepNum === currentStep) {
+      return "bg-black text-white";
+    }
+    if (stepNum < currentStep) {
+      return "bg-gray-200";
+    }
+    return "border";
+  };
+
+  const handleCrissaTimeChange = (time: string) => {
+    setFormData({ ...formData, crissaTime: time });
+  };
+
+  const handleAppointmentsChange = (appointments: string) => {
+    setFormData({ ...formData, appointmentsPerWeek: appointments });
+  };
+
+  const renderStep = () => {
+    // Show license check fail page if license check failed
+    if (hasValidLicense === false) {
+      return <LicenseCheckFail />;
+    }
+
+    switch (currentStep) {
+      case 1:
+        return <Step1Welcome />;
+      case 2:
+        return (
+          <Step2Setup
+            crissaTime={formData.crissaTime}
+            appointmentsPerWeek={formData.appointmentsPerWeek}
+            onCrissaTimeChange={handleCrissaTimeChange}
+            onAppointmentsChange={handleAppointmentsChange}
+          />
+        );
+      case 3:
+        return <Step3DeviceSetup />;
+      case 4:
+        return <Step4BasicTutorial />;
+      case 5:
+        return <Step6ReviewEdit />;
+      case 6:
+        return (
+          <Step7Ready
+            onStartRecording={handleStartRecording}
+            onBack={handleBack}
+          />
+        );
+      default:
+        return <div>Invalid step</div>;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Show warning banner if dev override is active */}
+      {onboardingStatus?.force_onboarding_override && (
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border border-orange-400 bg-orange-100 px-4 py-3 text-orange-800 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="font-medium">
+              ⚠️ Warning: Onboarding flow override is active (dev mode)
+            </span>
+            <span className="ml-4 text-sm" style={{ color: "#2E1005BF" }}>
+              Environment: {onboardingStatus.environment}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="container mx-auto max-w-2xl px-4 pb-12 pt-6 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
+        {/* Main heading for accessibility */}
+        <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
+        
+        {/* Progress indicator - Hide when showing license check fail */}
+        {hasValidLicense !== false && (
+          <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
+            <div className="flex items-center justify-between">
+              {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(
+                (stepNum) => (
+                  <div
+                    key={stepNum}
+                    className={`flex size-8 items-center justify-center rounded-full ${getStepClassName(
+                      stepNum
+                    )}`}
+                  >
+                    {stepNum}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Step content */}
+        <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
+          {renderStep()}
+        </div>
+
+        {/* Navigation - Only show for steps 1-5, step 6 has its own buttons, hide for license check fail */}
+        {currentStep < 6 && hasValidLicense !== false && (
+          <div className="flex justify-between pt-4 sm:pt-5 md:pt-6 lg:pt-8 xl:pt-10">
+            {currentStep > 1 && (
+              <Button onClick={handleBack} variant="outline">
+                Back
+              </Button>
+            )}
+            {currentStep === 1 ? (
+              <div className="flex w-full items-center justify-center">
+                <Button
+                  onClick={handleNext}
+                  disabled={!canContinue()}
+                  className={`px-12 py-6 text-lg ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
+                >
+                  Continue
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={handleNext}
+                disabled={!canContinue()}
+                className={`ml-auto ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
+              >
+                Continue
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

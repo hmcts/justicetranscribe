@@ -22,7 +22,9 @@ export default function DialogueHeader({
   const [isEditing, setIsEditing] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState<string>("");
   const [newSpeakerName, setNewSpeakerName] = useState<string>("");
-  const [newTitle, setNewTitle] = useState(currentTranscription?.title || DEFAULT_MEETING_TITLE);
+  const [newTitle, setNewTitle] = useState(
+    currentTranscription?.title || DEFAULT_MEETING_TITLE
+  );
 
   useEffect(() => {
     setNewTitle(currentTranscription?.title || DEFAULT_MEETING_TITLE);
@@ -32,7 +34,7 @@ export default function DialogueHeader({
     concatenateDialogueEntriesInTranscriptionJobs(transcriptionJobs);
   const uniqueSpeakers: string[] = dialogueEntries
     ? Array.from(
-        new Set(dialogueEntries.map((entry: DialogueEntry) => entry.speaker)),
+        new Set(dialogueEntries.map((entry: DialogueEntry) => entry.speaker))
       )
     : [];
 
@@ -53,7 +55,7 @@ export default function DialogueHeader({
       dialogue_entries: replaceSpeakerInDialogueEntries(
         job.dialogue_entries,
         oldSpeaker,
-        newSpeakerName,
+        newSpeakerName
       ),
     }));
 
@@ -78,7 +80,9 @@ export default function DialogueHeader({
                 onTitleEdit();
               } else if (e.key === "Escape") {
                 setIsEditing(false);
-                setNewTitle(currentTranscription?.title || DEFAULT_MEETING_TITLE);
+                setNewTitle(
+                  currentTranscription?.title || DEFAULT_MEETING_TITLE
+                );
               }
             }}
             onBlur={() => {
@@ -111,7 +115,7 @@ export default function DialogueHeader({
           <span>
             {currentTranscription?.created_datetime
               ? new Date(
-                  currentTranscription.created_datetime,
+                  currentTranscription.created_datetime
                 ).toLocaleDateString("en-US", {
                   weekday: "long",
                   year: "numeric",
@@ -165,7 +169,7 @@ export default function DialogueHeader({
                   <span>{speaker}</span>
                   <PencilIcon className="size-3" />
                 </button>
-              ),
+              )
             )}
           </div>
         </div>

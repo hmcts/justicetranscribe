@@ -53,7 +53,9 @@ export default function ProcessingLoader({
 
   return (
     <div className="mx-auto max-w-md py-12 text-center">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-gray-100">Upload Complete</h1>
+      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-gray-100">
+        Upload Complete
+      </h1>
       <div className="rounded-lg border border-blue-100 bg-blue-50 p-6 dark:border-blue-900/30 dark:bg-blue-900/10">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           Your meeting is safely saved
@@ -64,7 +66,7 @@ export default function ProcessingLoader({
         <div className="mt-6 flex justify-center">
           <StartNewMeetingButton
             onClick={handleNewTranscription}
-            className="hover:scale-105 active:scale-95 transition-all duration-200 shadow-md hover:shadow-lg px-4"
+            className="px-4 shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
             fullWidth={false}
             showIcon={false}
           />
