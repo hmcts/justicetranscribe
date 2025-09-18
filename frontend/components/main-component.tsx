@@ -28,7 +28,7 @@ function MainParentComponent() {
     const checkOnboardingStatus = async () => {
       try {
         const response = await apiClient.request<OnboardingStatus>(
-          "/user/onboarding-status",
+          "/user/onboarding-status"
         );
 
         if (response.data) {

@@ -13,7 +13,7 @@ export type MinuteVersion = MinuteVersion_Input;
  * Saves a transcription to the backend
  */
 export const saveTranscription = async (
-  transcription: Transcription,
+  transcription: Transcription
 ): Promise<void> => {
   try {
     const result = await apiClient.request("/transcriptions", {
@@ -34,11 +34,11 @@ export const saveTranscription = async (
  * Returns null if not found
  */
 export const getTranscriptionById = async (
-  id: string,
+  id: string
 ): Promise<Transcription | null> => {
   try {
     const result = await apiClient.request<Transcription>(
-      `/transcriptions/${id}`,
+      `/transcriptions/${id}`
     );
 
     if (result.error) {
@@ -60,12 +60,12 @@ export const getAllTranscriptionMetadata = async (): Promise<
 > => {
   try {
     const result = await apiClient.request<TranscriptionMetadata[]>(
-      "/transcriptions-metadata",
+      "/transcriptions-metadata"
     );
 
     if (result.error) {
       throw new Error(
-        `Error fetching transcriptions metadata: ${result.error}`,
+        `Error fetching transcriptions metadata: ${result.error}`
       );
     }
 
@@ -100,11 +100,11 @@ export const deleteTranscription = async (id: string): Promise<void> => {
 };
 
 export const getMinuteVersions = async (
-  transcriptionId: string,
+  transcriptionId: string
 ): Promise<MinuteVersion[]> => {
   try {
     const result = await apiClient.request<MinuteVersion[]>(
-      `/transcriptions/${transcriptionId}/minute-versions`,
+      `/transcriptions/${transcriptionId}/minute-versions`
     );
 
     if (result.error) {
@@ -120,14 +120,14 @@ export const getMinuteVersions = async (
 
 export const saveMinuteVersion = async (
   transcriptionId: string,
-  data: MinuteVersion,
+  data: MinuteVersion
 ) => {
   const result = await apiClient.request<MinuteVersion>(
     `/transcriptions/${transcriptionId}/minute-versions`,
     {
       method: "POST",
       body: JSON.stringify(data),
-    },
+    }
   );
 
   if (result.error) {
@@ -138,11 +138,11 @@ export const saveMinuteVersion = async (
 };
 
 export const getTranscriptionJobs = async (
-  transcriptionId: string,
+  transcriptionId: string
 ): Promise<TranscriptionJob[]> => {
   try {
     const result = await apiClient.request<TranscriptionJob[]>(
-      `/transcriptions/${transcriptionId}/jobs`,
+      `/transcriptions/${transcriptionId}/jobs`
     );
 
     if (result.error) {
@@ -158,7 +158,7 @@ export const getTranscriptionJobs = async (
 
 export const saveTranscriptionJob = async (
   transcriptionId: string,
-  jobData: TranscriptionJob,
+  jobData: TranscriptionJob
 ) => {
   try {
     const result = await apiClient.request<TranscriptionJob>(
@@ -166,7 +166,7 @@ export const saveTranscriptionJob = async (
       {
         method: "POST",
         body: JSON.stringify(jobData),
-      },
+      }
     );
 
     if (result.error) {
@@ -182,11 +182,11 @@ export const saveTranscriptionJob = async (
 
 export const getMinuteVersionById = async (
   transcriptionId: string,
-  minuteVersionId: string,
+  minuteVersionId: string
 ): Promise<MinuteVersion | null> => {
   try {
     const result = await apiClient.request<MinuteVersion>(
-      `/transcriptions/${transcriptionId}/minute-versions/${minuteVersionId}`,
+      `/transcriptions/${transcriptionId}/minute-versions/${minuteVersionId}`
     );
 
     if (result.error) {
@@ -221,7 +221,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
  * Pass only the fields you want to update (e.g., { hide_citations: true })
  */
 export const updateCurrentUser = async (
-  updates: Partial<Pick<User, "hide_citations">>,
+  updates: Partial<Pick<User, "hide_citations">>
 ): Promise<User | null> => {
   try {
     const result = await apiClient.request<User>("/user", {

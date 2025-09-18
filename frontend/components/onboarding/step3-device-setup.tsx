@@ -3,7 +3,7 @@ import { Monitor, Smartphone } from "lucide-react";
 
 export default function Step3DeviceSetup() {
   const [selectedDevice, setSelectedDevice] = useState<"desktop" | "mobile">(
-    "desktop",
+    "desktop"
   );
 
   return (

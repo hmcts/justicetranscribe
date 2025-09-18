@@ -43,7 +43,7 @@ export function MicrophonePermission({
     } catch (err) {
       console.log("error getting user media", err);
       onError(
-        "Microphone permission denied. Please enable it in your browser settings.",
+        "Microphone permission denied. Please enable it in your browser settings."
       );
     }
   }, [getAudioDevices, onError]);

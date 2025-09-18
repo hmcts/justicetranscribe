@@ -95,7 +95,7 @@ export default function RecordingControl({
             ctx.fillText(
               "Waiting for audio...",
               canvas.width / 2,
-              canvas.height / 2,
+              canvas.height / 2
             );
           }
         }
@@ -154,7 +154,7 @@ export default function RecordingControl({
             height / 2,
             (Math.min(width, height) / 10) * pulseSize,
             0,
-            Math.PI * 2,
+            Math.PI * 2
           );
           ctx.fill();
 
@@ -194,7 +194,7 @@ export default function RecordingControl({
             height / 2,
             (Math.min(width, height) / 10) * pulseSize,
             0,
-            Math.PI * 2,
+            Math.PI * 2
           );
           ctx.fill();
         } else {
@@ -210,7 +210,7 @@ export default function RecordingControl({
             const multiplier = 1.2;
             const barHeight = Math.min(
               (value / 255) * height * multiplier * 0.8,
-              height * 0.8,
+              height * 0.8
             );
 
             const x = startX + i * (barWidth + barSpacing);
@@ -218,7 +218,7 @@ export default function RecordingControl({
               0,
               (height - barHeight) / 2,
               0,
-              (height + barHeight) / 2,
+              (height + barHeight) / 2
             );
             const hue = 210 + (i / barCount) * 30;
             gradient.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.9)`);
@@ -238,7 +238,7 @@ export default function RecordingControl({
               x + barWidth,
               y + barHeight,
               x + barWidth - radius,
-              y + barHeight,
+              y + barHeight
             );
             ctx.lineTo(x + radius, y + barHeight);
             ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - radius);
@@ -260,7 +260,7 @@ export default function RecordingControl({
               0,
               centerX,
               centerY,
-              radius,
+              radius
             );
             circleGradient.addColorStop(0, "rgba(255, 255, 255, 0.4)");
             circleGradient.addColorStop(0.7, "rgba(59, 130, 246, 0.2)");
@@ -398,7 +398,7 @@ export default function RecordingControl({
             onClick={handleStopRecording}
             variant="destructive"
             className="min-w-0 flex-1"
-            style={{backgroundColor: '#B21010', color: 'white'}}
+            style={{ backgroundColor: "#B21010", color: "white" }}
           >
             <Square className="mr-2 size-4 sm:mr-2" />
             <span className="hidden sm:inline">Stop Recording</span>

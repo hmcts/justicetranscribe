@@ -183,7 +183,7 @@ export default function OnboardingPage() {
             <span className="font-medium">
               ⚠️ Warning: Onboarding flow override is active (dev mode)
             </span>
-            <span className="ml-4 text-sm opacity-75">
+            <span className="ml-4 text-sm" style={{ color: "#2E1005BF" }}>
               Environment: {onboardingStatus.environment}
             </span>
           </div>
@@ -200,12 +200,12 @@ export default function OnboardingPage() {
                   <div
                     key={stepNum}
                     className={`flex size-8 items-center justify-center rounded-full ${getStepClassName(
-                      stepNum,
+                      stepNum
                     )}`}
                   >
                     {stepNum}
                   </div>
-                ),
+                )
               )}
             </div>
           </div>

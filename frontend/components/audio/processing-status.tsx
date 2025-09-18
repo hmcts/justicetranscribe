@@ -78,7 +78,7 @@ export const getDuration = (file: Blob | File): Promise<number | null> => {
 };
 
 export const calculateEstimatedProcessingTime = (
-  audioDurationSeconds: number,
+  audioDurationSeconds: number
 ) => {
   if (audioDurationSeconds > 2 * 60 * 60) {
     return audioDurationSeconds * 0.08333333333;

@@ -32,7 +32,7 @@ export default function DownloadStyleCopyButton({
     } catch (err) {
       // Fallback for browsers that don't support ClipboardItem API
       await navigator.clipboard.writeText(
-        htmlToText(textToCopy, { wordwrap: false }),
+        htmlToText(textToCopy, { wordwrap: false })
       );
     }
 
