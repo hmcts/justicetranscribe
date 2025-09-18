@@ -125,7 +125,7 @@ class IndexedDBBackup {
   }
 
   async clearOldBackups(
-    maxAge: number = 7 * 24 * 60 * 60 * 1000,
+    maxAge: number = 7 * 24 * 60 * 60 * 1000
   ): Promise<void> {
     if (!this.db) {
       await this.init();

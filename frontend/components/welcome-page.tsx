@@ -146,16 +146,11 @@ function WelcomePage() {
       {!showAllMeetings && (
         <div className="mb-8">
           {isMobile ? (
-            <StartNewMeetingButton
-              onClick={handleNewMeeting}
-              size="large"
-            />
+            <StartNewMeetingButton onClick={handleNewMeeting} size="large" />
           ) : (
             <Popover>
               <PopoverTrigger asChild>
-                <StartNewMeetingButton
-                  size="large"
-                />
+                <StartNewMeetingButton size="large" />
               </PopoverTrigger>
               <PopoverContent
                 className="w-[--radix-popover-trigger-width] p-3"
@@ -217,7 +212,7 @@ function WelcomePage() {
             </div>
           </div>
           <Select value={speakerFilter} onValueChange={setSpeakerFilter}>
-            <SelectTrigger 
+            <SelectTrigger
               className="w-full"
               aria-labelledby="speaker-filter-label"
             >

@@ -105,7 +105,7 @@ class ApiClient {
           if (provider.id_token) {
             console.log(
               "🎫 Using ID token (JWT):",
-              `${provider.id_token.substring(0, 50)}...`,
+              `${provider.id_token.substring(0, 50)}...`
             );
 
             // Cache the token for 6 days and 20 hours (tokens refresh for 7 days)
@@ -132,7 +132,7 @@ class ApiClient {
   async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    retryCount: number = 0,
+    retryCount: number = 0
   ): Promise<ApiResponse<T>> {
     const MAX_RETRIES = 1;
 
@@ -162,7 +162,7 @@ class ApiClient {
       }
 
       console.log(
-        `🔄 Making ${options.method || "GET"} request to ${url}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`,
+        `🔄 Making ${options.method || "GET"} request to ${url}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`
       );
 
       const response = await fetch(url, requestOptions);
@@ -174,7 +174,7 @@ class ApiClient {
           retryCount < MAX_RETRIES
         ) {
           console.warn(
-            "🔄 Received 401, attempting to refresh session and retry...",
+            "🔄 Received 401, attempting to refresh session and retry..."
           );
 
           // Clear token cache and refresh session
@@ -193,7 +193,7 @@ class ApiClient {
         }
         if (response.status === 405) {
           throw new Error(
-            `Method ${options.method || "GET"} not allowed for ${endpoint}`,
+            `Method ${options.method || "GET"} not allowed for ${endpoint}`
           );
         }
 
@@ -294,7 +294,7 @@ class ApiClient {
       {
         method: "POST",
         body: JSON.stringify(data),
-      },
+      }
     );
   }
 

@@ -30,10 +30,10 @@ function MeetingsList({
     useTranscripts();
 
   const [showDeleteModal, setShowDeleteModal] = React.useState<string | null>(
-    null,
+    null
   );
   const [showRenameModal, setShowRenameModal] = React.useState<string | null>(
-    null,
+    null
   );
   const [renameTitle, setRenameTitle] = React.useState("");
 
@@ -42,7 +42,7 @@ function MeetingsList({
     .sort(
       (a, b) =>
         new Date(b.created_datetime).getTime() -
-        new Date(a.created_datetime).getTime(),
+        new Date(a.created_datetime).getTime()
     );
 
   // Show only 5 meetings if not showing all
@@ -120,7 +120,8 @@ function MeetingsList({
                 Cancel
               </button>
               <button
-                className="rounded px-3 py-2 text-sm text-white hover:bg-red-700" style={{backgroundColor: '#B21010'}}
+                className="rounded px-3 py-2 text-sm text-white hover:bg-red-700"
+                style={{ backgroundColor: "#B21010" }}
                 onClick={() => handleDelete(showDeleteModal)}
               >
                 Delete
@@ -212,7 +213,8 @@ function MeetingsList({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="size-8 p-0 hover:bg-red-100" style={{color: '#B21010'}}
+                      className="size-8 p-0 hover:bg-red-100"
+                      style={{ color: "#B21010" }}
                       onClick={() => setShowDeleteModal(meeting.id)}
                     >
                       <span className="sr-only">Delete</span>
