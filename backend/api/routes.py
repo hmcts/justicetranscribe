@@ -109,6 +109,32 @@ async def complete_onboarding(
             "message": "Onboarding completion skipped (dev override mode active)",
             "has_completed_onboarding": current_user.has_completed_onboarding
         }
+@router.post("/user/reset-onboarding")
+async def reset_onboarding(
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Reset user's onboarding status (dev only)"""
+    
+    # Only allow in local/dev environments
+    settings = get_settings()
+    if settings.ENVIRONMENT not in ["local", "dev"]:
+        raise HTTPException(
+            status_code=403, 
+            detail="This endpoint is only available in local/dev environments"
+        )
+    
+    # Reset onboarding status
+    updated_user = update_user(current_user.id, has_completed_onboarding=False)
+    
+    return {
+        "success": True,
+        "message": "Onboarding status reset successfully",
+        "has_completed_onboarding": updated_user.has_completed_onboarding,
+        "user_id": str(updated_user.id),
+        "email": updated_user.email
+    }
+
+
 @router.get("/healthcheck/azure-storage")
 async def azure_storage_health_check():
     """
