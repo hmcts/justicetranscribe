@@ -8,9 +8,9 @@ export default function Step6ReviewEdit() {
         <h2 className="text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
           Review and edit
         </h2>
-        <h4 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
+        <h3 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
           Your professional judgement is key
-        </h4>
+        </h3>
       </div>
 
       {/* Main Content */}
