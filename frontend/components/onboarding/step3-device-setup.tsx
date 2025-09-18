@@ -80,9 +80,9 @@ export default function Step3DeviceSetup() {
       {/* Mobile Content */}
       {selectedDevice === "mobile" && (
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold">
+          <h3 className="text-lg font-semibold">
             Do these things to avoid losing your recording
-          </h4>
+          </h3>
           <div className="space-y-3">
             <div className="flex items-start space-x-3">
               <span className="font-semibold">1.</span>
