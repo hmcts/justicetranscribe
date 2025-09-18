@@ -25,7 +25,7 @@ export default function Step2Setup({
 
       <div className="space-y-6">
         <fieldset>
-          <legend className="mb-3 block text-base font-medium">
+          <legend id="crissa-time-legend" className="mb-3 block text-base font-medium">
             Please estimate your usual time to write a CRISSA note:
           </legend>
           <div
@@ -66,7 +66,7 @@ export default function Step2Setup({
         </fieldset>
 
         <fieldset>
-          <legend className="mb-3 block text-base font-medium">
+          <legend id="appointments-legend" className="mb-3 block text-base font-medium">
             In a typical week, how many appointments with People on Probation do
             you have?
           </legend>
