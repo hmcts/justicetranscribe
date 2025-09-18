@@ -6,7 +6,6 @@
 
 import React from "react";
 import { Plus, ChevronLeft, Mic, MonitorPlay } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
 import { useUserSettings } from "@/providers/user-settings";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ import BackupRecovery from "./audio/backup-recovery";
 import BackupUploader from "./audio/backup-uploader";
 
 function WelcomePage() {
-  const router = useRouter();
   const {
     newTranscription,
     isLoading,
@@ -204,18 +202,6 @@ function WelcomePage() {
               </PopoverContent>
             </Popover>
           )}
-        </div>
-      )}
-
-      {/* Temporary onboarding test button for development */}
-      {!showAllMeetings && (
-        <div className="mb-6 flex justify-center">
-          <Button
-            onClick={() => router.push("/onboarding")}
-            className="bg-pink-500 px-8 py-4 text-lg font-semibold text-white hover:bg-pink-600"
-          >
-            Test Onboarding Flow
-          </Button>
         </div>
       )}
 

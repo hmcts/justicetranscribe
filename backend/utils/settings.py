@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     ENABLE_JWT_VERIFICATION: bool = True
     JWT_VERIFICATION_STRICT: bool = True
 
+    # Onboarding Override for Development Testing
+    FORCE_ONBOARDING_DEV: bool = False
+
     # Uncomment the below to run alembic commands locally, or to run the db interface independently of fastapi
     # from pydantic_settings import SettingsConfigDict
     if ENVIRONMENT == "local":
