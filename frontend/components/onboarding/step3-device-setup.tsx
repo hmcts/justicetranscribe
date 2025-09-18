@@ -48,7 +48,7 @@ export default function Step3DeviceSetup() {
       {/* Desktop Content */}
       {selectedDevice === "desktop" && (
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold">
+          <h3 className="text-lg font-semibold">
             Bookmark{" "}
             <a
               href="https://transcription.service.justice.gov.uk/"
@@ -59,7 +59,7 @@ export default function Step3DeviceSetup() {
               https://transcription.service.justice.gov.uk/
             </a>{" "}
             to find it easily
-          </h4>
+          </h3>
           <div className="space-y-2">
             <div className="flex items-start space-x-3">
               <span className="text-lg">•</span>
