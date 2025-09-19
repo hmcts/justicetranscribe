@@ -34,7 +34,7 @@ export function Rating({
             star <= (hoverValue || value || 0)
               ? "fill-current text-yellow-400"
               : "fill-none text-gray-300 hover:text-gray-400",
-            className,
+            className
           )}
           onClick={() => !readonly && onChange(star)}
           onMouseEnter={() => !readonly && setHoverValue(star)}

@@ -72,7 +72,7 @@ export default function JsonDropZone({
             typeof entry.speaker === "string" &&
             typeof entry.text === "string" &&
             typeof entry.start_time === "number" &&
-            typeof entry.end_time === "number",
+            typeof entry.end_time === "number"
         )
       ) {
         throw new Error("Invalid JSON format");
@@ -94,7 +94,7 @@ export default function JsonDropZone({
       console.error("Error processing JSON file:", error);
       if (onError) {
         onError(
-          error instanceof Error ? error.message : "Error processing JSON file",
+          error instanceof Error ? error.message : "Error processing JSON file"
         );
       }
     }

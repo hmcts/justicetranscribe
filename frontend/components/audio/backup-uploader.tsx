@@ -79,7 +79,7 @@ function BackupUploader({
         });
 
         const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          user_upload_s3_file_key,
+          user_upload_s3_file_key
         );
 
         if (transcriptionJobResult.error) {
@@ -107,13 +107,13 @@ function BackupUploader({
         setUploadError(
           error instanceof Error
             ? error.message
-            : "Error occurred while transcribing",
+            : "Error occurred while transcribing"
         );
         setIsProcessingTranscription(false);
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, backup.id, onUploadSuccess],
+    [setIsProcessingTranscription, backup.id, onUploadSuccess]
   );
 
   const handleRetryUpload = () => {
@@ -140,7 +140,8 @@ function BackupUploader({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30" style={{color: '#B21010'}}
+              className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30"
+              style={{ color: "#B21010" }}
             >
               Close
               <svg

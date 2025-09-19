@@ -19,7 +19,7 @@ export function cn(...inputs: ClassValue[]) {
 export default cn;
 
 export function concatenateDialogueEntriesInTranscriptionJobs(
-  jobs: TranscriptionJob[],
+  jobs: TranscriptionJob[]
 ): DialogueEntry[] {
   return jobs.flatMap((job) => job.dialogue_entries);
 }
@@ -27,21 +27,22 @@ export function concatenateDialogueEntriesInTranscriptionJobs(
 export function replaceSpeakerInDialogueEntries(
   entries: DialogueEntry[],
   oldSpeaker: string,
-  newSpeaker: string,
+  newSpeaker: string
 ): DialogueEntry[] {
   return entries.map((entry) =>
-    entry.speaker === oldSpeaker ? { ...entry, speaker: newSpeaker } : entry,
+    entry.speaker === oldSpeaker ? { ...entry, speaker: newSpeaker } : entry
   );
 }
 
 export const langfuseWeb = new LangfuseWeb({
   publicKey: process.env.NEXT_PUBLIC_LANGFUSE_PUBLIC_KEY || "",
-  baseUrl: process.env.NEXT_PUBLIC_LANGFUSE_HOST || "https://cloud.langfuse.com",
+  baseUrl:
+    process.env.NEXT_PUBLIC_LANGFUSE_HOST || "https://cloud.langfuse.com",
 });
 
 export const findExistingMinuteVersionForTemplate = (
   minuteVersions: MinuteVersion[],
-  templateName: string,
+  templateName: string
 ): MinuteVersion | undefined => {
   return minuteVersions
     .filter((version) => version.template.name === templateName)
@@ -58,7 +59,7 @@ export async function pollMinuteVersion(
   options: {
     maxAttempts?: number;
     interval?: number;
-  } = {},
+  } = {}
 ): Promise<MinuteVersion> {
   const maxAttempts = options.maxAttempts ?? 210; // 7 minutes total
   const interval = options.interval ?? 2000; // 2 seconds

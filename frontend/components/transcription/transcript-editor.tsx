@@ -52,7 +52,7 @@ function TranscriptEditor({ currentCitationIndex }: TranscriptEditorProps) {
   const handleSpeakerUpdate = async (
     oldSpeaker: string,
     entryIndex: number,
-    updateAll: boolean,
+    updateAll: boolean
   ) => {
     if (newSpeakerName.trim() !== "" && newSpeakerName !== oldSpeaker) {
       try {
@@ -62,7 +62,7 @@ function TranscriptEditor({ currentCitationIndex }: TranscriptEditorProps) {
               job.dialogue_entries.some((entry) =>
                 updateAll
                   ? entry.speaker === oldSpeaker
-                  : entry === dialogueEntries[entryIndex],
+                  : entry === dialogueEntries[entryIndex]
               )
             ) {
               const updatedJob = {
@@ -75,12 +75,12 @@ function TranscriptEditor({ currentCitationIndex }: TranscriptEditorProps) {
                       : entry
                     : entry === dialogueEntries[entryIndex]
                       ? { ...entry, speaker: newSpeakerName }
-                      : entry,
+                      : entry
                 ),
               };
               await saveTranscriptionJob(updatedJob);
             }
-          }),
+          })
         );
 
         posthog.capture("speaker_name_edited_in_transcript", {

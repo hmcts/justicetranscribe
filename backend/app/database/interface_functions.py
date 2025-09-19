@@ -260,3 +260,16 @@ def update_user(user_id: UUID, **kwargs) -> User:
         session.commit()
         session.refresh(user)
         return user
+
+
+def mark_user_onboarding_complete(user_id: UUID) -> User:
+    """Mark user as having completed onboarding"""
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user.has_completed_onboarding = True
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user

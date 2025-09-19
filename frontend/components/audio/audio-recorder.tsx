@@ -247,7 +247,7 @@ function AudioRecorderComponent({
       setError(
         err instanceof Error
           ? err.message
-          : "An unknown error occurred while accessing audio.",
+          : "An unknown error occurred while accessing audio."
       );
     }
   };

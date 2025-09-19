@@ -94,7 +94,7 @@ function SimpleEditor({
                         class: "citation-link",
                         style:
                           "color: blue; cursor: pointer; text-decoration: underline;",
-                      }),
+                      })
                     );
                   }
                 }
@@ -223,7 +223,7 @@ function SimpleEditor({
                         {
                           "bg-gray-100 text-primary":
                             editorObject.isActive("bold"),
-                        },
+                        }
                       )}
                       onClick={toggleBold}
                       type="button"
@@ -243,7 +243,7 @@ function SimpleEditor({
                         {
                           "bg-gray-100 text-primary":
                             editorObject.isActive("italic"),
-                        },
+                        }
                       )}
                       onClick={toggleItalic}
                       type="button"
@@ -268,7 +268,7 @@ function SimpleEditor({
                         {
                           "bg-gray-100 text-primary":
                             editorObject.isActive("bulletList"),
-                        },
+                        }
                       )}
                       onClick={toggleBulletList}
                       type="button"
@@ -288,7 +288,7 @@ function SimpleEditor({
                         {
                           "bg-gray-100 text-primary":
                             editorObject.isActive("orderedList"),
-                        },
+                        }
                       )}
                       onClick={toggleOrderedList}
                       type="button"
@@ -313,9 +313,9 @@ function SimpleEditor({
                         {
                           "bg-gray-100 text-primary": editorObject.isActive(
                             "heading",
-                            { level: 3 },
+                            { level: 3 }
                           ),
-                        },
+                        }
                       )}
                       onClick={() =>
                         editorObject
@@ -371,7 +371,7 @@ function SimpleEditor({
                 {currentTranscription && (
                   <CitationPopoverContent
                     dialogueEntries={concatenateDialogueEntriesInTranscriptionJobs(
-                      transcriptionJobs,
+                      transcriptionJobs
                     )}
                     selectedIndex={citationPopover.index}
                   />
@@ -393,7 +393,7 @@ function SimpleEditor({
           <span
             className={classNames(
               "ml-0.5",
-              isOverLimit ? "text-red-500" : "text-gray-500",
+              isOverLimit ? "text-red-500" : "text-gray-500"
             )}
           >
             characters
