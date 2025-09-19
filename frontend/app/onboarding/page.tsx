@@ -10,14 +10,8 @@ import Step1Welcome from "@/components/onboarding/step1-welcome";
 import Step2Setup from "@/components/onboarding/step2-setup";
 import Step3DeviceSetup from "@/components/onboarding/step3-device-setup";
 import Step4BasicTutorial from "@/components/onboarding/step4-basic-tutorial";
-<<<<<<< HEAD
 import Step5ReviewEdit from "@/components/onboarding/step5-review-edit";
 import Step6Ready from "@/components/onboarding/step6-ready";
-=======
-
-import Step6ReviewEdit from "@/components/onboarding/step6-review-edit";
-import Step7Ready from "@/components/onboarding/step7-ready";
->>>>>>> dev
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
 const TOTAL_STEPS = 6;
@@ -143,7 +137,6 @@ export default function OnboardingPage() {
     setFormData({ ...formData, appointmentsPerWeek: appointments });
   };
 
-<<<<<<< HEAD
   const handleLicenseRetry = () => {
     // Reset license check state to allow retry
     setHasValidLicense(null);
@@ -153,12 +146,6 @@ export default function OnboardingPage() {
     // Show license check fail page if license check failed
     if (hasValidLicense === false) {
       return <LicenseCheckFail onRetry={handleLicenseRetry} />;
-=======
-  const renderStep = () => {
-    // Show license check fail page if license check failed
-    if (hasValidLicense === false) {
-      return <LicenseCheckFail />;
->>>>>>> dev
     }
 
     switch (currentStep) {
@@ -178,17 +165,10 @@ export default function OnboardingPage() {
       case 4:
         return <Step4BasicTutorial />;
       case 5:
-<<<<<<< HEAD
         return <Step5ReviewEdit />;
       case 6:
         return (
           <Step6Ready
-=======
-        return <Step6ReviewEdit />;
-      case 6:
-        return (
-          <Step7Ready
->>>>>>> dev
             onStartRecording={handleStartRecording}
             onBack={handleBack}
           />
@@ -276,4 +256,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-// Fixed merge conflicts
