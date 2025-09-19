@@ -276,3 +276,4 @@ export default function OnboardingPage() {
     </div>
   );
 }
+// Fixed merge conflicts
