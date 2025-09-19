@@ -24,7 +24,7 @@ function PosthogProvider({ children }: React.PropsWithChildren) {
   const { user, loading } = useUserSettings();
 
   React.useEffect(() => {
-    if (user && user.email) {
+    if (user && user.email && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
       console.log("user email in provider", user.email);
       posthog.identify(user.email, { email: user.email });
     }
