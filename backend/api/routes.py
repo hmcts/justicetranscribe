@@ -50,6 +50,11 @@ from app.minutes.types import (
     UploadUrlResponse,
 )
 from utils.dependencies import get_current_user
+from utils.langfuse_models import (
+    LangfuseEventRequest,
+    LangfuseScoreRequest,
+    LangfuseTraceRequest,
+)
 from utils.settings import get_settings
 
 router = APIRouter()
@@ -114,18 +119,18 @@ async def reset_onboarding(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
     """Reset user's onboarding status (dev only)"""
-    
+
     # Only allow in local/dev environments
     settings = get_settings()
     if settings.ENVIRONMENT not in ["local", "dev"]:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="This endpoint is only available in local/dev environments"
         )
-    
+
     # Reset onboarding status
     updated_user = update_user(current_user.id, has_completed_onboarding=False)
-    
+
     return {
         "success": True,
         "message": "Onboarding status reset successfully",
@@ -482,3 +487,87 @@ async def update_current_user_route(
     """Update the current user's details."""
     update_fields = request.model_dump(exclude_unset=True)
     return update_user(current_user.id, **update_fields)
+
+
+@router.post("/langfuse/trace")
+async def submit_langfuse_trace(
+    request: LangfuseTraceRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Submit a trace to Langfuse via backend proxy for security."""
+    try:
+        # Submit general trace/event
+        langfuse_client.event(
+            trace_id=request.trace_id,
+            name=request.name,
+            metadata=request.metadata or {},
+            input=request.input_data,
+            output=request.output_data,
+            user_id=current_user.email,
+        )
+
+        logger.info(f"Langfuse trace '{request.name}' submitted for trace {request.trace_id} by user {current_user.email}")
+
+    except Exception as e:
+        logger.error(f"Failed to submit Langfuse trace: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit trace: {e!s}") from e
+    else:
+        return {"success": True, "message": "Trace submitted successfully"}
+
+
+@router.post("/langfuse/score")
+async def submit_langfuse_score(
+    request: LangfuseScoreRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Submit a score to Langfuse via backend proxy for security."""
+    try:
+        # Submit score using the backend Langfuse client
+        langfuse_client.score(
+            trace_id=request.trace_id,
+            name=request.name,
+            value=request.value,
+            comment=request.comment,
+            user_id=current_user.email,
+        )
+
+        logger.info(f"Langfuse score submitted for trace {request.trace_id} by user {current_user.email}")
+
+    except Exception as e:
+        logger.error(f"Failed to submit Langfuse score: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit score: {e!s}") from e
+    else:
+        return {"success": True, "message": "Score submitted successfully"}
+
+
+# Legacy endpoint for backward compatibility
+@router.post("/langfuse/event")
+async def submit_langfuse_event_legacy(
+    request: LangfuseEventRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Submit an event/score to Langfuse via backend proxy (legacy - use /langfuse/trace or /langfuse/score)."""
+    if request.event_type == "score":
+        if request.value is None:
+            raise HTTPException(status_code=400, detail="Score value is required for score events")
+
+        score_request = LangfuseScoreRequest(
+            trace_id=request.trace_id,
+            name=request.name,
+            value=request.value,
+            comment=request.comment,
+        )
+        return await submit_langfuse_score(score_request, current_user)
+
+    elif request.event_type == "event":
+        trace_request = LangfuseTraceRequest(
+            trace_id=request.trace_id,
+            name=request.name,
+            metadata=request.metadata,
+            input_data=request.input_data,
+            output_data=request.output_data,
+        )
+        return await submit_langfuse_trace(trace_request, current_user)
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported event type: {request.event_type}")
