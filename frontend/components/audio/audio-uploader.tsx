@@ -185,7 +185,9 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         const urlResult = await apiClient.getUploadUrl(fileExtension);
 
         if (urlResult.error) {
-          throw new Error("Failed to get upload URL");
+          const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);  // More descriptive error
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -228,7 +230,9 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         );
 
         if (transcriptionJobResult.error) {
-          throw new Error("Failed to start transcription job");
+          const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);  // More descriptive error
         }
         setProcessingStatus("transcribing");
 
