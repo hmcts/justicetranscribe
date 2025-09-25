@@ -25,6 +25,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { audioBackupDB } from "@/lib/indexeddb-backup";
 import { apiClient } from "@/lib/api-client";
+import * as Sentry from "@sentry/nextjs";
+import ErrorReportCard from "@/components/ui/error-report-card";
+import { getDuration } from "@/components/audio/processing-status";
 import AudioRecorderComponent from "./audio-recorder";
 import ScreenRecorder from "./screen-recorder";
 
@@ -174,6 +177,11 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     useState<AudioProcessingStatus>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [currentBackupId, setCurrentBackupId] = useState<string | null>(null);
+  const [lastRequestId, setLastRequestId] = useState<string | null>(null);
+  const [lastStatusCode, setLastStatusCode] = useState<number | null>(null);
+  const [lastSentryEventId, setLastSentryEventId] = useState<string | null>(null);
+  const [userUploadKey, setUserUploadKey] = useState<string | null>(null);
+  const [lastDuration, setLastDuration] = useState<number | null>(null);
   const { setIsProcessingTranscription } = useTranscripts();
   const startTranscription = useCallback(
     async (blob: Blob) => {
@@ -181,6 +189,9 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
         setProcessingStatus({ state: "uploading", progress: 0 });
         setUploadError(null);
+
+        // Calculate duration non-blocking for report
+        getDuration(blob).then((d) => setLastDuration(d ?? null));
 
         const urlResult = await apiClient.getUploadUrl(fileExtension);
 
@@ -190,6 +201,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { upload_url, user_upload_s3_file_key } = urlResult.data!;
+        setUserUploadKey(user_upload_s3_file_key);
 
         // Create XMLHttpRequest to track upload progress
         const xhr = new XMLHttpRequest();
@@ -205,12 +217,16 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve(xhr.response);
             } else {
-              reject(new Error("Failed to upload file to Azure Storage"));
+              const e = new Error("Failed to upload file to Azure Storage") as Error & { status?: number };
+              e.status = xhr.status;
+              reject(e);
             }
           });
 
           xhr.addEventListener("error", () => {
-            reject(new Error("Network error during upload"));
+            const e = new Error("Network error during upload") as Error & { status?: number };
+            e.status = xhr.status || 0;
+            reject(e);
           });
 
           xhr.addEventListener("timeout", () => {
@@ -250,16 +266,34 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           }
         }
       } catch (error) {
+        const err = error as Error & { requestId?: string; status?: number };
+        const eventId = Sentry.captureException(err, {
+          tags: {
+            area: "audio-upload",
+            recording_mode: initialRecordingMode,
+          },
+          extra: {
+            request_id: (err as any)?.requestId || lastRequestId || null,
+            status_code: err.status ?? null,
+            user_upload_key: userUploadKey,
+            backup_id: currentBackupId,
+            blob_type: audioBlob?.type || null,
+            blob_size: audioBlob?.size || null,
+          },
+        });
+        setLastSentryEventId(eventId || null);
         setUploadError(
           error instanceof Error
             ? error.message
             : "Error occurred while transcribing"
         );
+        setLastRequestId((error as any)?.requestId || lastRequestId || null);
+        setLastStatusCode((error as any)?.status ?? lastStatusCode ?? null);
         setIsProcessingTranscription(false);
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, currentBackupId]
+    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, audioBlob, lastRequestId, lastStatusCode, userUploadKey]
   );
 
   const handleRecordingStart = useCallback(() => {
@@ -298,27 +332,45 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         </CardContent>
       </Card>
       {uploadError && (
-        <Alert
-          variant="destructive"
-          className="my-4 w-full border border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
-        >
-          <AlertDescription className="flex items-center gap-2">
-            <svg
-              className="size-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            {uploadError}
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert
+            variant="destructive"
+            className="my-4 w-full border border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+          >
+            <AlertDescription className="flex items-center gap-2">
+              <svg
+                className="size-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {uploadError} {lastRequestId ? `(req ${lastRequestId})` : ""}
+            </AlertDescription>
+          </Alert>
+          <ErrorReportCard
+            data={{
+              title: "Audio upload/transcription failure",
+              requestId: lastRequestId,
+              statusCode: lastStatusCode,
+              recordingMode: initialRecordingMode,
+              fileSizeBytes: audioBlob?.size ?? null,
+              durationSeconds: lastDuration,
+              errorMessage: uploadError,
+              extra: {
+                user_upload_key: userUploadKey,
+                backup_id: currentBackupId,
+              },
+              sentryEventId: lastSentryEventId,
+            }}
+          />
+        </>
       )}
     </div>
   );
