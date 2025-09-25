@@ -215,16 +215,9 @@ export default function HelpPage() {
             <p className="mb-3">
               Guidance for Probation Officers on how to comply with Subject Access Requests (SARs) when using Justice Transcribe.
             </p>
-            <Button variant="outline" asChild>
-              <a
-                href="#"
-                aria-label="Download SARs Request Guidance - coming soon"
-                onClick={(e) => e.preventDefault()}
-                className="opacity-50 cursor-not-allowed"
-              >
-                Download SARs Guidance{" "}
-                <ExternalLink className="ml-1 size-4" />
-              </a>
+            <Button variant="outline" disabled className="opacity-50 cursor-not-allowed">
+              Download SARs Guidance{" "}
+              <ExternalLink className="ml-1 size-4" />
             </Button>
           </section>
         </div>
