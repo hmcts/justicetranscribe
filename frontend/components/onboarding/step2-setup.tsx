@@ -16,20 +16,20 @@ export default function Step2Setup({
   onAppointmentsChange,
 }: Step2SetupProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="text-center">
-        <h2 className="mb-6 text-[2.625rem] font-semibold sm:text-[2.875rem] md:text-[3rem] lg:text-[3.25rem] xl:text-[3.5rem]">
+        <h2 className="mb-1 text-2xl font-semibold sm:text-3xl">
           Get started
         </h2>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-3">
         <fieldset>
-          <legend id="crissa-time-legend" className="mb-3 block text-base font-medium">
+          <legend id="crissa-time-legend" className="mb-1.5 block text-sm font-medium">
             Please estimate your usual time to write a CRISSA note:
           </legend>
           <div
-            className="space-y-3"
+            className="space-y-1.5"
             role="radiogroup"
             aria-labelledby="crissa-time-legend"
           >
@@ -66,12 +66,12 @@ export default function Step2Setup({
         </fieldset>
 
         <fieldset>
-          <legend id="appointments-legend" className="mb-3 block text-base font-medium">
+          <legend id="appointments-legend" className="mb-1.5 block text-sm font-medium">
             In a typical week, how many appointments with People on Probation do
             you have?
           </legend>
           <div
-            className="space-y-3"
+            className="space-y-1.5"
             role="radiogroup"
             aria-labelledby="appointments-legend"
           >

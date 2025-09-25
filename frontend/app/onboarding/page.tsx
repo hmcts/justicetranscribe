@@ -197,43 +197,47 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <div className="container mx-auto max-w-2xl px-4 pb-12 pt-6 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
+      <div className="container mx-auto max-w-2xl px-3 pb-16 pt-2">
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
         
 
         {/* Step content */}
-        <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
+        <div className="mb-3">
           {renderStep()}
         </div>
 
         {/* Navigation - Only show for steps 1-5, step 6 has its own buttons, hide for license check fail */}
         {currentStep < 6 && hasValidLicense !== false && (
-          <div className="flex justify-between pt-4 sm:pt-5 md:pt-6 lg:pt-8 xl:pt-10">
-            {currentStep > 1 && (
-              <Button onClick={handleBack} variant="outline">
-                Back
-              </Button>
-            )}
-            {currentStep === 1 ? (
-              <div className="flex w-full items-center justify-center">
-                <Button
-                  onClick={handleNext}
-                  disabled={!canContinue()}
-                  className={`px-12 py-6 text-lg ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
-                >
-                  Continue
-                </Button>
-              </div>
-            ) : (
-              <Button
-                onClick={handleNext}
-                disabled={!canContinue()}
-                className={`ml-auto ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
-              >
-                Continue
-              </Button>
-            )}
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background">
+            <div className="container mx-auto max-w-2xl px-4 py-3">
+              {currentStep === 1 ? (
+                // Step 1: Centered Continue button only
+                <div className="flex w-full items-center justify-center">
+                  <Button
+                    onClick={handleNext}
+                    disabled={!canContinue()}
+                    className={`px-8 py-3 text-base ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
+                  >
+                    Continue
+                  </Button>
+                </div>
+              ) : (
+                // Steps 2, 4, 5: Back on left, Continue on right
+                <div className="flex items-center justify-between">
+                  <Button onClick={handleBack} variant="outline">
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleNext}
+                    disabled={!canContinue()}
+                    className={!canContinue() ? "cursor-not-allowed opacity-50" : ""}
+                  >
+                    Continue
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
