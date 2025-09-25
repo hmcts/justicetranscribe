@@ -8,10 +8,9 @@ import { apiClient } from "@/lib/api-client";
 // Step Components
 import Step1Welcome from "@/components/onboarding/step1-welcome";
 import Step2Setup from "@/components/onboarding/step2-setup";
-import Step3DeviceSetup from "@/components/onboarding/step3-device-setup";
-import Step4BasicTutorial from "@/components/onboarding/step4-basic-tutorial";
-import Step5ReviewEdit from "@/components/onboarding/step5-review-edit";
-import Step6Ready from "@/components/onboarding/step6-ready";
+import Step4BasicTutorial from "@/components/onboarding/step3-basic-tutorial";
+import Step5ReviewEdit from "@/components/onboarding/step4-review-edit";
+import Step6Ready from "@/components/onboarding/step5-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
 const TOTAL_STEPS = 6;
@@ -87,14 +86,29 @@ export default function OnboardingPage() {
         setHasValidLicense(false);
       }
     } else if (currentStep < TOTAL_STEPS && canContinue()) {
-      // For all other steps, use normal logic
-      setCurrentStep(currentStep + 1);
+      // Skip step 3 (device setup) - go from step 2 to step 4
+      if (currentStep === 2) {
+        setCurrentStep(4);
+      } else if (currentStep === 4) {
+        setCurrentStep(5);
+      } else if (currentStep === 5) {
+        setCurrentStep(6);
+      }
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+      // Handle back navigation with skipped step 3
+      if (currentStep === 4) {
+        setCurrentStep(2);
+      } else if (currentStep === 5) {
+        setCurrentStep(4);
+      } else if (currentStep === 6) {
+        setCurrentStep(5);
+      } else {
+        setCurrentStep(currentStep - 1);
+      }
     }
   };
 
@@ -119,15 +133,6 @@ export default function OnboardingPage() {
     router.push("/"); // Return to home to start recording
   };
 
-  const getStepClassName = (stepNum: number) => {
-    if (stepNum === currentStep) {
-      return "bg-black text-white";
-    }
-    if (stepNum < currentStep) {
-      return "bg-gray-200";
-    }
-    return "border";
-  };
 
   const handleCrissaTimeChange = (time: string) => {
     setFormData({ ...formData, crissaTime: time });
@@ -160,8 +165,6 @@ export default function OnboardingPage() {
             onAppointmentsChange={handleAppointmentsChange}
           />
         );
-      case 3:
-        return <Step3DeviceSetup />;
       case 4:
         return <Step4BasicTutorial />;
       case 5:
@@ -169,7 +172,7 @@ export default function OnboardingPage() {
       case 6:
         return (
           <Step6Ready
-            onStartRecording={handleStartRecording}
+            onGetStarted={handleStartRecording}
             onBack={handleBack}
           />
         );
@@ -198,25 +201,6 @@ export default function OnboardingPage() {
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
         
-        {/* Progress indicator - Hide when showing license check fail */}
-        {hasValidLicense !== false && (
-          <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
-            <div className="flex items-center justify-between">
-              {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(
-                (stepNum) => (
-                  <div
-                    key={stepNum}
-                    className={`flex size-8 items-center justify-center rounded-full ${getStepClassName(
-                      stepNum
-                    )}`}
-                  >
-                    {stepNum}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Step content */}
         <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
