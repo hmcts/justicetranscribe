@@ -3,12 +3,6 @@ import { Play, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
   Card,
   CardContent,
   CardHeader,
@@ -99,45 +93,37 @@ export default function HelpPage() {
 
         {/* Individual Sections */}
         <div className="space-y-6">
-          {/* FAQ */}
+          {/* Phone/VPN Issue */}
           <section className="rounded-lg border p-6">
-            <h3 className="mb-4 text-lg font-semibold">Frequently Asked Questions</h3>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="faq-phone-vpn">
-                <AccordionTrigger>
-                  Phone not working? (VPN not connected)
-                </AccordionTrigger>
-                <AccordionContent>
-                  <p className="mb-2">
-                    If your phone can't connect to apps and you can’t see “VPN” at the top of your iPhone screen then you need to reconnect:
-                  </p>
-                  <ol className="ml-6 list-decimal space-y-1.5">
-                    <li>Open the GlobalProtect app.</li>
-                    <li>
-                      Tap Connect. If you see a grey/paused circle, tap the middle until it turns blue and shows Connected.
-                    </li>
-                    <li>
-                      Wait a few seconds for the VPN indicator to appear at the top of your screen.
-                    </li>
-                    <li>If this doesn't work, contact the IT Service Desk.</li>
-                  </ol>
-                </AccordionContent>
-              </AccordionItem>
+            <h3 className="mb-4 text-lg font-semibold">
+              Phone not working? (VPN not connected)
+            </h3>
+            <p className="mb-2">
+              If your phone can't connect to apps and you can't see "VPN" at the top of your iPhone screen then you need to reconnect:
+            </p>
+            <ol className="ml-6 list-decimal space-y-1.5">
+              <li>Open the GlobalProtect app.</li>
+              <li>
+                Tap Connect. If you see a grey/paused circle, tap the middle until it turns blue and shows Connected.
+              </li>
+              <li>
+                Wait a few seconds for the VPN indicator to appear at the top of your screen.
+              </li>
+              <li>If this doesn't work, contact the IT Service Desk.</li>
+            </ol>
+          </section>
 
-              <AccordionItem value="faq-privacy-visibility">
-                <AccordionTrigger>
-                  Can my manager or colleagues see my summaries or transcripts?
-                </AccordionTrigger>
-                <AccordionContent>
-                  <p className="mb-2">
-                    No. Only you can access your JT transcripts and summaries (the audio files aren't stored). Managers and colleagues don’t have visibility unless you choose to share them (e.g. by copy-and-paste).
-                  </p>
-                  <p>
-                    The evaluation team may access a small sample to check accuracy and product performance under strict governance.
-                  </p>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+          {/* Privacy and Visibility */}
+          <section className="rounded-lg border p-6">
+            <h3 className="mb-4 text-lg font-semibold">
+              Can my manager or colleagues see my summaries or transcripts?
+            </h3>
+            <p className="mb-2">
+              No. Only you can access your JT transcripts and summaries (the audio files aren't stored). Managers and colleagues don't have visibility unless you choose to share them (e.g. by copy-and-paste).
+            </p>
+            <p>
+              The evaluation team may access a small sample to check accuracy and product performance under strict governance.
+            </p>
           </section>
           {/* Mobile Recording Tips */}
           <section className="rounded-lg border p-6">
@@ -201,22 +187,42 @@ export default function HelpPage() {
             </Button>
           </section>
 
-          {/* Probation Information Flyer */}
+          {/* Conversation Script for People on Probation */}
           <section className="rounded-lg border p-6">
             <h3 className="mb-2 text-lg font-semibold">
-              Probation Information Flyer
+              Conversation Script for People on Probation
             </h3>
             <p className="mb-3">
-              Share this flyer with people on probation. It explains how our AI
-              system works and our data compliance approach.
+              Download this document for a simple script to explain Justice Transcribe to people on probation. It explains what it does, why we use it, and how we handle data safely and compliantly.
             </p>
             <Button variant="outline" asChild>
               <a
                 href="/downloads/probation-flyer.pdf"
                 download
-                aria-label="Download Probation Flyer"
+                aria-label="Download Conversation Script for People on Probation"
               >
-                Download Probation Flyer{" "}
+                Download Conversation Script{" "}
+                <ExternalLink className="ml-1 size-4" />
+              </a>
+            </Button>
+          </section>
+
+          {/* SARs Request Guidance */}
+          <section className="rounded-lg border p-6">
+            <h3 className="mb-2 text-lg font-semibold">
+              SARs Request Guidance
+            </h3>
+            <p className="mb-3">
+              Guidance for Probation Officers on how to comply with Subject Access Requests (SARs) when using Justice Transcribe.
+            </p>
+            <Button variant="outline" asChild>
+              <a
+                href="#"
+                aria-label="Download SARs Request Guidance - coming soon"
+                onClick={(e) => e.preventDefault()}
+                className="opacity-50 cursor-not-allowed"
+              >
+                Download SARs Guidance{" "}
                 <ExternalLink className="ml-1 size-4" />
               </a>
             </Button>
