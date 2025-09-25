@@ -7,13 +7,12 @@ import { apiClient } from "@/lib/api-client";
 
 // Step Components
 import Step1Welcome from "@/components/onboarding/step1-welcome";
-import Step2Setup from "@/components/onboarding/step2-setup";
-import Step4BasicTutorial from "@/components/onboarding/step3-basic-tutorial";
-import Step5ReviewEdit from "@/components/onboarding/step4-review-edit";
-import Step6Ready from "@/components/onboarding/step5-ready";
+import Step2BasicTutorial from "@/components/onboarding/step2-basic-tutorial";
+import Step3ReviewEdit from "@/components/onboarding/step3-review-edit";
+import Step4Ready from "@/components/onboarding/step4-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 4;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -23,11 +22,7 @@ export default function OnboardingPage() {
     force_onboarding_override?: boolean;
     environment?: string;
   } | null>(null);
-  const [formData, setFormData] = useState({
-    crissaTime: "",
-    appointmentsPerWeek: "",
-    acceptedPrivacy: false,
-  });
+  // Removed formData as step 2 is no longer used
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -50,15 +45,8 @@ export default function OnboardingPage() {
     fetchOnboardingStatus();
   }, []);
 
-  // Validation for step 2
-  const isStep2Valid = () => {
-    return formData.crissaTime && formData.appointmentsPerWeek;
-  };
-
   const canContinue = () => {
-    if (currentStep === 2) {
-      return isStep2Valid();
-    }
+    // No validation needed as step 2 is removed
     return true;
   };
 
@@ -78,7 +66,7 @@ export default function OnboardingPage() {
         // Store onboarding status for warning banner
         setOnboardingStatus(response.data);
 
-        // Authentication is valid - continue to step 2
+        // Authentication is valid - go to step 2 (Basic Tutorial)
         setCurrentStep(2);
       } catch (error) {
         console.error("Auth check failed:", error);
@@ -86,29 +74,15 @@ export default function OnboardingPage() {
         setHasValidLicense(false);
       }
     } else if (currentStep < TOTAL_STEPS && canContinue()) {
-      // Skip step 3 (device setup) - go from step 2 to step 4
-      if (currentStep === 2) {
-        setCurrentStep(4);
-      } else if (currentStep === 4) {
-        setCurrentStep(5);
-      } else if (currentStep === 5) {
-        setCurrentStep(6);
-      }
+      // Go to next step: 2->3, 3->4
+      setCurrentStep(currentStep + 1);
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
-      // Handle back navigation with skipped step 3
-      if (currentStep === 4) {
-        setCurrentStep(2);
-      } else if (currentStep === 5) {
-        setCurrentStep(4);
-      } else if (currentStep === 6) {
-        setCurrentStep(5);
-      } else {
-        setCurrentStep(currentStep - 1);
-      }
+      // Simple back navigation: 4->3, 3->2, 2->1
+      setCurrentStep(currentStep - 1);
     }
   };
 
@@ -134,13 +108,7 @@ export default function OnboardingPage() {
   };
 
 
-  const handleCrissaTimeChange = (time: string) => {
-    setFormData({ ...formData, crissaTime: time });
-  };
-
-  const handleAppointmentsChange = (appointments: string) => {
-    setFormData({ ...formData, appointmentsPerWeek: appointments });
-  };
+  // Removed form handlers as step 2 is no longer used
 
   const handleLicenseRetry = () => {
     // Reset license check state to allow retry
@@ -157,21 +125,12 @@ export default function OnboardingPage() {
       case 1:
         return <Step1Welcome />;
       case 2:
-        return (
-          <Step2Setup
-            crissaTime={formData.crissaTime}
-            appointmentsPerWeek={formData.appointmentsPerWeek}
-            onCrissaTimeChange={handleCrissaTimeChange}
-            onAppointmentsChange={handleAppointmentsChange}
-          />
-        );
+        return <Step2BasicTutorial />;
+      case 3:
+        return <Step3ReviewEdit />;
       case 4:
-        return <Step4BasicTutorial />;
-      case 5:
-        return <Step5ReviewEdit />;
-      case 6:
         return (
-          <Step6Ready
+          <Step4Ready
             onGetStarted={handleStartRecording}
             onBack={handleBack}
           />
@@ -183,6 +142,14 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Skip to main content for screen readers */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
+      
       {/* Show warning banner if dev override is active */}
       {onboardingStatus?.force_onboarding_override && (
         <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border border-orange-400 bg-orange-100 px-4 py-3 text-orange-800 shadow-lg">
@@ -197,19 +164,18 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <div className="container mx-auto max-w-2xl px-3 pb-16 pt-2">
+      <div id="main-content" className="container mx-auto max-w-2xl px-3 pb-16 pt-4">
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
         
-
-        {/* Step content */}
-        <div className="mb-3">
+        {/* Step content - centered vertically */}
+        <div className="flex min-h-[calc(100vh-200px)] flex-col justify-center">
           {renderStep()}
         </div>
 
-        {/* Navigation - Only show for steps 1-5, step 6 has its own buttons, hide for license check fail */}
-        {currentStep < 6 && hasValidLicense !== false && (
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background">
+        {/* Navigation - Show for all steps, hide for license check fail */}
+        {hasValidLicense !== false && (
+          <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background" aria-label="Onboarding navigation">
             <div className="container mx-auto max-w-2xl px-4 py-3">
               {currentStep === 1 ? (
                 // Step 1: Centered Continue button only
@@ -222,8 +188,21 @@ export default function OnboardingPage() {
                     Continue
                   </Button>
                 </div>
+              ) : currentStep === 4 ? (
+                // Step 4: Back on left, green Get Started on right
+                <div className="flex items-center justify-between">
+                  <Button onClick={handleBack} variant="outline">
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleStartRecording}
+                    className="bg-green-600 px-8 py-3 text-base text-white hover:bg-green-700"
+                  >
+                    Get started
+                  </Button>
+                </div>
               ) : (
-                // Steps 2, 4, 5: Back on left, Continue on right
+                // Steps 2, 3: Back on left, Continue on right
                 <div className="flex items-center justify-between">
                   <Button onClick={handleBack} variant="outline">
                     Back
@@ -238,7 +217,7 @@ export default function OnboardingPage() {
                 </div>
               )}
             </div>
-          </div>
+          </nav>
         )}
       </div>
     </div>
