@@ -143,9 +143,9 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
             <div className="flex items-center gap-3">
               <Upload className="size-5 text-gray-600" />
               <div>
-                <h3 className="font-medium text-gray-900">
+                <h2 className="font-medium text-gray-900">
                   Reupload Recordings
-                </h3>
+                </h2>
                 <p className="text-sm text-gray-500">
                   {backups.length} recording{backups.length !== 1 ? "s" : ""}{" "}
                   waiting for upload
