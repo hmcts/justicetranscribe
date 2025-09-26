@@ -16,6 +16,7 @@ if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
       maskInputOptions: {
         password: true,
       },
+      maskTextSelector: ".ph-mask",
     },
   });
 }
