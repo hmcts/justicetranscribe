@@ -183,90 +183,132 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   const [userUploadKey, setUserUploadKey] = useState<string | null>(null);
   const [lastDuration, setLastDuration] = useState<number | null>(null);
   const { setIsProcessingTranscription } = useTranscripts();
+  const uploadFile = useCallback(
+    async (blob: Blob, uploadUrl: string): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            setProcessingStatus({ state: "uploading", progress });
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+          }
+        });
+
+        xhr.addEventListener("error", () => {
+          reject(new Error("Network error during upload"));
+        });
+
+        xhr.addEventListener("timeout", () => {
+          reject(new Error("Upload timed out"));
+        });
+
+        xhr.open("PUT", uploadUrl);
+        xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
+        xhr.send(blob);
+      });
+    },
+    []
+  );
+
   const startTranscription = useCallback(
     async (blob: Blob) => {
-      try {
-        const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
-        setProcessingStatus({ state: "uploading", progress: 0 });
-        setUploadError(null);
+      const maxRetries = 2;
+      let lastError: Error | null = null;
 
-        // Calculate duration non-blocking for report
-        getDuration(blob).then((d) => setLastDuration(d ?? null));
+      // Calculate duration non-blocking for report (telemetry)
+      getDuration(blob).then((d) => setLastDuration(d ?? null));
 
-        const urlResult = await apiClient.getUploadUrl(fileExtension);
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
+          setProcessingStatus({ state: "uploading", progress: 0 });
+          setUploadError(null);
 
-        if (urlResult.error) {
-          throw new Error("Failed to get upload URL");
-        }
+          // Show retry attempt to user
+          if (attempt > 1) {
+            console.log(`Upload attempt ${attempt} of ${maxRetries}`);
+            setUploadError(`Retrying upload (attempt ${attempt} of ${maxRetries})...`);
+          }
+          const urlResult = await apiClient.getUploadUrl(fileExtension);
 
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
-        setUserUploadKey(user_upload_s3_file_key);
+          if (urlResult.error) {
+            const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
+            console.error(errorMsg);
+            throw new Error(errorMsg);
+          }
 
-        // Create XMLHttpRequest to track upload progress
-        const xhr = new XMLHttpRequest();
-        await new Promise((resolve, reject) => {
-          xhr.upload.addEventListener("progress", (event) => {
-            if (event.lengthComputable) {
-              const progress = Math.round((event.loaded / event.total) * 100);
-              setProcessingStatus({ state: "uploading", progress });
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          const { upload_url, user_upload_s3_file_key } = urlResult.data!;
+          setUserUploadKey(user_upload_s3_file_key);
+
+          // Clear retry message on successful URL fetch
+          if (attempt > 1) {
+            setUploadError(null);
+          }
+
+          // Upload the file with the new URL
+          await uploadFile(blob, upload_url);
+
+          const transcriptionJobResult = await apiClient.startTranscriptionJob(
+            user_upload_s3_file_key
+          );
+
+          if (transcriptionJobResult.error) {
+            const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
+            console.error(errorMsg);
+            throw new Error(errorMsg);
+          }
+
+          setProcessingStatus("transcribing");
+
+          posthog.capture("transcription_started", {
+            file_type: blob.type,
+            source: blob instanceof File ? "upload" : "recording",
+            retry_attempt: attempt,
+          });
+
+          // Clean up backup after successful upload
+          if (currentBackupId) {
+            try {
+              await audioBackupDB.deleteAudioBackup(currentBackupId);
+              setCurrentBackupId(null);
+            } catch (error) {
+              alert(`error deleting backup: ${error}`);
             }
-          });
+          }
 
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-            } else {
-              const e = new Error("Failed to upload file to Azure Storage") as Error & { status?: number };
-              e.status = xhr.status;
-              reject(e);
-            }
-          });
+          // Success - break out of retry loop
+          return;
 
-          xhr.addEventListener("error", () => {
-            const e = new Error("Network error during upload") as Error & { status?: number };
-            e.status = xhr.status || 0;
-            reject(e);
-          });
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error("Unknown error occurred");
+          console.error(`Upload attempt ${attempt} failed:`, lastError.message);
 
-          xhr.addEventListener("timeout", () => {
-            reject(new Error("Upload timed out"));
-          });
-
-          xhr.open("PUT", upload_url);
-          // Add required headers for Azure Blob Storage
-          xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
-          xhr.send(blob);
-        });
-
-        const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          user_upload_s3_file_key
-        );
-
-        if (transcriptionJobResult.error) {
-          throw new Error("Failed to start transcription job");
-        }
-        setProcessingStatus("transcribing");
-
-        // await pollTranscription(user_upload_s3_file_key);
-        // setProcessingStatus("transcribing_complete");
-        posthog.capture("transcription_started", {
-          file_type: blob.type,
-          source: blob instanceof File ? "upload" : "recording",
-        });
-
-        // Clean up backup after successful upload
-        if (currentBackupId) {
-          try {
-            await audioBackupDB.deleteAudioBackup(currentBackupId);
-            setCurrentBackupId(null);
-          } catch (error) {
-            // Sentry.captureException(error);
-            alert(`error deleting backup: ${error}`);
+          // If this isn't the last attempt, continue to retry
+          if (attempt < maxRetries) {
+            // Add a small delay before retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
           }
         }
-      } catch (error) {
-        const err = error as Error & { requestId?: string; status?: number };
+      }
+
+      // All retries failed
+      setUploadError(
+        lastError?.message || "Error occurred while transcribing"
+      );
+      // Capture rich context for failed upload/transcription
+      try {
+        const err = lastError as Error & { requestId?: string; status?: number };
         const eventId = Sentry.captureException(err, {
           tags: {
             area: "audio-upload",
@@ -274,7 +316,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           },
           extra: {
             request_id: (err as any)?.requestId || lastRequestId || null,
-            status_code: err.status ?? null,
+            status_code: err?.status ?? null,
             user_upload_key: userUploadKey,
             backup_id: currentBackupId,
             blob_type: audioBlob?.type || null,
@@ -282,18 +324,13 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           },
         });
         setLastSentryEventId(eventId || null);
-        setUploadError(
-          error instanceof Error
-            ? error.message
-            : "Error occurred while transcribing"
-        );
-        setLastRequestId((error as any)?.requestId || lastRequestId || null);
-        setLastStatusCode((error as any)?.status ?? lastStatusCode ?? null);
-        setIsProcessingTranscription(false);
-        setProcessingStatus("idle");
-      }
+        setLastRequestId((lastError as any)?.requestId || lastRequestId || null);
+        setLastStatusCode((lastError as any)?.status ?? lastStatusCode ?? null);
+      } catch {}
+      setIsProcessingTranscription(false);
+      setProcessingStatus("idle");
     },
-    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, audioBlob, lastRequestId, lastStatusCode, userUploadKey]
+    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, audioBlob, lastRequestId, lastStatusCode, userUploadKey, uploadFile]
   );
 
   const handleRecordingStart = useCallback(() => {
