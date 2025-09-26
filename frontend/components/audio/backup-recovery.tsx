@@ -181,10 +181,10 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1">
-                      <h4 className="text-sm font-medium">
+                      <h3 className="text-sm font-medium">
                         Recording #{backups.length - index} -{" "}
                         {formatTimestamp(backup.timestamp)}
-                      </h4>
+                      </h3>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 sm:gap-4">
                         <span>Size: {formatFileSize(backup.blob)}</span>
                       </div>
