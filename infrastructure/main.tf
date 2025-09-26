@@ -190,7 +190,11 @@ resource "azurerm_linux_web_app" "frontend" {
   # Add this lifecycle rule to ignore changes to app_settings
   lifecycle {
     ignore_changes = [
-      app_settings
+      app_settings,
+      site_config[0].application_stack[0].docker_image_name,
+      site_config[0].application_stack[0].docker_registry_url,
+      site_config[0].application_stack[0].docker_registry_username,
+      site_config[0].application_stack[0].docker_registry_password
     ]
   }
 
@@ -312,6 +316,10 @@ resource "azurerm_linux_web_app" "backend_api" {
       app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
       app_settings["AZURE_AD_TENANT_ID"],
       app_settings["AZURE_AD_CLIENT_ID"],
+      site_config[0].application_stack[0].docker_image_name,
+      site_config[0].application_stack[0].docker_registry_url,
+      site_config[0].application_stack[0].docker_registry_username,
+      site_config[0].application_stack[0].docker_registry_password
     ]
   }
 

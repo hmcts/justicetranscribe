@@ -38,7 +38,7 @@ export default function DragAndDropUploader({
       }
       return acc;
     },
-    {} as Record<string, string[]>,
+    {} as Record<string, string[]>
   );
 
   const handleFileLoad = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,7 +71,7 @@ export default function DragAndDropUploader({
     <div
       className={cn(
         "group relative cursor-pointer",
-        isDragActive && "opacity-70",
+        isDragActive && "opacity-70"
       )}
     >
       <div
@@ -82,7 +82,7 @@ export default function DragAndDropUploader({
           isDragReject && "border-red-400 bg-red-50/50",
           !isDragActive && "hover:border-blue-400",
           selectedFileName && "bg-gray-50/50",
-          "dark:border-gray-700 dark:hover:border-blue-500",
+          "dark:border-gray-700 dark:hover:border-blue-500"
         )}
       >
         {!selectedFileName ? (
@@ -90,7 +90,7 @@ export default function DragAndDropUploader({
             <svg
               className={cn(
                 "h-10 w-10 opacity-75 transition-transform",
-                isDragActive && "scale-110",
+                isDragActive && "scale-110"
               )}
               fill="none"
               stroke="currentColor"

@@ -258,7 +258,7 @@ function ScreenRecorder({
         recordingGain.gain.value = paused ? 0 : 1;
       }
     },
-    [recordingGain],
+    [recordingGain]
   );
 
   const startRecording = async () => {
@@ -268,7 +268,7 @@ function ScreenRecorder({
     try {
       if (!navigator.mediaDevices?.getDisplayMedia) {
         throw new Error(
-          "Screen capture is not supported in this browser. Please use Chrome or Edge.",
+          "Screen capture is not supported in this browser. Please use Chrome or Edge."
         );
       }
 
@@ -299,7 +299,7 @@ function ScreenRecorder({
       if (!screenStream.getAudioTracks().length) {
         screenStream.getTracks().forEach((track) => track.stop());
         throw new Error(
-          "We couldn't pick up any audio. Please make sure when you click share 'Entire Screen' you then check 'Share audio' at the bottom right of the pop up.",
+          "We couldn't pick up any audio. Please make sure when you click share 'Entire Screen' you then check 'Share audio' at the bottom right of the pop up."
         );
       }
 
@@ -344,7 +344,7 @@ function ScreenRecorder({
       } catch (micError) {
         console.warn(
           "Could not access microphone. Recording only tab audio.",
-          micError,
+          micError
         );
         // Create a new stream with just the tab audio, still with gain control
         const screenSource =
@@ -409,7 +409,7 @@ function ScreenRecorder({
           });
         } else {
           setError(
-            "No audio data was recorded. Please try again and ensure audio is shared.",
+            "No audio data was recorded. Please try again and ensure audio is shared."
           );
 
           // Track failed recording
@@ -443,7 +443,7 @@ function ScreenRecorder({
       } catch (wakeLockError) {
         console.warn(
           "Wake lock request failed, continuing without it:",
-          wakeLockError,
+          wakeLockError
         );
       }
 
@@ -463,7 +463,7 @@ function ScreenRecorder({
     } catch (error) {
       setShowShareGuidance(false);
       setError(
-        error instanceof Error ? error.message : "An unknown error occurred",
+        error instanceof Error ? error.message : "An unknown error occurred"
       );
       setIsRecording(false);
       setRecordingTime(0);

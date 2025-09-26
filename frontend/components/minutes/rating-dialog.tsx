@@ -76,7 +76,10 @@ function RatingDialog({
             />
           </div>
           <div className="space-y-2 ph-no-capture">
-            <label htmlFor="feedback-textarea" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="feedback-textarea"
+              className="text-sm font-medium text-gray-700"
+            >
               Any specific feedback? (Optional)
             </label>
             <Textarea

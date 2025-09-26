@@ -31,7 +31,7 @@ function formatTranscript(transcript: DialogueEntry[]): string {
   return transcript
     .map(
       (entry) =>
-        `<p><strong>${entry.speaker}</strong>: ${entry.text}</p><p>&nbsp;</p>`,
+        `<p><strong>${entry.speaker}</strong>: ${entry.text}</p><p>&nbsp;</p>`
     )
     .join("\n");
 }
@@ -101,7 +101,7 @@ function preprocessHtml(html: string, transcript: DialogueEntry[]): string {
 async function convertHTMLToWordAndDownload(
   htmlContent: string,
   transcript: DialogueEntry[],
-  fileName: string = "ai-minutes.docx",
+  fileName: string = "ai-minutes.docx"
 ): Promise<void> {
   const processedHtml = preprocessHtml(htmlContent, transcript);
   const result = await asBlob(processedHtml);
@@ -123,7 +123,7 @@ export function removeCitations(text: string | null | undefined): string {
 async function convertAIMinutesToWordDoc(
   html: string,
   transcript: DialogueEntry[],
-  fileName: string = "document.docx",
+  fileName: string = "document.docx"
 ): Promise<void> {
   const cleanedHTML = removeCitations(html);
   await convertHTMLToWordAndDownload(cleanedHTML, transcript, fileName);

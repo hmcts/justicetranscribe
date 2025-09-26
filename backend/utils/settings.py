@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     AZURE_STORAGE_TRANSCRIPTION_CONTAINER: str
     DATABASE_CONNECTION_STRING: str
     ENVIRONMENT: str = "local"
+    # Onboarding Override for Development Testing
+    FORCE_ONBOARDING_DEV: bool = False
     GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT: str
     GOV_NOTIFY_API_KEY: str
     # JWT Verification Settings - Strict by default
@@ -32,6 +34,12 @@ class Settings(BaseSettings):
     LANGFUSE_SECRET_KEY: str
     LANGFUSE_HOST: str
     RUN_MIGRATIONS: bool = False
+    SENTRY_DSN: str
+
+    # Uncomment the below to run alembic commands locally, or to run the db interface independently of fastapi
+    # from pydantic_settings import SettingsConfigDict
+    if ENVIRONMENT == "local":
+        model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     SENTRY_DSN: str
 
 

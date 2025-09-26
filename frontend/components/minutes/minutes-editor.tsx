@@ -95,7 +95,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
 
         const minuteVersion = await pollMinuteVersion(
           currentTranscription.id,
-          minute_version_id,
+          minute_version_id
         );
 
         setCurrentVersion(minuteVersion);
@@ -110,7 +110,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
         setIsGenerating(false);
       }
     },
-    [currentTranscription?.id, setIsGenerating, setCurrentVersion],
+    [currentTranscription?.id, setIsGenerating, setCurrentVersion]
   );
 
   const handleAIEdit = useCallback(
@@ -147,7 +147,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
 
         const minuteVersion = await pollMinuteVersion(
           currentTranscription.id,
-          minute_version_id,
+          minute_version_id
         );
 
         setCurrentVersion(minuteVersion);
@@ -162,7 +162,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
         setIsGenerating(false);
       }
     },
-    [currentTranscription?.id, currentVersion, selectedTemplate],
+    [currentTranscription?.id, currentVersion, selectedTemplate]
   );
 
   const handleTemplateChange = useCallback(
@@ -174,7 +174,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
       const minuteVersions = await getMinuteVersions(currentTranscription.id);
       const existingVersion = findExistingMinuteVersionForTemplate(
         minuteVersions,
-        template.name,
+        template.name
       );
       if (
         existingVersion &&
@@ -191,7 +191,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
 
         const minuteVersion = await pollMinuteVersion(
           currentTranscription.id,
-          existingVersion.id,
+          existingVersion.id
         );
         setCurrentVersion(minuteVersion);
         setIsGenerating(false);
@@ -199,7 +199,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
         generateAIMinutes(template);
       }
     },
-    [templates, currentTranscription?.id, generateAIMinutes],
+    [templates, currentTranscription?.id, generateAIMinutes]
   );
 
   useEffect(() => {

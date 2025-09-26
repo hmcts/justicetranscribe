@@ -71,7 +71,8 @@ function ContentDisplay({
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30" style={{color: '#B21010'}}
+          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30"
+          style={{ color: "#B21010" }}
         >
           Close
           <svg
@@ -223,7 +224,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         });
 
         const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          user_upload_s3_file_key,
+          user_upload_s3_file_key
         );
 
         if (transcriptionJobResult.error) {
@@ -252,13 +253,13 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         setUploadError(
           error instanceof Error
             ? error.message
-            : "Error occurred while transcribing",
+            : "Error occurred while transcribing"
         );
         setIsProcessingTranscription(false);
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, currentBackupId],
+    [setIsProcessingTranscription, currentBackupId]
   );
 
   const handleRecordingStart = useCallback(() => {
@@ -276,7 +277,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
       }
       setProcessingStatus({ state: "uploading", progress: 0 });
     },
-    [startTranscription],
+    [startTranscription]
   );
 
   return (
