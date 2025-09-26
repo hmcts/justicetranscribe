@@ -13,12 +13,15 @@ if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
     capture_pageview: true,
     session_recording: {
       maskAllInputs: true,
-      maskInputOptions: {
-        password: true,
-      },
-      maskTextSelector: ".ph-mask",
+      maskTextSelector: "*",
     },
-  });
+    before_send: (event: any) => {
+      if (event.event === "minutes_rating_submitted" && event.properties?.comment) {
+        event.properties.comment = "[REDACTED]";
+      }
+      return event;
+    },
+  } as any);
 }
 
 function PosthogProvider({ children }: React.PropsWithChildren) {
