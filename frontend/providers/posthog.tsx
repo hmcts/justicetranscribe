@@ -15,11 +15,15 @@ if (typeof window !== "undefined") {
     capture_pageview: true,
     session_recording: {
       maskAllInputs: true,
-      maskInputOptions: {
-        password: true,
-      },
+      maskTextSelector: "*",
     },
-  });
+    before_send: (event: any) => {
+      if (event.event === "minutes_rating_submitted" && event.properties?.comment) {
+        event.properties.comment = "[REDACTED]";
+      }
+      return event;
+    },
+  } as any);
 }
 
 function PosthogProvider({ children }: React.PropsWithChildren) {
