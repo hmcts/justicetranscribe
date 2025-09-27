@@ -127,6 +127,8 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=https://${{ needs.terraform.outputs.backend_hostname }}
             ENVIRONMENT=${{ needs.terraform.outputs.environment }}
+            NEXT_PUBLIC_POSTHOG_API_KEY=${{ secrets.NEXT_PUBLIC_POSTHOG_API_KEY }}
+            NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
 
       # Backend build and deploy
       - name: Extract backend metadata
