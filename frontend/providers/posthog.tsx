@@ -6,12 +6,10 @@ import React from "react";
 import { useUserSettings } from "@/providers/user-settings";
 import PostHogPageView from "./posthog-page-view";
 
-// Only initialize on client-side
-if (typeof window !== "undefined") {
-  // pragma: allowlist secret
-  const API_KEY = "phc_gMiQR2FpJt3FObuZ2HXF2yVtbGfKhdHfbpbjTcpyQQz"; // pragma: allowlist secret
-  posthog.init(API_KEY, {
-    api_host: "https://eu.i.posthog.com",
+// Only initialize on client-side when API key is provided
+if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
+  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_API_KEY, {
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://eu.i.posthog.com",
     capture_pageview: true,
     session_recording: {
       maskAllInputs: true,
@@ -27,14 +25,19 @@ if (typeof window !== "undefined") {
 }
 
 function PosthogProvider({ children }: React.PropsWithChildren) {
-  const { user } = useUserSettings();
+  const { user, loading } = useUserSettings();
 
   React.useEffect(() => {
-    if (user && user.email) {
+    if (user && user.email && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
       console.log("user email in provider", user.email);
       posthog.identify(user.email, { email: user.email });
     }
   }, [user]);
+
+  // If PostHog API key is not provided, just render children without PostHog wrapper
+  if (!process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
+    return <>{children}</>;
+  }
 
   return (
     <PostHogProvider client={posthog}>
