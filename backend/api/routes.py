@@ -538,36 +538,3 @@ async def submit_langfuse_score(
         raise HTTPException(status_code=500, detail=f"Failed to submit score: {e!s}") from e
     else:
         return {"success": True, "message": "Score submitted successfully"}
-
-
-# Legacy endpoint for backward compatibility
-@router.post("/langfuse/event")
-async def submit_langfuse_event_legacy(
-    request: LangfuseEventRequest,
-    current_user: User = Depends(get_current_user),  # noqa: B008
-):
-    """Submit an event/score to Langfuse via backend proxy (legacy - use /langfuse/trace or /langfuse/score)."""
-    if request.event_type == "score":
-        if request.value is None:
-            raise HTTPException(status_code=400, detail="Score value is required for score events")
-
-        score_request = LangfuseScoreRequest(
-            trace_id=request.trace_id,
-            name=request.name,
-            value=request.value,
-            comment=request.comment,
-        )
-        return await submit_langfuse_score(score_request, current_user)
-
-    elif request.event_type == "event":
-        trace_request = LangfuseTraceRequest(
-            trace_id=request.trace_id,
-            name=request.name,
-            metadata=request.metadata,
-            input_data=request.input_data,
-            output_data=request.output_data,
-        )
-        return await submit_langfuse_trace(trace_request, current_user)
-
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported event type: {request.event_type}")
