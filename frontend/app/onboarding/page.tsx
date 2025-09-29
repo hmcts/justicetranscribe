@@ -197,7 +197,7 @@ export default function OnboardingPage() {
       <div className="container mx-auto max-w-2xl px-4 pb-12 pt-6 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
-        
+
         {/* Progress indicator - Hide when showing license check fail */}
         {hasValidLicense !== false && (
           <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
