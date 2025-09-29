@@ -170,9 +170,9 @@ function BackupUploader({
           ) : (
             <div className="space-y-4">
               <div className="text-center">
-                <h2 className="mb-2 text-2xl font-semibold">
+                <h1 className="mb-2 text-2xl font-semibold">
                   Retry Upload - Backed Up Recording
-                </h2>
+                </h1>
                 <div className="space-y-1 text-sm text-gray-600">
                   <p>File: {backup.fileName}</p>
                   <p>Recorded: {formatTimestamp(backup.timestamp)}</p>
