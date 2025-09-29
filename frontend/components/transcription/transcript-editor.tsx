@@ -137,7 +137,7 @@ function TranscriptEditor({ currentCitationIndex }: TranscriptEditorProps) {
           ref={(el: HTMLDivElement | null) => {
             transcriptRefs.current[index] = el;
           }}
-          className={`mb-2 flex items-start space-x-2 rounded-md p-2 transition-colors ${
+          className={`mb-2 flex items-start space-x-2 rounded-md p-2 transition-colors ph-mask ${
             currentCitationIndex === index ? " bg-blue-100" : ""
           }`}
         >

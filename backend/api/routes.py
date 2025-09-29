@@ -50,6 +50,10 @@ from app.minutes.types import (
     UploadUrlResponse,
 )
 from utils.dependencies import get_current_user
+from utils.langfuse_models import (
+    LangfuseScoreRequest,
+    LangfuseTraceRequest,
+)
 from utils.settings import get_settings
 
 router = APIRouter()
@@ -114,18 +118,18 @@ async def reset_onboarding(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
     """Reset user's onboarding status (dev only)"""
-    
+
     # Only allow in local/dev environments
     settings = get_settings()
     if settings.ENVIRONMENT not in ["local", "dev"]:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="This endpoint is only available in local/dev environments"
         )
-    
+
     # Reset onboarding status
     updated_user = update_user(current_user.id, has_completed_onboarding=False)
-    
+
     return {
         "success": True,
         "message": "Onboarding status reset successfully",
@@ -174,7 +178,7 @@ async def get_upload_url(
     presigned_url = generate_blob_upload_url(
         container_name=get_settings().AZURE_STORAGE_CONTAINER_NAME,
         blob_name=user_upload_blob_path,
-        expiry_hours=1,
+        expiry_hours=4,
     )
 
     return UploadUrlResponse(
@@ -482,3 +486,56 @@ async def update_current_user_route(
     """Update the current user's details."""
     update_fields = request.model_dump(exclude_unset=True)
     return update_user(current_user.id, **update_fields)
+
+
+@router.post("/langfuse/trace")
+async def submit_langfuse_trace(
+    request: LangfuseTraceRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Submit a trace to Langfuse via backend proxy for security."""
+    try:
+        # Submit general trace/event
+        langfuse_client.event(
+            trace_id=request.trace_id,
+            name=request.name,
+            metadata=request.metadata or {},
+            input=request.input_data,
+            output=request.output_data,
+            user_id=current_user.email,
+        )
+
+        logger.info(f"Langfuse trace '{request.name}' submitted for trace {request.trace_id} by user {current_user.email}")
+
+    except Exception as e:
+        _e = f"Failed to submit Langfuse trace: {e!s}"
+        logger.error(_e)
+        raise HTTPException(status_code=500, detail=_e) from e
+    else:
+        return {"success": True, "message": "Trace submitted successfully"}
+
+
+@router.post("/langfuse/score")
+async def submit_langfuse_score(
+    request: LangfuseScoreRequest,
+    current_user: User = Depends(get_current_user),  # noqa: B008
+):
+    """Submit a score to Langfuse via backend proxy for security."""
+    try:
+        # Submit score using the backend Langfuse client
+        langfuse_client.score(
+            trace_id=request.trace_id,
+            name=request.name,
+            value=request.value,
+            comment=request.comment,
+            user_id=current_user.email,
+        )
+
+        logger.info(f"Langfuse score submitted for trace {request.trace_id} by user {current_user.email}")
+
+    except Exception as e:
+        _e = f"Failed to submit Langfuse score: {e!s}"
+        logger.error(_e)
+        raise HTTPException(status_code=500, detail=_e) from e
+    else:
+        return {"success": True, "message": "Score submitted successfully"}
