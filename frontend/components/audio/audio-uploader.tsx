@@ -223,6 +223,9 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     async (blob: Blob) => {
       const maxRetries = 2;
       let lastError: Error | null = null;
+      let currentRequestId: string | null = null;
+      let currentStatusCode: number | null = null;
+      let currentUserUploadKey: string | null = null;
 
       // Calculate duration non-blocking for report (telemetry)
       getDuration(blob).then((d) => setLastDuration(d ?? null));
@@ -256,6 +259,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { upload_url, user_upload_s3_file_key } = urlResult.data!;
+        currentUserUploadKey = user_upload_s3_file_key;
         setUserUploadKey(user_upload_s3_file_key);
 
         // Clear retry message on successful URL fetch
@@ -307,6 +311,11 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           lastError = error instanceof Error ? error : new Error("Unknown error occurred");
           console.error(`Upload attempt ${attempt} failed:`, lastError.message);
 
+          // Extract request ID and status code from error if available
+          const err = lastError as Error & { requestId?: string; status?: number };
+          currentRequestId = err?.requestId || null;
+          currentStatusCode = err?.status ?? null;
+
           if (attempt < maxRetries) {
             await delay(1000);
           }
@@ -328,23 +337,23 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
               recording_mode: initialRecordingMode,
             },
             extra: {
-              request_id: (err as any)?.requestId || lastRequestId || null,
-              status_code: err?.status ?? null,
-              user_upload_key: userUploadKey,
+              request_id: currentRequestId,
+              status_code: currentStatusCode,
+              user_upload_key: currentUserUploadKey,
               backup_id: currentBackupId,
-              blob_type: audioBlob?.type || null,
-              blob_size: audioBlob?.size || null,
+              blob_type: blob.type,
+              blob_size: blob.size,
             },
           });
           setLastSentryEventId(eventId || null);
-          setLastRequestId((lastError as any)?.requestId || lastRequestId || null);
-          setLastStatusCode((lastError as any)?.status ?? lastStatusCode ?? null);
+          setLastRequestId(currentRequestId);
+          setLastStatusCode(currentStatusCode);
         } catch {}
         setIsProcessingTranscription(false);
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, audioBlob, lastRequestId, lastStatusCode, userUploadKey, uploadFile]
+    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, uploadFile]
   );
 
   const handleRecordingStart = useCallback(() => {
