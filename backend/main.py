@@ -1,22 +1,19 @@
 import logging
 from contextlib import asynccontextmanager
-import uuid
-import contextvars
 
 import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
-from fastapi import Request
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
+from utils.exception_handlers import http_exception_handler, unhandled_exception_handler
+from utils.middleware import add_request_id
 from utils.settings import get_settings
 
 log = logging.getLogger("uvicorn")
-request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
 
 
 @asynccontextmanager
@@ -65,34 +62,18 @@ if settings.ENVIRONMENT == "local":
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
+# Add middleware and exception handlers
 @app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    rid = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    request_id_ctx.set(rid)
-    response = await call_next(request)
-    response.headers["X-Request-Id"] = rid
-    return response
-
+async def request_id_middleware(request, call_next):
+    return await add_request_id(request, call_next)
 
 @app.exception_handler(FastAPIHTTPException)
-async def http_exception_handler(request: Request, exc: FastAPIHTTPException):
-    rid = request_id_ctx.get()
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail, "request_id": rid},
-        headers={"X-Request-Id": rid},
-    )
-
+async def http_exception_wrapper(request, exc):  # noqa: ARG001 - request required by FastAPI interface
+    return await http_exception_handler(exc)
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    rid = request_id_ctx.get()
-    sentry_sdk.capture_exception(exc)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error", "request_id": rid},
-        headers={"X-Request-Id": rid},
-    )
+async def unhandled_exception_wrapper(request, exc):  # noqa: ARG001 - request required by FastAPI interface
+    return await unhandled_exception_handler(exc)
 
 
 app.include_router(api_router)
