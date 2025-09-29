@@ -51,7 +51,6 @@ from app.minutes.types import (
 )
 from utils.dependencies import get_current_user
 from utils.langfuse_models import (
-    LangfuseEventRequest,
     LangfuseScoreRequest,
     LangfuseTraceRequest,
 )
