@@ -177,45 +177,53 @@ export default function OnboardingPage() {
         {hasValidLicense !== false && (
           <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background" aria-label="Onboarding navigation">
             <div className="container mx-auto max-w-2xl px-4 py-3">
-              {currentStep === 1 ? (
-                // Step 1: Centered Continue button only
-                <div className="flex w-full items-center justify-center">
-                  <Button
-                    onClick={handleNext}
-                    disabled={!canContinue()}
-                    className={`px-8 py-3 text-base ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
-                  >
-                    Continue
-                  </Button>
-                </div>
-              ) : currentStep === 4 ? (
-                // Step 4: Back on left, green Get Started on right
-                <div className="flex items-center justify-between">
-                  <Button onClick={handleBack} variant="outline">
-                    Back
-                  </Button>
-                  <Button
-                    onClick={handleStartRecording}
-                    className="bg-green-600 px-8 py-3 text-base text-white hover:bg-green-700"
-                  >
-                    Get started
-                  </Button>
-                </div>
-              ) : (
+              {(() => {
+                if (currentStep === 1) {
+                  // Step 1: Centered Continue button only
+                  return (
+                    <div className="flex w-full items-center justify-center">
+                      <Button
+                        onClick={handleNext}
+                        disabled={!canContinue()}
+                        className={`px-8 py-3 text-base ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  );
+                }
+                if (currentStep === 4) {
+                  // Step 4: Back on left, green Get Started on right
+                  return (
+                    <div className="flex items-center justify-between">
+                      <Button onClick={handleBack} variant="outline">
+                        Back
+                      </Button>
+                      <Button
+                        onClick={handleStartRecording}
+                        className="bg-green-600 px-8 py-3 text-base text-white hover:bg-green-700"
+                      >
+                        Get started
+                      </Button>
+                    </div>
+                  );
+                }
                 // Steps 2, 3: Back on left, Continue on right
-                <div className="flex items-center justify-between">
-                  <Button onClick={handleBack} variant="outline">
-                    Back
-                  </Button>
-                  <Button
-                    onClick={handleNext}
-                    disabled={!canContinue()}
-                    className={!canContinue() ? "cursor-not-allowed opacity-50" : ""}
-                  >
-                    Continue
-                  </Button>
-                </div>
-              )}
+                return (
+                  <div className="flex items-center justify-between">
+                    <Button onClick={handleBack} variant="outline">
+                      Back
+                    </Button>
+                    <Button
+                      onClick={handleNext}
+                      disabled={!canContinue()}
+                      className={!canContinue() ? "cursor-not-allowed opacity-50" : ""}
+                    >
+                      Continue
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
           </nav>
         )}

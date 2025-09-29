@@ -6,16 +6,13 @@
 /* eslint-disable react/react-in-jsx-scope */
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter, usePathname } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
 import { Home, HelpCircle } from "lucide-react";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 export default function Header({ className }: { className?: string }) {
-  const { newTranscription, selectedRecordingMode } = useTranscripts();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { selectedRecordingMode } = useTranscripts();
 
   const handleHomeClick = useCallback(() => {
     // Always navigate to home/welcome page
