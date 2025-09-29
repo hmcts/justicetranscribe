@@ -8,7 +8,6 @@ import pytest
 from pydantic import ValidationError
 
 from utils.langfuse_models import (
-    LangfuseEventRequest,
     LangfuseScoreRequest,
     LangfuseTraceRequest,
 )
@@ -181,97 +180,3 @@ class TestLangfuseScoreRequest:
         error = exc_info.value
         assert "value" in str(error), f"Expected 'value' in validation error for non-numeric value, got: {error!s}"
         assert "Input should be a valid number" in str(error), f"Expected 'Input should be a valid number' in validation error for non-numeric value, got: {error!s}"
-
-
-class TestLangfuseEventRequest:
-    """Unit tests for the LangfuseEventRequest model (legacy)."""
-
-    def test_event_request_score_type(self):
-        """Test event request configured as a score event."""
-        event = LangfuseEventRequest(
-            event_type="score",
-            trace_id="trace-123",
-            name="user-rating",
-            value=4.0,
-            comment="Good response"
-        )
-
-        assert event.event_type == "score", f"Expected event_type 'score', got '{event.event_type}'"
-        assert event.trace_id == "trace-123", f"Expected trace_id 'trace-123', got '{event.trace_id}'"
-        assert event.name == "user-rating", f"Expected name 'user-rating', got '{event.name}'"
-        assert event.value == 4.0, f"Expected value 4.0, got {event.value}"
-        assert event.comment == "Good response", f"Expected comment 'Good response', got '{event.comment}'"
-        # Event-specific fields should be None
-        assert event.metadata is None, f"Expected metadata to be None, got {event.metadata}"
-        assert event.input_data is None, f"Expected input_data to be None, got {event.input_data}"
-        assert event.output_data is None, f"Expected output_data to be None, got {event.output_data}"
-
-    def test_event_request_event_type(self):
-        """Test event request configured as a general event."""
-        metadata = {"step": "processing", "duration": 1.5}
-
-        event = LangfuseEventRequest(
-            event_type="event",
-            trace_id="trace-456",
-            name="processing-step",
-            metadata=metadata,
-            input_data="raw input data",
-            output_data={"processed": True}
-        )
-
-        assert event.event_type == "event", f"Expected event_type 'event', got '{event.event_type}'"
-        assert event.trace_id == "trace-456", f"Expected trace_id 'trace-456', got '{event.trace_id}'"
-        assert event.name == "processing-step", f"Expected name 'processing-step', got '{event.name}'"
-        assert event.metadata == metadata, f"Expected metadata {metadata}, got {event.metadata}"
-        assert event.input_data == "raw input data", f"Expected input_data 'raw input data', got '{event.input_data}'"
-        assert event.output_data == {"processed": True}, f"Expected output_data {{'processed': True}}, got {event.output_data}"
-        # Score-specific fields should be None
-        assert event.value is None, f"Expected value to be None, got {event.value}"
-        assert event.comment is None, f"Expected comment to be None, got {event.comment}"
-
-    def test_event_request_mixed_fields(self):
-        """Test event request with both score and event fields populated."""
-        # This should be valid even if not semantically correct
-        event = LangfuseEventRequest(
-            event_type="mixed",
-            trace_id="trace-789",
-            name="mixed-event",
-            value=3.5,
-            comment="Score comment",
-            metadata={"type": "mixed"},
-            input_data="input",
-            output_data="output"
-        )
-
-        assert event.event_type == "mixed", f"Expected event_type 'mixed', got '{event.event_type}'"
-        assert event.value == 3.5, f"Expected value 3.5, got {event.value}"
-        assert event.comment == "Score comment", f"Expected comment 'Score comment', got '{event.comment}'"
-        assert event.metadata == {"type": "mixed"}, f"Expected metadata {{'type': 'mixed'}}, got {event.metadata}"
-        assert event.input_data == "input", f"Expected input_data 'input', got '{event.input_data}'"
-        assert event.output_data == "output", f"Expected output_data 'output', got '{event.output_data}'"
-
-    def test_event_request_missing_required_fields(self):
-        """Test validation errors for missing required fields."""
-        # Missing event_type
-        with pytest.raises(ValidationError) as exc_info:
-            LangfuseEventRequest(trace_id="trace-123", name="test-event")
-
-        error = exc_info.value
-        assert "event_type" in str(error), f"Expected 'event_type' in validation error for missing event_type, got: {error!s}"
-        assert "Field required" in str(error), f"Expected 'Field required' in validation error for missing event_type, got: {error!s}"
-
-        # Missing trace_id
-        with pytest.raises(ValidationError) as exc_info:
-            LangfuseEventRequest(event_type="event", name="test-event")
-
-        error = exc_info.value
-        assert "trace_id" in str(error), f"Expected 'trace_id' in validation error for missing trace_id, got: {error!s}"
-        assert "Field required" in str(error), f"Expected 'Field required' in validation error for missing trace_id, got: {error!s}"
-
-        # Missing name
-        with pytest.raises(ValidationError) as exc_info:
-            LangfuseEventRequest(event_type="event", trace_id="trace-123")
-
-        error = exc_info.value
-        assert "name" in str(error), f"Expected 'name' in validation error for missing name, got: {error!s}"
-        assert "Field required" in str(error), f"Expected 'Field required' in validation error for missing name, got: {error!s}"
