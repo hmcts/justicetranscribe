@@ -1,15 +1,11 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
 
 interface Step4ReadyProps {
   onGetStarted: () => void;
   onBack: () => void;
 }
 
-export default function Step4Ready({
-  onGetStarted,
-  onBack,
-}: Step4ReadyProps) {
+export default function Step4Ready({}: Step4ReadyProps) {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-4 text-center">

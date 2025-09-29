@@ -1,17 +1,17 @@
-/* eslint-disable react/button-has-type */
-
 "use client";
 
-/* eslint-disable react/require-default-props */
-/* eslint-disable react/react-in-jsx-scope */
+import React, { useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useTranscripts } from "@/providers/transcripts";
 import { Home, HelpCircle } from "lucide-react";
-import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
-export default function Header({ className }: { className?: string }) {
+interface HeaderProps {
+  className?: string;
+}
+
+export default function Header({ className }: HeaderProps) {
   const { selectedRecordingMode } = useTranscripts();
 
   const handleHomeClick = useCallback(() => {
@@ -42,6 +42,7 @@ export default function Header({ className }: { className?: string }) {
             {!selectedRecordingMode && (
               <div className="flex items-center space-x-2">
                 <button
+                  type="button"
                   onClick={handleHomeClick}
                   className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
                   aria-label="Go to home"
@@ -81,3 +82,7 @@ export default function Header({ className }: { className?: string }) {
     </header>
   );
 }
+
+Header.defaultProps = {
+  className: undefined,
+};

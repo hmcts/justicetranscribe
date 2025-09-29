@@ -5,9 +5,7 @@ export default function Step3ReviewEdit() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div className="space-y-3 text-center">
-        <h2 className="text-3xl font-semibold sm:text-4xl">
-          Review and edit
-        </h2>
+        <h2 className="text-3xl font-semibold sm:text-4xl">Review and edit</h2>
         <h3 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
           Your professional judgement is key
         </h3>
@@ -38,19 +36,27 @@ export default function Step3ReviewEdit() {
           <div className="space-y-4 text-black">
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Verify names, pronouns, places, and acronyms.</p>
+              <p className="text-base">
+                Verify names, pronouns, places, and acronyms.
+              </p>
             </div>
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Add missing specifics (risk-relevant facts, DOBs).</p>
+              <p className="text-base">
+                Add missing specifics (risk-relevant facts, DOBs).
+              </p>
             </div>
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Stay under 4,000 characters for NDelius.</p>
+              <p className="text-base">
+                Stay under 4,000 characters for NDelius.
+              </p>
             </div>
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Describe body language, observations and wider context.</p>
+              <p className="text-base">
+                Describe body language, observations and wider context.
+              </p>
             </div>
           </div>
         </div>

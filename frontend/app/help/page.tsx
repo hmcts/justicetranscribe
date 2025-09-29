@@ -99,15 +99,19 @@ export default function HelpPage() {
               Phone not working? (VPN not connected)
             </h3>
             <p className="mb-2">
-              If your phone can&apos;t connect to apps and you can&apos;t see &quot;VPN&quot; at the top of your iPhone screen then you need to reconnect:
+              If your phone can&apos;t connect to apps and you can&apos;t see
+              &quot;VPN&quot; at the top of your iPhone screen then you need to
+              reconnect:
             </p>
             <ol className="ml-6 list-decimal space-y-1.5">
               <li>Open the GlobalProtect app.</li>
               <li>
-                Tap Connect. If you see a grey/paused circle, tap the middle until it turns blue and shows Connected.
+                Tap Connect. If you see a grey/paused circle, tap the middle
+                until it turns blue and shows Connected.
               </li>
               <li>
-                Wait a few seconds for the VPN indicator to appear at the top of your screen.
+                Wait a few seconds for the VPN indicator to appear at the top
+                of your screen.
               </li>
               <li>If this doesn&apos;t work, contact the IT Service Desk.</li>
             </ol>
@@ -119,10 +123,14 @@ export default function HelpPage() {
               Can my manager or colleagues see my summaries or transcripts?
             </h3>
             <p className="mb-2">
-              No. Only you can access your JT transcripts and summaries (the audio files aren&apos;t stored). Managers and colleagues don&apos;t have visibility unless you choose to share them (e.g. by copy-and-paste).
+              No. Only you can access your JT transcripts and summaries (the
+              audio files aren&apos;t stored). Managers and colleagues
+              don&apos;t have visibility unless you choose to share them (e.g.
+              by copy-and-paste).
             </p>
             <p>
-              The evaluation team may access a small sample to check accuracy and product performance under strict governance.
+              The evaluation team may access a small sample to check accuracy
+              and product performance under strict governance.
             </p>
           </section>
           {/* Mobile Recording Tips */}
@@ -193,7 +201,9 @@ export default function HelpPage() {
               Conversation Script for People on Probation
             </h3>
             <p className="mb-3">
-              Download this document for a simple script to explain Justice Transcribe to people on probation. It explains what it does, why we use it, and how we handle data safely and compliantly.
+              Download this document for a simple script to explain Justice
+              Transcribe to people on probation. It explains what it does, why
+              we use it, and how we handle data safely and compliantly.
             </p>
             <Button variant="outline" asChild>
               <a
@@ -213,10 +223,15 @@ export default function HelpPage() {
               SARs Request Guidance
             </h3>
             <p className="mb-3">
-              Guidance for Probation Officers on how to comply with Subject Access Requests (SARs) when using Justice Transcribe.
+              Guidance for Probation Officers on how to comply with Subject
+              Access Requests (SARs) when using Justice Transcribe.
             </p>
-            <Button variant="outline" disabled className="opacity-50 cursor-not-allowed">
-              Download SARs Guidance{" "}
+            <Button
+              variant="outline"
+              disabled
+              className="cursor-not-allowed opacity-50"
+            >
+              Download SARs Guidance
               <ExternalLink className="ml-1 size-4" />
             </Button>
           </section>

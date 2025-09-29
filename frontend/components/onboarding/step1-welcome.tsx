@@ -31,6 +31,7 @@ export default function Step1Welcome() {
         {/* Image */}
         <div className="flex justify-center lg:justify-end">
           <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/Probation officer listening.png"
               alt="Probation officer listening attentively to client"

@@ -38,7 +38,7 @@ export default function OnboardingPage() {
           setOnboardingStatus(response.data);
         }
       } catch (error) {
-        console.error("Failed to fetch onboarding status:", error);
+        // Failed to fetch onboarding status, continue silently
       }
     };
 
@@ -69,8 +69,7 @@ export default function OnboardingPage() {
         // Authentication is valid - go to step 2 (Basic Tutorial)
         setCurrentStep(2);
       } catch (error) {
-        console.error("Auth check failed:", error);
-        // Authentication failed - show sorry message
+        // Auth check failed - show sorry message
         setHasValidLicense(false);
       }
     } else if (currentStep < TOTAL_STEPS && canContinue()) {
@@ -98,15 +97,13 @@ export default function OnboardingPage() {
       });
 
       if (response.data?.success) {
-        console.log("Onboarding marked as complete:", response.data.message);
+        // Onboarding marked as complete successfully
       }
     } catch (error) {
-      console.error("Failed to mark onboarding as complete:", error);
-      // Continue to home page even if API call fails
+      // Failed to mark onboarding as complete, continue to home page anyway
     }
     router.push("/"); // Return to home to start recording
   };
-
 
   // Removed form handlers as step 2 is no longer used
 
@@ -130,10 +127,7 @@ export default function OnboardingPage() {
         return <Step3ReviewEdit />;
       case 4:
         return (
-          <Step4Ready
-            onGetStarted={handleStartRecording}
-            onBack={handleBack}
-          />
+          <Step4Ready onGetStarted={handleStartRecording} onBack={handleBack} />
         );
       default:
         return <div>Invalid step</div>;
@@ -143,9 +137,9 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Skip to main content for screen readers */}
-      <a 
-        href="#main-content" 
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded focus:shadow-lg"
+      <a
+        href="#main-content"
+        className="focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg sr-only"
       >
         Skip to main content
       </a>
@@ -164,7 +158,10 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <div id="main-content" className="container mx-auto max-w-2xl px-3 pb-16 pt-4">
+      <div
+        id="main-content"
+        className="container mx-auto max-w-2xl px-3 pb-16 pt-4"
+      >
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
         
@@ -175,7 +172,10 @@ export default function OnboardingPage() {
 
         {/* Navigation - Show for all steps, hide for license check fail */}
         {hasValidLicense !== false && (
-          <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background" aria-label="Onboarding navigation">
+          <nav
+            className="fixed inset-x-0 bottom-0 z-40 border-t bg-background"
+            aria-label="Onboarding navigation"
+          >
             <div className="container mx-auto max-w-2xl px-4 py-3">
               {(() => {
                 if (currentStep === 1) {
@@ -217,7 +217,9 @@ export default function OnboardingPage() {
                     <Button
                       onClick={handleNext}
                       disabled={!canContinue()}
-                      className={!canContinue() ? "cursor-not-allowed opacity-50" : ""}
+                      className={
+                        !canContinue() ? "cursor-not-allowed opacity-50" : ""
+                      }
                     >
                       Continue
                     </Button>

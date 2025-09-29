@@ -6,10 +6,10 @@ export default function Step2BasicTutorial() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-2 text-center">
-        <h2 className="text-3xl font-semibold sm:text-4xl">
-          Basic Tutorial
-        </h2>
-        <p className="text-lg text-gray-600">Using Justice Transcribe is simple</p>
+        <h2 className="text-3xl font-semibold sm:text-4xl">Basic Tutorial</h2>
+        <p className="text-lg text-gray-600">
+          Using Justice Transcribe is simple
+        </p>
       </div>
 
       {/* Video Placeholder */}
@@ -34,7 +34,9 @@ export default function Step2BasicTutorial() {
         </div>
         <div className="flex items-start space-x-4">
           <span className="text-lg font-semibold text-blue-600">2.</span>
-          <span className="text-base">Give permission to use your microphone</span>
+          <span className="text-base">
+            Give permission to use your microphone
+          </span>
         </div>
         <div className="flex items-start space-x-4">
           <span className="text-lg font-semibold text-blue-600">3.</span>
