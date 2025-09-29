@@ -216,87 +216,100 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
       const maxRetries = 2;
       let lastError: Error | null = null;
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
-          setProcessingStatus({ state: "uploading", progress: 0 });
+      const delay = (ms: number): Promise<void> => {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve();
+          }, ms);
+        });
+      };
+
+      const performSingleAttempt = async (attempt: number): Promise<void> => {
+        const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
+        setProcessingStatus({ state: "uploading", progress: 0 });
+        setUploadError(null);
+
+        // Show retry attempt to user
+        if (attempt > 1) {
+          console.log(`Upload attempt ${attempt} of ${maxRetries}`);
+          setUploadError(`Retrying upload (attempt ${attempt} of ${maxRetries})...`);
+        }
+
+        const urlResult = await apiClient.getUploadUrl(fileExtension);
+
+        if (urlResult.error) {
+          const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
+
+        // Clear retry message on successful URL fetch
+        if (attempt > 1) {
           setUploadError(null);
+        }
 
-          // Show retry attempt to user
-          if (attempt > 1) {
-            console.log(`Upload attempt ${attempt} of ${maxRetries}`);
-            setUploadError(`Retrying upload (attempt ${attempt} of ${maxRetries})...`);
+        // Upload the file with the new URL
+        await uploadFile(blob, upload_url);
+
+        const transcriptionJobResult = await apiClient.startTranscriptionJob(
+          user_upload_s3_file_key
+        );
+
+        if (transcriptionJobResult.error) {
+          const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        setProcessingStatus("transcribing");
+
+        posthog.capture("transcription_started", {
+          file_type: blob.type,
+          source: blob instanceof File ? "upload" : "recording",
+          retry_attempt: attempt,
+        });
+
+        // Clean up backup after successful upload
+        if (currentBackupId) {
+          try {
+            await audioBackupDB.deleteAudioBackup(currentBackupId);
+            setCurrentBackupId(null);
+          } catch (error) {
+            alert(`error deleting backup: ${error}`);
           }
+        }
+      };
 
-          const urlResult = await apiClient.getUploadUrl(fileExtension);
+      // Sequential retry logic without loops or recursion
+      let attempt = 1;
+      let success = false;
 
-          if (urlResult.error) {
-            const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
-            console.error(errorMsg);
-            throw new Error(errorMsg);
-          }
-
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          const { upload_url, user_upload_s3_file_key } = urlResult.data!;
-
-          // Clear retry message on successful URL fetch
-          if (attempt > 1) {
-            setUploadError(null);
-          }
-
-          // Upload the file with the new URL
-          await uploadFile(blob, upload_url);
-
-          const transcriptionJobResult = await apiClient.startTranscriptionJob(
-            user_upload_s3_file_key
-          );
-
-          if (transcriptionJobResult.error) {
-            const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
-            console.error(errorMsg);
-            throw new Error(errorMsg);
-          }
-
-          setProcessingStatus("transcribing");
-
-          posthog.capture("transcription_started", {
-            file_type: blob.type,
-            source: blob instanceof File ? "upload" : "recording",
-            retry_attempt: attempt,
-          });
-
-          // Clean up backup after successful upload
-          if (currentBackupId) {
-            try {
-              await audioBackupDB.deleteAudioBackup(currentBackupId);
-              setCurrentBackupId(null);
-            } catch (error) {
-              alert(`error deleting backup: ${error}`);
-            }
-          }
-
-          // Success - break out of retry loop
-          return;
-
+      while (attempt <= maxRetries && !success) {
+        try {
+          await performSingleAttempt(attempt);
+          success = true;
         } catch (error) {
           lastError = error instanceof Error ? error : new Error("Unknown error occurred");
           console.error(`Upload attempt ${attempt} failed:`, lastError.message);
 
-          // If this isn't the last attempt, continue to retry
           if (attempt < maxRetries) {
-            // Add a small delay before retry
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            continue;
+            await delay(1000);
           }
+          attempt = attempt + 1;
         }
       }
 
-      // All retries failed
-      setUploadError(
-        lastError?.message || "Error occurred while transcribing"
-      );
-      setIsProcessingTranscription(false);
-      setProcessingStatus("idle");
+      if (!success) {
+        // All retries failed
+        setUploadError(
+          lastError?.message || "Error occurred while transcribing"
+        );
+        setIsProcessingTranscription(false);
+        setProcessingStatus("idle");
+      }
     },
     [setIsProcessingTranscription, currentBackupId, uploadFile]
   );
