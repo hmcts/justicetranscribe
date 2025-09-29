@@ -509,8 +509,9 @@ async def submit_langfuse_trace(
         logger.info(f"Langfuse trace '{request.name}' submitted for trace {request.trace_id} by user {current_user.email}")
 
     except Exception as e:
-        logger.error(f"Failed to submit Langfuse trace: {e!s}")
-        raise HTTPException(status_code=500, detail=f"Failed to submit trace: {e!s}") from e
+        _e = f"Failed to submit Langfuse trace: {e!s}"
+        logger.error(_e)
+        return {"success": False, "message": _e}
     else:
         return {"success": True, "message": "Trace submitted successfully"}
 
@@ -534,7 +535,8 @@ async def submit_langfuse_score(
         logger.info(f"Langfuse score submitted for trace {request.trace_id} by user {current_user.email}")
 
     except Exception as e:
-        logger.error(f"Failed to submit Langfuse score: {e!s}")
-        raise HTTPException(status_code=500, detail=f"Failed to submit score: {e!s}") from e
+        _e = f"Failed to submit Langfuse score: {e!s}"
+        logger.error(_e)
+        return {"success": False, "message": _e}
     else:
         return {"success": True, "message": "Score submitted successfully"}
