@@ -332,9 +332,41 @@ class UserAllowlistCache:
         return is_allowlisted
 
 
-# Factory function to create cache instance
+# Global cache instance - singleton pattern
+_global_cache: UserAllowlistCache | None = None
+
+
+def get_allowlist_cache(ttl_seconds: int = 300) -> UserAllowlistCache:
+    """
+    Get the global allowlist cache instance (singleton pattern).
+
+    This ensures that all requests share the same cache instance,
+    providing proper caching behavior and avoiding repeated Azure
+    Blob Storage calls.
+
+    Parameters
+    ----------
+    ttl_seconds : int
+        Time-to-live for cache entries in seconds. Only used on first creation.
+
+    Returns
+    -------
+    UserAllowlistCache
+        The global cache instance.
+    """
+    global _global_cache
+    if _global_cache is None:
+        _global_cache = UserAllowlistCache(ttl_seconds)
+    return _global_cache
+
+
 def create_allowlist_cache(ttl_seconds: int = 300) -> UserAllowlistCache:
-    """Create a new allowlist cache instance.
+    """
+    Create a new allowlist cache instance.
+
+    Note: This function is kept for backward compatibility but should
+    generally be avoided in favor of get_allowlist_cache() for shared
+    caching behavior.
 
     Parameters
     ----------

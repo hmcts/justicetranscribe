@@ -50,7 +50,7 @@ from app.minutes.types import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
-from utils.allowlist import create_allowlist_cache
+from utils.allowlist import get_allowlist_cache
 from utils.dependencies import get_current_user
 from utils.langfuse_models import (
     LangfuseScoreRequest,
@@ -107,7 +107,7 @@ async def get_onboarding_status(
 
     # Check allowlist status using environment-specific configuration
     allowlist_config = settings.get_allowlist_config()
-    allowlist_cache = create_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
+    allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
     is_allowlisted = await allowlist_cache.is_user_allowlisted(
         current_user.email,
         settings.AZURE_STORAGE_CONNECTION_STRING,
