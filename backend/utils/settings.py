@@ -42,12 +42,6 @@ class Settings(BaseSettings):
     RUN_MIGRATIONS: bool = False
     SENTRY_DSN: str
 
-    # Uncomment the below to run alembic commands locally, or to run the db interface independently of fastapi
-    # from pydantic_settings import SettingsConfigDict
-    if ENVIRONMENT == "local":
-        model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    SENTRY_DSN: str
-
 
     @field_validator("LANGFUSE_HOST")
     @classmethod
