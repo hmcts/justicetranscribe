@@ -51,15 +51,16 @@ def main():
     allowed = pd.concat([allowed_wales, allowed_kssr], ignore_index=True)
     keep_cols = ["Provider", "Email"]
     allowed = allowed[keep_cols]
-    allowed["Email"] = allowed["Email"].apply(lambda x: x.lower().strip())
+
+    allowed.columns = map(str.lower, allowed.columns)
     for k, v in allowed.iterrows():
-        if v["Provider"] == "Kent Surrey Sussex Region":
-            v["Provider"] = "KSS"
+        if v["provider"] == "Kent Surrey Sussex Region":
+            v["provider"] = "kss"
 
     # Ai Justice Unit team members, commented out members used to test logic in dev
     ai_justice_unit = pd.DataFrame(
         {
-            "Email": [
+            "email": [
                 # "ayse.mutlu@justice.gov.uk",
                 "dan.james@justice.gov.uk",
                 "developer@localhost.com",
@@ -70,13 +71,12 @@ def main():
                 ],
         }
     )
-    ai_justice_unit["Provider"] = "Ai Justice Unit"
+    ai_justice_unit["provider"] = "Ai Justice Unit"
     allowed = pd.concat([allowed, ai_justice_unit], ignore_index=True)
 
     # pilot members
     pilot_pth = here("data/pilot_users.csv")
-    pilot_df = pd.read_csv(pilot_pth, encoding="cp1252", names=["Email", "Provider"])
-    pilot_df["Email"] = pilot_df["Email"].apply(lambda x: x.lower().strip())
+    pilot_df = pd.read_csv(pilot_pth, encoding="cp1252", names=["email", "provider"])
     allowed = pd.concat([allowed, pilot_df], ignore_index=True)
 
     # manually onboarded members
@@ -90,24 +90,32 @@ def main():
             ("samantha.merrett@justice.gov.uk", "HQ-DAT"),
             ("matt.proctor-leake@justice.gov.uk", "HQ-DAT"),
         ],
-        columns=["Email", "Provider"],
+        columns=["email", "provider"],
     )
     allowed = pd.concat([allowed, manually_onboarded], ignore_index=True)
-
+    # lowercase all provider values
+    allowed["provider"] = allowed["provider"].apply(lambda x: x.lower().strip())
     allowed = allowed.drop_duplicates()
+
+    #  sanity - lower everything
+    for col in allowed.columns:
+        allowed[col] = allowed[col].apply(lambda x: x.lower().strip())
+    # rebuild lookup for dev with everything lowered
+    ai_justice_unit = allowed.query(
+        "provider == 'ai justice unit'"
+        ).reset_index(drop=True)
+
     # Always write UTF-8 for backend readers
-    output_path = Path(here("data/allowlist_final.csv"))
+    output_path = here("data/allowlist_final.csv")
     allowed.to_csv(output_path, index=False, encoding="utf-8")
     ai_justice_pth = here("data/allowlist_dev.csv")
     ai_justice_unit.to_csv(ai_justice_pth, index=False, encoding="utf-8")
 
-
+    # azure operations 
     BLOB_PTH = "lookups/allowlist.csv"
     conn_dev = secrets["AZURE_STORAGE_CONNECTION_STRING"]
     conn_prod = secrets["AZURE_STORAGE_CONNECTION_STRING_PROD"]
     container = secrets["AZURE_STORAGE_CONTAINER_NAME"]
-
-
     _upload_with_connection_string(conn_prod, container, BLOB_PTH, output_path)
     #  dev allowlist should contain team only
     _upload_with_connection_string(conn_dev, container, BLOB_PTH, ai_justice_pth)
