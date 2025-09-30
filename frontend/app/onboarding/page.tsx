@@ -126,9 +126,7 @@ export default function OnboardingPage() {
       case 3:
         return <Step3ReviewEdit />;
       case 4:
-        return (
-          <Step4Ready onGetStarted={handleStartRecording} onBack={handleBack} />
-        );
+        return <Step4Ready />;
       default:
         return <div>Invalid step</div>;
     }
