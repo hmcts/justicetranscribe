@@ -68,3 +68,7 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
     </div>
   );
 }
+
+LicenseCheckFail.defaultProps = {
+  onRetry: undefined,
+};
