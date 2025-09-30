@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/no-autofocus */
 import React, { useEffect, useState } from "react";
 import { CalendarIcon, PencilIcon, UsersIcon } from "lucide-react";
-import { CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeader } from "@/components/ui/card";
 import { useTranscripts } from "@/providers/transcripts";
 import { Transcription, DialogueEntry } from "@/src/api/generated";
 import {
@@ -90,14 +90,19 @@ export default function DialogueHeader({
             }}
           />
         ) : (
-          <h1
-            className="mb-0 rounded-md px-2 py-1 text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
+            className="mb-0 rounded-md px-2 py-1 text-left text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
             onClick={() => setIsEditing(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setIsEditing(true);
+              }
+            }}
           >
             {currentTranscription?.title || DEFAULT_MEETING_TITLE}
-          </h1>
+          </button>
         )}
         <button
           className="text-muted-foreground hover:text-foreground"
