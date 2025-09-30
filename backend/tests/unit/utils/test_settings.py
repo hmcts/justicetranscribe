@@ -45,6 +45,8 @@ class TestSettingsConfigurationValidation:
             "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT": "{}",
             "AZURE_AD_TENANT_ID": "test",
             "AZURE_AD_CLIENT_ID": "test",
+            "ALLOWLIST_CONTAINER": "application-data",
+            "ALLOWLIST_BLOB_NAME": "lookups/allowlist.csv",
             "ENVIRONMENT": "local"
         }
 
@@ -299,6 +301,8 @@ class TestSettingsRefactoring:
             GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT="{}",
             AZURE_AD_TENANT_ID="test",
             AZURE_AD_CLIENT_ID="test",
+            ALLOWLIST_CONTAINER="application-data",
+            ALLOWLIST_BLOB_NAME="lookups/allowlist.csv",
             ENVIRONMENT="test"
         )
 
