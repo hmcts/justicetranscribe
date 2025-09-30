@@ -8,7 +8,6 @@ Output:
 * data/allowlist_final.csv
 """
 
-import os
 from pathlib import Path
 
 from azure.storage.blob import BlobServiceClient
@@ -99,7 +98,8 @@ def main():
     # Always write UTF-8 for backend readers
     output_path = Path(here("data/allowlist_final.csv"))
     allowed.to_csv(output_path, index=False, encoding="utf-8")
-
+    ai_justice_pth = here("data/allowlist_dev.csv")
+    ai_justice_unit.to_csv(ai_justice_pth, index=False, encoding="utf-8")
 
 
     BLOB_PTH = "lookups/allowlist.csv"
@@ -107,8 +107,10 @@ def main():
     conn_prod = secrets["AZURE_STORAGE_CONNECTION_STRING_PROD"]
     container = secrets["AZURE_STORAGE_CONTAINER_NAME"]
 
-    for i in [conn_dev, conn_prod]:
-        _upload_with_connection_string(i, container, BLOB_PTH, output_path)
+
+    _upload_with_connection_string(conn_prod, container, BLOB_PTH, output_path)
+    #  dev allowlist should contain team only
+    _upload_with_connection_string(conn_dev, container, BLOB_PTH, ai_justice_pth)
 
 
 if __name__ == "__main__":
