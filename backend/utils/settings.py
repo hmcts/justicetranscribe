@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONNECTION_STRING: str
     AZURE_STORAGE_CONTAINER_NAME: str
     AZURE_STORAGE_TRANSCRIPTION_CONTAINER: str
+    # Allow list configuration
+    ALLOWLIST_CONTAINER: str
+    ALLOWLIST_BLOB_NAME: str
+    ALLOWLIST_CACHE_TTL_SECONDS: int = 300
+    # Environment-specific allowlist configuration
+    ALLOWLIST_ENVIRONMENT: str | None = None
     DATABASE_CONNECTION_STRING: str
     ENVIRONMENT: str = "local"
     # Onboarding Override for Development Testing
@@ -36,12 +42,6 @@ class Settings(BaseSettings):
     RUN_MIGRATIONS: bool = False
     SENTRY_DSN: str
 
-    # Uncomment the below to run alembic commands locally, or to run the db interface independently of fastapi
-    # from pydantic_settings import SettingsConfigDict
-    if ENVIRONMENT == "local":
-        model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    SENTRY_DSN: str
-
 
     @field_validator("LANGFUSE_HOST")
     @classmethod
@@ -55,6 +55,42 @@ class Settings(BaseSettings):
             )
             raise ValueError(error_msg)
         return v
+
+    def get_allowlist_config(self) -> dict[str, str]:
+        """Get environment-specific allowlist configuration.
+
+        Returns
+        -------
+        dict[str, str]
+            Dictionary containing container and blob name for the current environment.
+            Maps to appropriate allowlist based on environment:
+            - local/dev: Uses dev allowlist
+            - prod: Uses prod allowlist
+        """
+        # Determine environment for allowlist selection
+        if self.ALLOWLIST_ENVIRONMENT:
+            env = self.ALLOWLIST_ENVIRONMENT
+        elif self.ENVIRONMENT in ["local", "dev"]:
+            env = "dev"
+        elif self.ENVIRONMENT == "prod":
+            env = "prod"
+        else:
+            # Default to dev for unknown environments
+            env = "dev"
+
+        # Environment-specific allowlist paths
+        allowlist_configs = {
+            "dev": {
+                "container": self.ALLOWLIST_CONTAINER,
+                "blob_name": "lookups/allowlist.csv"
+            },
+            "prod": {
+                "container": self.ALLOWLIST_CONTAINER,
+                "blob_name": "lookups/allowlist.csv"
+            }
+        }
+
+        return allowlist_configs.get(env, allowlist_configs["dev"])
 
 
 class LocalSettings(Settings):

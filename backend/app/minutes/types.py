@@ -67,3 +67,36 @@ class StartTranscriptionJobRequest(BaseModel):
 class UpdateUserRequest(BaseModel):
     hide_citations: bool | None = None
     # Add other user fields here as needed
+
+
+class OnboardingStatusResponse(BaseModel):
+    """
+    Response model for user onboarding status and allowlist check.
+
+    This model contains all the information needed by the frontend to determine
+    the user's access level and what UI to display.
+
+    Attributes
+    ----------
+    has_completed_onboarding : bool
+        Whether the user has completed the onboarding process.
+    force_onboarding_override : bool
+        Whether onboarding is being forced in development mode.
+    should_show_onboarding : bool
+        Whether the onboarding UI should be displayed to the user.
+    user_id : uuid.UUID
+        Unique identifier for the user.
+    environment : str
+        Current environment (local, dev, prod, etc.).
+    is_allowlisted : bool
+        Whether the user's email is in the allowlist.
+    should_show_coming_soon : bool
+        Whether the "coming soon" page should be displayed instead of the app.
+    """
+    has_completed_onboarding: bool
+    force_onboarding_override: bool
+    should_show_onboarding: bool
+    user_id: uuid.UUID
+    environment: str
+    is_allowlisted: bool
+    should_show_coming_soon: bool
