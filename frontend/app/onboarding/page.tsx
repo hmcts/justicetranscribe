@@ -201,7 +201,8 @@ export default function OnboardingPage() {
                       </Button>
                       <Button
                         onClick={handleStartRecording}
-                        className="bg-green-600 px-8 py-3 text-base text-white hover:bg-green-700"
+                        className="px-8 py-3 text-base text-white hover:opacity-90"
+                        style={{ backgroundColor: "#10652F" }}
                       >
                         Get started
                       </Button>
