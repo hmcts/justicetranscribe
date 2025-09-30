@@ -10,6 +10,7 @@ import Header from "@/components/layout/header";
 import { TranscriptsProvider } from "@/providers/transcripts";
 import { UserSettingsProvider } from "@/providers/user-settings";
 import PosthogProvider from "../providers/posthog";
+import AccessGate from "@/providers/access-gate";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,13 +30,14 @@ export default function RootLayout({
         <UserSettingsProvider>
           <PosthogProvider>
             <TranscriptsProvider>
-              {/* <BeforeUnloadGuard /> */}
-              <div className="flex min-h-screen flex-col">
-                <Header className="fixed top-0 z-50 w-full" />
-                <div className="mt-[50px] flex flex-1">
-                  <main className="w-full pb-[50px]">{children}</main>
+              <AccessGate>
+                <div className="flex min-h-screen flex-col">
+                  <Header className="fixed top-0 z-50 w-full" />
+                  <div className="mt-[50px] flex flex-1">
+                    <main className="w-full pb-[50px]">{children}</main>
+                  </div>
                 </div>
-              </div>
+              </AccessGate>
             </TranscriptsProvider>
           </PosthogProvider>
         </UserSettingsProvider>

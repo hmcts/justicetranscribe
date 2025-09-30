@@ -47,6 +47,19 @@ function WelcomePage() {
   const [speakerFilter, setSpeakerFilter] = React.useState<string>("all");
   const isMobile = useMediaQuery("(max-width: 768px)");
 
+  // Listen for home button clicks when already on home page
+  React.useEffect(() => {
+    const handleResetToWelcome = () => {
+      setShowAllMeetings(false);
+      setSpeakerFilter("all");
+    };
+
+    window.addEventListener("reset-to-welcome", handleResetToWelcome);
+    return () => {
+      window.removeEventListener("reset-to-welcome", handleResetToWelcome);
+    };
+  }, []);
+
   const firstName = user?.email
     ? getFirstName(user.email).charAt(0).toUpperCase() +
       getFirstName(user.email).slice(1).toLowerCase()
