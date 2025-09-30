@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { apiClient } from "@/lib/api-client";
 
@@ -11,6 +11,62 @@ export default function AccessGate({
   const router = useRouter();
   const pathname = usePathname();
   const [accessStatus, setAccessStatus] = useState<'checking' | 'allowed' | 'denied' | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const checkInProgress = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const checkAccess = useCallback(async () => {
+    // Prevent multiple concurrent checks
+    if (checkInProgress.current || isChecking) {
+      return;
+    }
+
+    checkInProgress.current = true;
+    setIsChecking(true);
+    setAccessStatus('checking');
+
+    // Create abort controller for cleanup
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const res = await apiClient.request<{
+        is_allowlisted: boolean;
+        should_show_coming_soon: boolean;
+      }>("/user/onboarding-status", {
+        signal: abortControllerRef.current.signal,
+      });
+      
+      if (res.data) {
+        const { should_show_coming_soon } = res.data;
+        const newStatus = should_show_coming_soon ? 'denied' : 'allowed';
+        setAccessStatus(newStatus);
+        setIsChecking(false);
+        
+        // Redirect if needed
+        const onComingSoon = pathname?.startsWith("/coming-soon");
+        if (should_show_coming_soon && !onComingSoon) {
+          router.push("/coming-soon");
+        } else if (!should_show_coming_soon && onComingSoon) {
+          router.push("/");
+        }
+      }
+    } catch (e) {
+      // Only handle error if not aborted
+      if (e instanceof Error && e.name !== 'AbortError') {
+        console.warn("Access gate check failed:", e);
+        setAccessStatus('denied');
+        setIsChecking(false);
+        
+        const onComingSoon = pathname?.startsWith("/coming-soon");
+        if (!onComingSoon) {
+          router.push("/coming-soon");
+        }
+      }
+    } finally {
+      checkInProgress.current = false;
+      abortControllerRef.current = null;
+    }
+  }, [router, pathname, isChecking]);
 
   useEffect(() => {
     const onComingSoon = pathname?.startsWith("/coming-soon");
@@ -29,49 +85,27 @@ export default function AccessGate({
     }
     
     // If we already know the status and user is on correct page, we're done
-    if (accessStatus !== null && accessStatus !== 'checking') {
+    if (accessStatus !== null && accessStatus !== 'checking' && !isChecking) {
       return;
     }
     
     // Need to check access - do it once
-    if (accessStatus === null) {
-      setAccessStatus('checking');
-      
-      const check = async () => {
-        try {
-          const res = await apiClient.request<{
-            is_allowlisted: boolean;
-            should_show_coming_soon: boolean;
-          }>("/user/onboarding-status");
-          
-          if (res.data) {
-            const { should_show_coming_soon } = res.data;
-            const newStatus = should_show_coming_soon ? 'denied' : 'allowed';
-            setAccessStatus(newStatus);
-            
-            // Redirect if needed
-            if (should_show_coming_soon && !onComingSoon) {
-              router.push("/coming-soon");
-            } else if (!should_show_coming_soon && onComingSoon) {
-              router.push("/");
-            }
-          }
-        } catch (e) {
-          // On error, deny access (fail-safe)
-          console.warn("Access gate check failed:", e);
-          setAccessStatus('denied');
-          if (!onComingSoon) {
-            router.push("/coming-soon");
-          }
-        }
-      };
-      
-      check();
+    if (accessStatus === null && !isChecking) {
+      checkAccess();
     }
-  }, [router, pathname, accessStatus]);
+  }, [router, pathname, accessStatus, isChecking, checkAccess]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Show loading screen only while actively checking
-  if (accessStatus === 'checking') {
+  if (accessStatus === 'checking' || isChecking) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
         <div 
