@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import ClassVar, Literal
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from app.database.postgres_models import (
     TemplateMetadata,
@@ -15,6 +15,8 @@ class TemplateResponse(BaseModel):
 
 class TranscriptionMetadata(BaseModel):
     """Pydantic model for transcription metadata."""
+    
+    model_config = ConfigDict()
 
     id: uuid.UUID
     title: str
@@ -23,8 +25,9 @@ class TranscriptionMetadata(BaseModel):
     is_showable_in_ui: bool
     speakers: list[str] = Field(default_factory=list)
 
-    class Config:
-        json_encoders: ClassVar[dict] = {datetime: lambda dt: dt.isoformat()}
+    @field_serializer('created_datetime', 'updated_datetime')
+    def serialize_datetime(self, value: datetime | None) -> str | None:
+        return value.isoformat() if value else None
 
 
 class GenerateMinutesRequest(BaseModel):

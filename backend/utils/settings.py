@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     LANGFUSE_HOST: str
     RUN_MIGRATIONS: bool = False
     SENTRY_DSN: str
+    # CORS configuration from infrastructure
+    CORS_ALLOWED_ORIGINS: str | None = None
 
 
     @field_validator("LANGFUSE_HOST")
