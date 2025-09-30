@@ -168,6 +168,7 @@ class ApiClient {
       const response = await fetch(url, requestOptions);
 
       if (!response.ok) {
+        const requestId = response.headers.get("X-Request-Id") || undefined;
         if (
           response.status === 401 &&
           !isLocalDevelopment() &&
@@ -189,24 +190,37 @@ class ApiClient {
           const errorMessage = isLocalDevelopment()
             ? "Authentication failed. Check if backend is running."
             : "Authentication failed. Your session may have expired. Please refresh the page to log in again.";
-          throw new Error(errorMessage);
+          const e = new Error(errorMessage) as Error & { requestId?: string; status?: number };
+          e.requestId = requestId;
+          e.status = response.status;
+          throw e;
         }
         if (response.status === 405) {
-          throw new Error(
+          const e = new Error(
             `Method ${options.method || "GET"} not allowed for ${endpoint}`
-          );
+          ) as Error & { requestId?: string; status?: number };
+          e.requestId = requestId;
+          e.status = response.status;
+          throw e;
         }
 
         // Try to extract error message from response body
         let errorMessage = `HTTP error! status: ${response.status}`;
+        let bodyRequestId: string | undefined;
         try {
           const errorData = await response.json();
           errorMessage = errorData.detail || errorData.message || errorMessage;
+          if (errorData.request_id) {
+            bodyRequestId = errorData.request_id as string;
+          }
         } catch (parseError) {
           console.error("Error parsing response body:", parseError);
           // If we can't parse the response body, fall back to generic error (errorMessage already set above)
         }
-        throw new Error(errorMessage);
+        const e = new Error(errorMessage) as Error & { requestId?: string; status?: number };
+        e.requestId = bodyRequestId || requestId;
+        e.status = response.status;
+        throw e;
       }
 
       const data = await response.json();

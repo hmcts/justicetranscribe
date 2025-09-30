@@ -13,8 +13,8 @@ import useTemplates from "@/hooks/use-templates";
 import { apiClient } from "@/lib/api-client";
 import {
   findExistingMinuteVersionForTemplate,
-  langfuseWeb,
   pollMinuteVersion,
+  submitLangfuseScore,
 } from "@/lib/utils";
 import { useTranscripts } from "@/providers/transcripts";
 import {
@@ -249,7 +249,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
       setCurrentVersion(savedVersion);
 
       if (currentVersion.trace_id) {
-        await langfuseWeb.score({
+        await submitLangfuseScore({
           traceId: currentVersion.trace_id,
           name: "user-feedback",
           value: rating,
@@ -324,7 +324,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           </div>
         )}
         {currentVersion && (
-          <div className="w-full overflow-visible">
+          <div className="w-full overflow-visible ph-mask">
             <SimpleEditor
               initialContent={currentVersion?.html_content ?? ""}
               isEditing={isEditing}

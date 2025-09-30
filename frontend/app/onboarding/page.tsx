@@ -7,14 +7,12 @@ import { apiClient } from "@/lib/api-client";
 
 // Step Components
 import Step1Welcome from "@/components/onboarding/step1-welcome";
-import Step2Setup from "@/components/onboarding/step2-setup";
-import Step3DeviceSetup from "@/components/onboarding/step3-device-setup";
-import Step4BasicTutorial from "@/components/onboarding/step4-basic-tutorial";
-import Step5ReviewEdit from "@/components/onboarding/step5-review-edit";
-import Step6Ready from "@/components/onboarding/step6-ready";
+import Step2BasicTutorial from "@/components/onboarding/step2-basic-tutorial";
+import Step3ReviewEdit from "@/components/onboarding/step3-review-edit";
+import Step4Ready from "@/components/onboarding/step4-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 4;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -24,11 +22,7 @@ export default function OnboardingPage() {
     force_onboarding_override?: boolean;
     environment?: string;
   } | null>(null);
-  const [formData, setFormData] = useState({
-    crissaTime: "",
-    appointmentsPerWeek: "",
-    acceptedPrivacy: false,
-  });
+  // Removed formData as step 2 is no longer used
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -44,22 +38,15 @@ export default function OnboardingPage() {
           setOnboardingStatus(response.data);
         }
       } catch (error) {
-        console.error("Failed to fetch onboarding status:", error);
+        // Failed to fetch onboarding status, continue silently
       }
     };
 
     fetchOnboardingStatus();
   }, []);
 
-  // Validation for step 2
-  const isStep2Valid = () => {
-    return formData.crissaTime && formData.appointmentsPerWeek;
-  };
-
   const canContinue = () => {
-    if (currentStep === 2) {
-      return isStep2Valid();
-    }
+    // No validation needed as step 2 is removed
     return true;
   };
 
@@ -79,21 +66,21 @@ export default function OnboardingPage() {
         // Store onboarding status for warning banner
         setOnboardingStatus(response.data);
 
-        // Authentication is valid - continue to step 2
+        // Authentication is valid - go to step 2 (Basic Tutorial)
         setCurrentStep(2);
       } catch (error) {
-        console.error("Auth check failed:", error);
-        // Authentication failed - show sorry message
+        // Auth check failed - show sorry message
         setHasValidLicense(false);
       }
     } else if (currentStep < TOTAL_STEPS && canContinue()) {
-      // For all other steps, use normal logic
+      // Go to next step: 2->3, 3->4
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
+      // Simple back navigation: 4->3, 3->2, 2->1
       setCurrentStep(currentStep - 1);
     }
   };
@@ -110,32 +97,15 @@ export default function OnboardingPage() {
       });
 
       if (response.data?.success) {
-        console.log("Onboarding marked as complete:", response.data.message);
+        // Onboarding marked as complete successfully
       }
     } catch (error) {
-      console.error("Failed to mark onboarding as complete:", error);
-      // Continue to home page even if API call fails
+      // Failed to mark onboarding as complete, continue to home page anyway
     }
     router.push("/"); // Return to home to start recording
   };
 
-  const getStepClassName = (stepNum: number) => {
-    if (stepNum === currentStep) {
-      return "bg-black text-white";
-    }
-    if (stepNum < currentStep) {
-      return "bg-gray-200";
-    }
-    return "border";
-  };
-
-  const handleCrissaTimeChange = (time: string) => {
-    setFormData({ ...formData, crissaTime: time });
-  };
-
-  const handleAppointmentsChange = (appointments: string) => {
-    setFormData({ ...formData, appointmentsPerWeek: appointments });
-  };
+  // Removed form handlers as step 2 is no longer used
 
   const handleLicenseRetry = () => {
     // Reset license check state to allow retry
@@ -152,27 +122,11 @@ export default function OnboardingPage() {
       case 1:
         return <Step1Welcome />;
       case 2:
-        return (
-          <Step2Setup
-            crissaTime={formData.crissaTime}
-            appointmentsPerWeek={formData.appointmentsPerWeek}
-            onCrissaTimeChange={handleCrissaTimeChange}
-            onAppointmentsChange={handleAppointmentsChange}
-          />
-        );
+        return <Step2BasicTutorial />;
       case 3:
-        return <Step3DeviceSetup />;
+        return <Step3ReviewEdit />;
       case 4:
-        return <Step4BasicTutorial />;
-      case 5:
-        return <Step5ReviewEdit />;
-      case 6:
-        return (
-          <Step6Ready
-            onStartRecording={handleStartRecording}
-            onBack={handleBack}
-          />
-        );
+        return <Step4Ready />;
       default:
         return <div>Invalid step</div>;
     }
@@ -180,6 +134,13 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Skip to main content for screen readers */}
+      <a
+        href="#main-content"
+        className="sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg focus:not-sr-only"
+      >
+        Skip to main content
+      </a>
       {/* Show warning banner if dev override is active */}
       {onboardingStatus?.force_onboarding_override && (
         <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border border-orange-400 bg-orange-100 px-4 py-3 text-orange-800 shadow-lg">
@@ -194,63 +155,76 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <div className="container mx-auto max-w-2xl px-4 pb-12 pt-6 sm:pt-8 md:pt-10 lg:pt-12 xl:pt-14">
+      <div
+        id="main-content"
+        className="container mx-auto max-w-2xl px-3 pb-16 pt-4"
+      >
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
-        
-        {/* Progress indicator - Hide when showing license check fail */}
-        {hasValidLicense !== false && (
-          <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
-            <div className="flex items-center justify-between">
-              {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map(
-                (stepNum) => (
-                  <div
-                    key={stepNum}
-                    className={`flex size-8 items-center justify-center rounded-full ${getStepClassName(
-                      stepNum
-                    )}`}
-                  >
-                    {stepNum}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Step content */}
-        <div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6 xl:mb-8">
+        {/* Step content - centered vertically */}
+        <div className="flex min-h-[calc(100vh-200px)] flex-col justify-center">
           {renderStep()}
         </div>
 
-        {/* Navigation - Only show for steps 1-5, step 6 has its own buttons, hide for license check fail */}
-        {currentStep < 6 && hasValidLicense !== false && (
-          <div className="flex justify-between pt-4 sm:pt-5 md:pt-6 lg:pt-8 xl:pt-10">
-            {currentStep > 1 && (
-              <Button onClick={handleBack} variant="outline">
-                Back
-              </Button>
-            )}
-            {currentStep === 1 ? (
-              <div className="flex w-full items-center justify-center">
-                <Button
-                  onClick={handleNext}
-                  disabled={!canContinue()}
-                  className={`px-12 py-6 text-lg ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
-                >
-                  Continue
-                </Button>
-              </div>
-            ) : (
-              <Button
-                onClick={handleNext}
-                disabled={!canContinue()}
-                className={`ml-auto ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
-              >
-                Continue
-              </Button>
-            )}
-          </div>
+        {/* Navigation - Show for all steps, hide for license check fail */}
+        {hasValidLicense !== false && (
+          <nav
+            className="fixed inset-x-0 bottom-0 z-40 border-t bg-background"
+            aria-label="Onboarding navigation"
+          >
+            <div className="container mx-auto max-w-2xl px-4 py-3">
+              {(() => {
+                if (currentStep === 1) {
+                  // Step 1: Centered Continue button only
+                  return (
+                    <div className="flex w-full items-center justify-center">
+                      <Button
+                        onClick={handleNext}
+                        disabled={!canContinue()}
+                        className={`px-8 py-3 text-base ${!canContinue() ? "cursor-not-allowed opacity-50" : ""}`}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  );
+                }
+                if (currentStep === 4) {
+                  // Step 4: Back on left, green Get Started on right
+                  return (
+                    <div className="flex items-center justify-between">
+                      <Button onClick={handleBack} variant="outline">
+                        Back
+                      </Button>
+                      <Button
+                        onClick={handleStartRecording}
+                        className="px-8 py-3 text-base text-white hover:opacity-90"
+                        style={{ backgroundColor: "#10652F" }}
+                      >
+                        Get started
+                      </Button>
+                    </div>
+                  );
+                }
+                // Steps 2, 3: Back on left, Continue on right
+                return (
+                  <div className="flex items-center justify-between">
+                    <Button onClick={handleBack} variant="outline">
+                      Back
+                    </Button>
+                    <Button
+                      onClick={handleNext}
+                      disabled={!canContinue()}
+                      className={
+                        !canContinue() ? "cursor-not-allowed opacity-50" : ""
+                      }
+                    >
+                      Continue
+                    </Button>
+                  </div>
+                );
+              })()}
+            </div>
+          </nav>
         )}
       </div>
     </div>

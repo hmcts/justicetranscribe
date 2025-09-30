@@ -6,7 +6,6 @@ import { DialogueEntry, TranscriptionJob } from "@/src/api/generated";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-import { LangfuseWeb } from "langfuse";
 import { getMinuteVersionById, MinuteVersion } from "@/lib/database";
 
 // Constant for fallback when no meeting title is available
@@ -34,11 +33,59 @@ export function replaceSpeakerInDialogueEntries(
   );
 }
 
-export const langfuseWeb = new LangfuseWeb({
-  publicKey: process.env.NEXT_PUBLIC_LANGFUSE_PUBLIC_KEY || "",
-  baseUrl:
-    process.env.NEXT_PUBLIC_LANGFUSE_HOST || "https://cloud.langfuse.com",
-});
+// Langfuse trace submission via backend proxy
+export const submitLangfuseTrace = async (params: {
+  traceId: string;
+  name: string;
+  metadata?: Record<string, any>;
+  inputData?: Record<string, any> | string;
+  outputData?: Record<string, any> | string;
+}) => {
+  const { apiClient } = await import("@/lib/api-client");
+
+  const result = await apiClient.request("/langfuse/trace", {
+    method: "POST",
+    body: JSON.stringify({
+      trace_id: params.traceId,
+      name: params.name,
+      metadata: params.metadata,
+      input_data: params.inputData,
+      output_data: params.outputData,
+    }),
+  });
+
+  if (result.error) {
+    throw new Error(`Failed to submit trace: ${result.error}`);
+  }
+
+  return result.data;
+};
+
+// Langfuse score submission via backend proxy
+export const submitLangfuseScore = async (params: {
+  traceId: string;
+  name: string;
+  value: number;
+  comment?: string;
+}) => {
+  const { apiClient } = await import("@/lib/api-client");
+
+  const result = await apiClient.request("/langfuse/score", {
+    method: "POST",
+    body: JSON.stringify({
+      trace_id: params.traceId,
+      name: params.name,
+      value: params.value,
+      comment: params.comment,
+    }),
+  });
+
+  if (result.error) {
+    throw new Error(`Failed to submit score: ${result.error}`);
+  }
+
+  return result.data;
+};
 
 export const findExistingMinuteVersionForTemplate = (
   minuteVersions: MinuteVersion[],

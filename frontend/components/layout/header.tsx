@@ -1,25 +1,25 @@
-/* eslint-disable react/button-has-type */
-
 "use client";
 
-/* eslint-disable react/require-default-props */
-/* eslint-disable react/react-in-jsx-scope */
+import React, { useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
 import { Home, HelpCircle } from "lucide-react";
-import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
-export default function Header({ className }: { className?: string }) {
-  const { newTranscription, selectedRecordingMode } = useTranscripts();
+interface HeaderProps {
+  className?: string;
+}
+
+export default function Header({ className }: HeaderProps) {
+  const { selectedRecordingMode } = useTranscripts();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const handleHomeClick = useCallback(() => {
-    const hasQueryParams = searchParams?.toString().length > 0;
+    const hasQueryParams = (searchParams?.toString().length ?? 0) > 0;
     
     if (pathname === "/" && !hasQueryParams) {
       // Already on clean home page - trigger event to reset view state
@@ -53,6 +53,7 @@ export default function Header({ className }: { className?: string }) {
             {!selectedRecordingMode && (
               <div className="flex items-center space-x-2">
                 <button
+                  type="button"
                   onClick={handleHomeClick}
                   className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
                   aria-label="Go to home"
@@ -92,3 +93,7 @@ export default function Header({ className }: { className?: string }) {
     </header>
   );
 }
+
+Header.defaultProps = {
+  className: undefined,
+};

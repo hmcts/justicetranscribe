@@ -79,7 +79,6 @@
     "http-proxy-middleware": "^3.0.0",
     "jose": "^6.0.10",
     "jwt-decode": "^4.0.0",
-    "langfuse": "^3.37.2",
     "lucide-react": "^0.429.0",
     "mammoth": "^1.8.0",
     "markdown-it": "^14.1.0",

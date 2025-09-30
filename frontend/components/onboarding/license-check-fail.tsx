@@ -44,7 +44,7 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
         </div>
       </div>
 
-      <div className="pt-4 space-y-4">
+      <div className="space-y-4 pt-4">
         <Button
           onClick={handleSignUp}
           disabled={isSubmitted}
@@ -56,7 +56,7 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
         >
           {isSubmitted ? "You've signed up" : "Join the waiting list"}
         </Button>
-        
+
         <div className="text-sm text-gray-500">
           <p>Having trouble? Try refreshing or check your connection.</p>
           <Button
@@ -71,3 +71,7 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
     </div>
   );
 }
+
+LicenseCheckFail.defaultProps = {
+  onRetry: undefined,
+};

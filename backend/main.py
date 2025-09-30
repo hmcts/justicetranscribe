@@ -4,10 +4,13 @@ from contextlib import asynccontextmanager
 import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
+from utils.exception_handlers import http_exception_handler, unhandled_exception_handler
+from utils.middleware import add_request_id
 from utils.settings import get_settings
 
 log = logging.getLogger("uvicorn")
@@ -57,6 +60,20 @@ if settings.ENVIRONMENT == "local":
     )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+# Add middleware and exception handlers
+@app.middleware("http")
+async def request_id_middleware(request, call_next):
+    return await add_request_id(request, call_next)
+
+@app.exception_handler(FastAPIHTTPException)
+async def http_exception_wrapper(request, exc):  # noqa: ARG001 - request required by FastAPI interface
+    return await http_exception_handler(exc)
+
+@app.exception_handler(Exception)
+async def unhandled_exception_wrapper(request, exc):  # noqa: ARG001 - request required by FastAPI interface
+    return await unhandled_exception_handler(exc)
 
 
 app.include_router(api_router)
