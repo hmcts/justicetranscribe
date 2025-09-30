@@ -110,8 +110,7 @@ export default function HelpPage() {
                 until it turns blue and shows Connected.
               </li>
               <li>
-                Wait a few seconds for the VPN indicator to appear at the top
-                of your screen.
+                Wait a few seconds for the VPN indicator to appear at the top of your screen.
               </li>
               <li>If this doesn&apos;t work, contact the IT Service Desk.</li>
             </ol>

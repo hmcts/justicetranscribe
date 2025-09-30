@@ -1,11 +1,6 @@
 import React from "react";
 
-interface Step4ReadyProps {
-  onGetStarted: () => void;
-  onBack: () => void;
-}
-
-export default function Step4Ready({ onGetStarted, onBack }: Step4ReadyProps) {
+export default function Step4Ready() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-4 text-center">

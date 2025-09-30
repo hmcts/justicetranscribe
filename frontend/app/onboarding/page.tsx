@@ -126,9 +126,7 @@ export default function OnboardingPage() {
       case 3:
         return <Step3ReviewEdit />;
       case 4:
-        return (
-          <Step4Ready onGetStarted={handleStartRecording} onBack={handleBack} />
-        );
+        return <Step4Ready />;
       default:
         return <div>Invalid step</div>;
     }
@@ -139,11 +137,10 @@ export default function OnboardingPage() {
       {/* Skip to main content for screen readers */}
       <a
         href="#main-content"
-        className="focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg sr-only"
+        className="sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg focus:not-sr-only"
       >
         Skip to main content
       </a>
-      
       {/* Show warning banner if dev override is active */}
       {onboardingStatus?.force_onboarding_override && (
         <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border border-orange-400 bg-orange-100 px-4 py-3 text-orange-800 shadow-lg">
@@ -164,7 +161,6 @@ export default function OnboardingPage() {
       >
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
-        
         {/* Step content - centered vertically */}
         <div className="flex min-h-[calc(100vh-200px)] flex-col justify-center">
           {renderStep()}
@@ -201,7 +197,8 @@ export default function OnboardingPage() {
                       </Button>
                       <Button
                         onClick={handleStartRecording}
-                        className="bg-green-600 px-8 py-3 text-base text-white hover:bg-green-700"
+                        className="px-8 py-3 text-base text-white hover:opacity-90"
+                        style={{ backgroundColor: "#10652F" }}
                       >
                         Get started
                       </Button>
