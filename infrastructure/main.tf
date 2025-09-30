@@ -182,6 +182,14 @@ resource "azurerm_linux_web_app" "frontend" {
     # Add database connection for Next.js API routes
     "DATABASE_CONNECTION_STRING"                = local.database_connection_string
     "DATABASE_URL"                              = local.database_connection_string  # Alternative naming
+    
+    # Allowlist Configuration (for frontend consistency)
+    "ALLOWLIST_CONTAINER"                       = "application-data"
+    "ALLOWLIST_BLOB_NAME"                       = "lookups/allowlist.csv"
+    "ALLOWLIST_CACHE_TTL_SECONDS"               = "7200"
+    
+    # Onboarding Configuration
+    "FORCE_ONBOARDING_DEV"                      = "false"
   }
 
   # VNet integration allows secure database access
@@ -295,6 +303,14 @@ resource "azurerm_linux_web_app" "backend_api" {
     # Development/Testing Configuration
     "DISABLE_AUTH_SIGNATURE_VERIFICATION" = "false"
     "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT" = "placeholder-google-credentials-json"
+    
+    # Allowlist Configuration
+    "ALLOWLIST_CONTAINER"                = "application-data"
+    "ALLOWLIST_BLOB_NAME"                = "lookups/allowlist.csv"
+    "ALLOWLIST_CACHE_TTL_SECONDS"        = "7200"
+    
+    # Onboarding Configuration
+    "FORCE_ONBOARDING_DEV"               = "false"
   }
 
   # Only ignore changes to sensitive environment variables
