@@ -1,11 +1,11 @@
-"""Test CORS security filtering for wildcard patterns."""
+"""Test CORS utilities for parsing and normalizing origins."""
 
 import pytest
-from main import parse_origins
+from utils.cors_utils import parse_origins
 
 
-class TestCORSWildcardFiltering:
-    """Test that wildcard patterns are properly filtered out."""
+class TestCORSOriginParsing:
+    """Test CORS origin parsing and normalization functionality."""
 
     def test_rejects_leading_wildcard(self):
         """Test that origins starting with * are rejected."""
