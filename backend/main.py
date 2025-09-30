@@ -58,11 +58,25 @@ def parse_origins(val: str | None) -> list[str]:
     # Drop wildcards & dedupe; normalize to scheme://host[:port]
     out = []
     for o in raw:
-        if o == "*" or o.startswith("*"):
+        # Reject any origin containing wildcards anywhere
+        if "*" in o:
             continue
+            
         parts = urlsplit(o)
         if parts.scheme and parts.netloc:
-            normalized = f"{parts.scheme}://{parts.netloc}"
+            # Normalize to scheme://host format, removing default ports
+            host = parts.netloc
+            # Check if port is default and remove it
+            if parts.port is not None:
+                if (parts.scheme == "https" and parts.port == 443) or (parts.scheme == "http" and parts.port == 80):
+                    # Remove the port from netloc - use hostname if available, otherwise reconstruct
+                    if parts.hostname:
+                        host = parts.hostname
+                    else:
+                        # Fallback: reconstruct hostname from netloc
+                        host = parts.netloc.split(":")[0]
+                
+            normalized = f"{parts.scheme}://{host}"
             if normalized not in out:
                 out.append(normalized)
     return out
