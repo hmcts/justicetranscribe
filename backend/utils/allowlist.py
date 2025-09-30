@@ -197,7 +197,7 @@ class UserAllowlistCache:
 
         return allowlist_df[["provider", "email"]].drop_duplicates()
 
-    def _validate_allowlist_data(self, allowlist_df: pd.DataFrame) -> bool:
+    def _validate_allowlist_data(self, allowlist_df: pd.DataFrame) -> bool:  # noqa: PLR0911
         """Validate allowlist data using simple pandas checks.
 
         Performs critical data quality checks on the allowlist DataFrame.
@@ -224,15 +224,19 @@ class UserAllowlistCache:
             required_columns = ["provider", "email"]
             if not all(col in allowlist_df.columns for col in required_columns):
                 logger.error("Missing required columns. Expected: %s, got: %s", required_columns, list(allowlist_df.columns))
+                return False
             # 2. Check for null values in critical columns
             elif allowlist_df[required_columns].isna().any().any():
                 logger.error("Found null values in required columns")
+                return False
             # 3. Check at least one row exists
             elif len(allowlist_df) == 0:
                 logger.error("Allowlist data is empty")
+                return False
             # 4. Check for duplicate emails
             elif allowlist_df["email"].duplicated().any():
                 logger.error("Found duplicate emails in allowlist data")
+                return False
             # 5. Validate email format (basic regex check)
             else:
                 email_pattern = r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
