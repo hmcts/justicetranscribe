@@ -42,6 +42,7 @@ from app.minutes.templates.templates_metadata import (
 )
 from app.minutes.types import (
     GenerateMinutesRequest,
+    OnboardingStatusResponse,
     StartTranscriptionJobRequest,
     TemplateResponse,
     TranscriptionMetadata,
@@ -49,6 +50,7 @@ from app.minutes.types import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
+from utils.allowlist import create_allowlist_cache
 from utils.dependencies import get_current_user
 from utils.settings import get_settings
 
@@ -66,12 +68,32 @@ async def health_check():
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
-@router.get("/user/onboarding-status")
+@router.get("/user/onboarding-status", response_model=OnboardingStatusResponse)
 async def get_onboarding_status(
     current_user: User = Depends(get_current_user),  # noqa: B008
-):
-    """Get user's onboarding status and check for dev override"""
+) -> OnboardingStatusResponse:
+    """
+    Get user's onboarding status and allowlist check.
 
+    This endpoint provides comprehensive status information for the frontend
+    to determine what UI to display to the user. It checks both onboarding
+    completion status and allowlist membership.
+
+    Parameters
+    ----------
+    current_user : User
+        The authenticated user from the dependency injection.
+
+    Returns
+    -------
+    OnboardingStatusResponse
+        Complete status information including onboarding and allowlist status.
+
+    Raises
+    ------
+    HTTPException
+        If user authentication fails or allowlist check fails.
+    """
     # Check if onboarding should be forced in development
     settings = get_settings()
     force_onboarding = (
@@ -79,13 +101,25 @@ async def get_onboarding_status(
         settings.ENVIRONMENT in ["local", "dev"]
     )
 
-    return {
-        "has_completed_onboarding": current_user.has_completed_onboarding,
-        "force_onboarding_override": force_onboarding,
-        "should_show_onboarding": not current_user.has_completed_onboarding or force_onboarding,
-        "user_id": str(current_user.id),
-        "environment": settings.ENVIRONMENT,
-    }
+    # Check allowlist status using environment-specific configuration
+    allowlist_config = settings.get_allowlist_config()
+    allowlist_cache = create_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
+    is_allowlisted = await allowlist_cache.is_user_allowlisted(
+        current_user.email,
+        settings.AZURE_STORAGE_CONNECTION_STRING,
+        allowlist_config["container"],
+        allowlist_config["blob_name"]
+    )
+
+    return OnboardingStatusResponse(
+        has_completed_onboarding=current_user.has_completed_onboarding,
+        force_onboarding_override=force_onboarding,
+        should_show_onboarding=(not current_user.has_completed_onboarding) or force_onboarding,
+        user_id=current_user.id,
+        environment=settings.ENVIRONMENT,
+        is_allowlisted=is_allowlisted,
+        should_show_coming_soon=not is_allowlisted,
+    )
 
 
 @router.post("/user/complete-onboarding")
@@ -114,18 +148,18 @@ async def reset_onboarding(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
     """Reset user's onboarding status (dev only)"""
-    
+
     # Only allow in local/dev environments
     settings = get_settings()
     if settings.ENVIRONMENT not in ["local", "dev"]:
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="This endpoint is only available in local/dev environments"
         )
-    
+
     # Reset onboarding status
     updated_user = update_user(current_user.id, has_completed_onboarding=False)
-    
+
     return {
         "success": True,
         "message": "Onboarding status reset successfully",

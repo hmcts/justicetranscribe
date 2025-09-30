@@ -357,7 +357,9 @@ class TestUserAllowlistCache:
         result = cache._validate_allowlist_data(invalid_df)
         assert result is False, f"Expected exception handling to return False, got {result}"
         # Verify that the error was logged
-        mock_logger.error.assert_called_with("Allowlist data validation error: Test exception")
+        mock_logger.exception.assert_called_once()
+        call_args = mock_logger.exception.call_args
+        assert call_args[0][0] == "Allowlist data validation error"
 
 
 class TestCreateAllowlistCache:
