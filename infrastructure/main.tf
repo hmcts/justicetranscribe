@@ -502,7 +502,7 @@ locals {
 
 # Azure Storage Account for file uploads and processing
 resource "azurerm_storage_account" "main" {
-  name                     = "${substr(var.prefix, 0, 12)}${var.environment}stor"
+  name                     = "justicetrans${var.environment}stor"
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"

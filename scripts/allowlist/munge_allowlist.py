@@ -1,11 +1,11 @@
 """A script to ingest allowlist csv, prep and save to blob storage.
 
 Data dependencies:
-* data/allowlist.csv
 * data/pilot_users.csv
 
 Output:
 * data/allowlist_final.csv
+* data/allowlist_dev.csv
 """
 
 from pathlib import Path
@@ -39,75 +39,62 @@ def main():
 
 
     secrets = dotenv_values()
-    allowlist_pth = here("data/allowlist.csv")
-    # need to use windows compat codec, utf-8 error
-    df = pd.read_csv(allowlist_pth, encoding="cp1252")
-    df = df.dropna().drop_duplicates()
-    df = df.loc[df["Active/Inactive Staff"] == "Active", :].reset_index(drop=True)
-    wales = df.loc[df["Provider"] == "Wales"].reset_index(drop=True)
-    kssr = df.loc[df["Provider"] == "Kent Surrey Sussex Region"].reset_index(drop=True)
-    allowed_wales = wales.sample(1000, random_state=41, replace=False)
-    allowed_kssr = kssr.sample(1000, random_state=41, replace=False)
-    allowed = pd.concat([allowed_wales, allowed_kssr], ignore_index=True)
-    keep_cols = ["Provider", "Email"]
-    allowed = allowed[keep_cols]
 
-    allowed.columns = map(str.lower, allowed.columns)
-    for k, v in allowed.iterrows():
-        if v["provider"] == "Kent Surrey Sussex Region":
-            v["provider"] = "kss"
-
-    # Ai Justice Unit team members, commented out members used to test logic in dev
     ai_justice_unit = pd.DataFrame(
         {
             "email": [
-                # "ayse.mutlu@justice.gov.uk",
+                "ayse.mutlu@justice.gov.uk",
                 "dan.james@justice.gov.uk",
-                # "developer@localhost.com",
+                "developer@localhost.com",
                 "franziska.hasford@justice.gov.uk",
                 "john.daley@justice.gov.uk",
-                # "louis.allgood@justice.gov.uk",
+                "louis.allgood@justice.gov.uk",
                 "richard.leyshon@justice.gov.uk",
                 ],
         }
     )
     ai_justice_unit["provider"] = "Ai Justice Unit"
-    allowed = pd.concat([allowed, ai_justice_unit], ignore_index=True)
+    # allowed = pd.concat([allowed, ai_justice_unit], ignore_index=True)
 
     # pilot members
     pilot_pth = here("data/pilot_users.csv")
     pilot_df = pd.read_csv(pilot_pth, encoding="cp1252", names=["email", "provider"])
-    allowed = pd.concat([allowed, pilot_df], ignore_index=True)
+    # allowed = pd.concat([allowed, pilot_df], ignore_index=True)
+    out_df = pd.concat([pilot_df, ai_justice_unit], ignore_index=True)
 
     # manually onboarded members
     manually_onboarded = pd.DataFrame.from_records(
         [
             ("adele.alenizy@justice.gov.uk", "Wales"),
             ("clare.phillips@justice.gov.uk", "Wales"),
+            ("carys.girvin@justice.gov.uk", "HQ-DPM"),
             ("helen.smith11@justice.gov.uk", "Wales"),
             ("jessamine.stonehouse@justice.gov.uk", "HQ-DPM"),
+            ("katie.morris2@justice.gov.uk", "HQ-DPM"),
+            ("louis.clarke@justice.gov.uk", "HQ-DPM"),
             ("louisa.chatterton@justice.gov.uk", "HQ-DPM"),
             ("samantha.merrett@justice.gov.uk", "HQ-DAT"),
             ("matt.proctor-leake@justice.gov.uk", "HQ-DAT"),
         ],
         columns=["email", "provider"],
     )
-    allowed = pd.concat([allowed, manually_onboarded], ignore_index=True)
-    # lowercase all provider values
-    allowed["provider"] = allowed["provider"].apply(lambda x: x.lower().strip())
-    allowed = allowed.drop_duplicates()
+    out_df = pd.concat([out_df, manually_onboarded], ignore_index=True)
+    out_df = out_df.drop_duplicates()
 
     #  sanity - lower everything
-    for col in allowed.columns:
-        allowed[col] = allowed[col].apply(lambda x: x.lower().strip())
-    # rebuild lookup for dev with everything lowered
-    ai_justice_unit = allowed.query(
-        "provider == 'ai justice unit'"
-        ).reset_index(drop=True)
+    for col in out_df.columns:
+        out_df[col] = out_df[col].apply(lambda x: x.lower().strip())
+
 
     # Always write UTF-8 for backend readers
     output_path = here("data/allowlist_final.csv")
-    allowed.to_csv(output_path, index=False, encoding="utf-8")
+    out_df.to_csv(output_path, index=False, encoding="utf-8")
+
+
+    # rebuild lookup for dev with everything lowered
+    ai_justice_unit = out_df.query(
+        "provider == 'ai justice unit'"
+        ).reset_index(drop=True)
     ai_justice_pth = here("data/allowlist_dev.csv")
     ai_justice_unit.to_csv(ai_justice_pth, index=False, encoding="utf-8")
 
