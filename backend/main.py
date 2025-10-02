@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
+from utils.cors_utils import parse_origins
 from utils.exception_handlers import http_exception_handler, unhandled_exception_handler
 from utils.middleware import add_request_id
 from utils.settings import get_settings
@@ -42,21 +43,26 @@ sentry_sdk.init(
 
 app = FastAPI(lifespan=lifespan, openapi_url="/api/openapi.json")
 
-# Configure CORS for local development only
-# Note: In production (Azure App Service), CORS is handled at the infrastructure level
-# through Azure's CORS configuration, so we don't need this middleware there
+# Configure CORS based on environment
+# For local development, use hardcoded origins
+# For deployed environments, use CORS_ALLOWED_ORIGINS from infrastructure
 if settings.ENVIRONMENT == "local":
     origins = [
         "http://localhost:3000",  # Local frontend development
         "http://127.0.0.1:3000",  # Alternative localhost
     ]
+else:
+    origins = parse_origins(settings.CORS_ALLOWED_ORIGINS)
 
+if origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],  # Allow all methods (GET, POST, PUT, DELETE, etc.)
-        allow_headers=["*"],  # Allow all headers
+        allow_credentials=True,  # Needed for Easy Auth and cookies
+        allow_methods=["*"],     # Let OPTIONS succeed without guessing methods
+        allow_headers=["*"],     # Avoids 403 on Authorization, custom headers, etc.
+        expose_headers=["X-Request-ID"],
+        max_age=86400,  # Cache preflight for 24 hours
     )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

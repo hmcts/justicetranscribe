@@ -3,6 +3,7 @@
 import React, { useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
 import { Home, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,11 +14,21 @@ interface HeaderProps {
 
 export default function Header({ className }: HeaderProps) {
   const { selectedRecordingMode } = useTranscripts();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const handleHomeClick = useCallback(() => {
-    // Always navigate to home/welcome page
-    window.location.href = "/";
-  }, []);
+    const hasQueryParams = (searchParams?.toString().length ?? 0) > 0;
+    
+    if (pathname === "/" && !hasQueryParams) {
+      // Already on clean home page - trigger event to reset view state
+      window.dispatchEvent(new CustomEvent("reset-to-welcome"));
+    } else {
+      // Navigate to clean home (removes query params like ?id=xyz)
+      router.push("/");
+    }
+  }, [router, pathname, searchParams]);
 
   return (
     <header className={cn("z-50 bg-white dark:border-gray-800", className)}>

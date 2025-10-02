@@ -1,27 +1,66 @@
 """Pytest configuration and shared fixtures."""
 
 import asyncio
-import os
-from typing import Any, AsyncGenerator, Generator
+import sys
+from collections.abc import AsyncGenerator, Generator
+from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 # Add the backend directory to Python path for imports
-import sys
-from pathlib import Path
-
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
+
+
+def create_test_csv_data(rows: list[tuple[str, str]]) -> str:
+    """Create properly formatted CSV test data with realistic formatting variations.
+
+    Parameters
+    ----------
+    rows : list[tuple[str, str]]
+        List of (provider, email) tuples with potential formatting variations.
+
+    Returns
+    -------
+    str
+        Properly formatted CSV string with realistic whitespace and case variations.
+    """
+    csv_lines = ["Provider,Email"]
+    for provider, email in rows:
+        # Add realistic formatting variations that would be cleaned by parsing
+        formatted_provider = f"  {provider}  " if len(provider) > 5 else provider
+        formatted_email = f"  {email}  " if "@" in email else email
+        csv_lines.append(f"{formatted_provider},{formatted_email}")
+
+    return "\n".join(csv_lines) + "\n"
+
+
+def clean_email_for_comparison(email: str) -> str:
+    """Clean email for robust test comparisons.
+
+    Parameters
+    ----------
+    email : str
+        Email to clean.
+
+    Returns
+    -------
+    str
+        Cleaned email (lowercased and stripped).
+    """
+    return email.strip().lower()
 
 
 def pytest_addoption(parser):
     """Add command line options for test configuration."""
     parser.addoption(
-        "--integration", 
-        action="store_true", 
+        "--integration",
+        action="store_true",
         default=False,
         help="Run integration tests (skipped by default)"
     )
@@ -30,6 +69,12 @@ def pytest_addoption(parser):
         action="store_true",
         default=False,
         help="Allow tests that require network access (disabled by default)"
+    )
+    parser.addoption(
+        "--data-validation",
+        action="store_true",
+        default=False,
+        help="Run data validation tests (skipped by default)"
     )
 
 
@@ -119,7 +164,7 @@ def sample_transcript() -> dict[str, Any]:
                 ],
             },
             {
-                "id": "speaker_2", 
+                "id": "speaker_2",
                 "name": "Jane Smith",
                 "segments": [
                     {"start": 5.0, "end": 10.0, "text": "with multiple speakers discussing"},
@@ -142,12 +187,12 @@ def sample_meeting_data() -> dict[str, Any]:
     }
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_client() -> AsyncGenerator[AsyncClient, None]:
     """Create test client for API testing."""
     # Import here to avoid circular imports
     from main import app
-    
+
     async with AsyncClient(app=app, base_url="http://test") as client:
         yield client
 
@@ -156,7 +201,7 @@ async def test_client() -> AsyncGenerator[AsyncClient, None]:
 def sync_test_client() -> TestClient:
     """Create synchronous test client for API testing."""
     from main import app
-    
+
     return TestClient(app)
 
 
@@ -173,7 +218,7 @@ def setup_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "JWT_SECRET_KEY": "test-jwt-secret",
         "SENTRY_DSN": "",  # Disable Sentry in tests
     }
-    
+
     for key, value in test_env_vars.items():
         monkeypatch.setenv(key, value)
 
@@ -205,11 +250,11 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "external_api: mark test as calling external APIs"
     )
-    
+
     # Configure socket blocking based on flags
     allow_network = config.getoption("--allow-network")
     run_integration = config.getoption("--integration")
-    
+
     # Only enable socket blocking for pure unit tests
     # Integration tests and network tests need sockets for async loops and network calls
     if not allow_network and not run_integration:
@@ -224,11 +269,11 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     skip_integration = not config.getoption("--integration")
     # Skip network tests by default unless --allow-network flag is used
     allow_network = config.getoption("--allow-network")
-    
+
     for item in items:
         # Get the test file path relative to tests directory
         test_path = Path(item.fspath).relative_to(Path(__file__).parent)
-        
+
         # Auto-mark based on directory structure
         if test_path.parts[0] == "unit":
             item.add_marker(pytest.mark.unit)
@@ -239,7 +284,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
                 item.add_marker(pytest.mark.skip(reason="Integration test skipped. Use --integration to run."))
         elif test_path.parts[0] == "e2e":
             item.add_marker(pytest.mark.e2e)
-        
+
         # Skip network tests if they're marked and network is not allowed
         if not allow_network:
             for marker in item.iter_markers():
