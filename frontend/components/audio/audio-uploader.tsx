@@ -219,6 +219,49 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     []
   );
 
+  // CHUNKED UPLOAD FALLBACK: Upload individual chunks when single upload fails
+  const uploadChunksAsFallback = useCallback(
+    async (backupId: string, mimeType: string): Promise<void> => {
+      try {
+        const chunks = await audioBackupDB.getChunks(backupId);
+        if (chunks.length === 0) {
+          throw new Error("No chunks found for fallback upload");
+        }
+
+        
+        // Get upload URL for chunked upload
+        const fileExtension = mimeType.includes("mp4") ? "mp4" : "webm";
+        const urlResult = await apiClient.getUploadUrl(fileExtension);
+        
+        if (urlResult.error) {
+          throw new Error("Failed to get upload URL for chunked upload");
+        }
+        
+        const { upload_url } = urlResult.data!;
+        
+        // Upload each chunk individually
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const chunkUploadUrl = `${upload_url}&chunk=${i}&total=${chunks.length}`;
+          
+          setProcessingStatus({ 
+            state: "uploading", 
+            progress: Math.round((i / chunks.length) * 100) 
+          });
+          
+          await uploadFile(chunk.data, chunkUploadUrl);
+        }
+        
+        setProcessingStatus({ state: "uploading", progress: 100 });
+        
+      } catch (error) {
+        console.error("❌ Chunked upload fallback failed:", error);
+        throw error;
+      }
+    },
+    [uploadFile]
+  );
+
   const startTranscription = useCallback(
     async (blob: Blob) => {
       const maxRetries = 2;
@@ -245,7 +288,6 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
         // Show retry attempt to user
         if (attempt > 1) {
-          console.log(`Upload attempt ${attempt} of ${maxRetries}`);
           setUploadError(`Retrying upload (attempt ${attempt} of ${maxRetries})...`);
         }
 
@@ -267,8 +309,25 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           setUploadError(null);
         }
 
-        // Upload the file with the new URL
-        await uploadFile(blob, upload_url);
+        // Try single file upload first
+        try {
+          await uploadFile(blob, upload_url);
+        } catch (uploadError) {
+          
+          // CHUNKED UPLOAD FALLBACK: If single upload fails, try uploading chunks
+          if (currentBackupId) {
+            try {
+              await uploadChunksAsFallback(currentBackupId, blob.type);
+            } catch (chunkedError) {
+              console.error("❌ Both single and chunked upload failed:", chunkedError);
+              const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+              const chunkedErrorMessage = chunkedError instanceof Error ? chunkedError.message : String(chunkedError);
+              throw new Error(`Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`);
+            }
+          } else {
+            throw uploadError; // No backup ID available for chunked fallback
+          }
+        }
 
         const transcriptionJobResult = await apiClient.startTranscriptionJob(
           user_upload_s3_file_key
@@ -288,15 +347,19 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           retry_attempt: attempt,
         });
 
-        // Clean up backup after successful upload
+        // STREAMING: Clean up streamed chunks after successful upload
         if (currentBackupId) {
           try {
-            await audioBackupDB.deleteAudioBackup(currentBackupId);
+            await audioBackupDB.deleteChunks(currentBackupId);
             setCurrentBackupId(null);
           } catch (error) {
-            alert(`error deleting backup: ${error}`);
+            alert(`error deleting backup chunks: ${error}`);
           }
         }
+        
+        // EXPLICIT NULLIFICATION: Help Next.js garbage collection
+        // @ts-ignore - Explicitly nullify blob to help GC
+        blob = null;
       };
 
       // Sequential retry logic without loops or recursion
