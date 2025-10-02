@@ -84,14 +84,17 @@ def main():
     #  sanity - lower everything
     for col in out_df.columns:
         out_df[col] = out_df[col].apply(lambda x: x.lower().strip())
-    # rebuild lookup for dev with everything lowered
-    ai_justice_unit = out_df.query(
-        "provider == 'ai justice unit'"
-        ).reset_index(drop=True)
+
 
     # Always write UTF-8 for backend readers
     output_path = here("data/allowlist_final.csv")
     out_df.to_csv(output_path, index=False, encoding="utf-8")
+
+
+    # rebuild lookup for dev with everything lowered
+    ai_justice_unit = out_df.query(
+        "provider == 'ai justice unit'"
+        ).reset_index(drop=True)
     ai_justice_pth = here("data/allowlist_dev.csv")
     ai_justice_unit.to_csv(ai_justice_pth, index=False, encoding="utf-8")
 
