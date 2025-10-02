@@ -30,6 +30,51 @@ function BackupUploader({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const { setIsProcessingTranscription } = useTranscripts();
 
+  // CHUNKED UPLOAD FALLBACK: Split blob into chunks and upload individually
+  const uploadBlobAsChunks = useCallback(
+    async (blob: Blob, baseUploadUrl: string): Promise<void> => {
+      const chunkSize = 1024 * 1024; // 1MB chunks
+      const totalChunks = Math.ceil(blob.size / chunkSize);
+      
+      
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, blob.size);
+        const chunk = blob.slice(start, end);
+        
+        const chunkUploadUrl = `${baseUploadUrl}&chunk=${i}&total=${totalChunks}`;
+        
+        setProcessingStatus({ 
+          state: "uploading", 
+          progress: Math.round((i / totalChunks) * 100) 
+        });
+        
+        // Upload individual chunk
+        const xhr = new XMLHttpRequest();
+        await new Promise((resolve, reject) => {
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.response);
+            } else {
+              reject(new Error(`Chunk ${i} upload failed with status ${xhr.status}`));
+            }
+          });
+          
+          xhr.addEventListener("error", () => {
+            reject(new Error(`Network error uploading chunk ${i}`));
+          });
+          
+          xhr.open("PUT", chunkUploadUrl);
+          xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
+          xhr.send(chunk);
+        });
+      }
+      
+      setProcessingStatus({ state: "uploading", progress: 100 });
+    },
+    []
+  );
+
   const startTranscription = useCallback(
     async (blob: Blob) => {
       try {
@@ -46,37 +91,51 @@ function BackupUploader({
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { upload_url, user_upload_s3_file_key } = urlResult.data!;
 
-        // Create XMLHttpRequest to track upload progress
-        const xhr = new XMLHttpRequest();
-        await new Promise((resolve, reject) => {
-          xhr.upload.addEventListener("progress", (event) => {
-            if (event.lengthComputable) {
-              const progress = Math.round((event.loaded / event.total) * 100);
-              setProcessingStatus({ state: "uploading", progress });
-            }
-          });
+        // Try single file upload first
+        try {
+          // Create XMLHttpRequest to track upload progress
+          const xhr = new XMLHttpRequest();
+          await new Promise((resolve, reject) => {
+            xhr.upload.addEventListener("progress", (event) => {
+              if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                setProcessingStatus({ state: "uploading", progress });
+              }
+            });
 
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-            } else {
-              reject(new Error("Failed to upload file to Azure Storage"));
-            }
-          });
+            xhr.addEventListener("load", () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error("Failed to upload file to Azure Storage"));
+              }
+            });
 
-          xhr.addEventListener("error", () => {
-            reject(new Error("Network error during upload"));
-          });
+            xhr.addEventListener("error", () => {
+              reject(new Error("Network error during upload"));
+            });
 
-          xhr.addEventListener("timeout", () => {
-            reject(new Error("Upload timed out"));
-          });
+            xhr.addEventListener("timeout", () => {
+              reject(new Error("Upload timed out"));
+            });
 
-          xhr.open("PUT", upload_url);
-          // Add required headers for Azure Blob Storage
-          xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
-          xhr.send(blob);
-        });
+            xhr.open("PUT", upload_url);
+            // Add required headers for Azure Blob Storage
+            xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
+            xhr.send(blob);
+          });
+        } catch (uploadError) {
+          
+          // CHUNKED UPLOAD FALLBACK: For backup uploader, we need to split the blob into chunks
+          try {
+            await uploadBlobAsChunks(blob, upload_url);
+          } catch (chunkedError) {
+            console.error("❌ Both single and chunked upload failed:", chunkedError);
+            const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+            const chunkedErrorMessage = chunkedError instanceof Error ? chunkedError.message : String(chunkedError);
+            throw new Error(`Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`);
+          }
+        }
 
         const transcriptionJobResult = await apiClient.startTranscriptionJob(
           user_upload_s3_file_key
@@ -103,6 +162,10 @@ function BackupUploader({
           // Sentry.captureException(error);
           alert(`error deleting backup: ${error}`);
         }
+        
+        // EXPLICIT NULLIFICATION: Help Next.js garbage collection
+        // @ts-ignore - Explicitly nullify blob to help GC
+        blob = null;
       } catch (error) {
         setUploadError(
           error instanceof Error
