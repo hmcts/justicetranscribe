@@ -33,9 +33,10 @@ export default function AccessGate({
           
           // Handle redirects
           const currentPathname = window.location.pathname;
+          const currentSearch = window.location.search;
           const onComingSoon = currentPathname?.startsWith("/coming-soon");
           const onOnboarding = currentPathname?.startsWith("/onboarding");
-          const isTranscriptPage = currentPathname?.includes("?id=");
+          const isTranscriptPage = currentSearch?.includes("id=");
           
           if (should_show_coming_soon && !onComingSoon) {
             console.log("🔄 Redirecting to coming-soon");
