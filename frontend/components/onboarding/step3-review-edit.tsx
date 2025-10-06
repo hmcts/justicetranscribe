@@ -5,13 +5,14 @@ export default function Step3ReviewEdit() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div className="space-y-3 text-center">
-        <h2 className="text-3xl font-semibold sm:text-4xl">Review and edit</h2>
-        <h3 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
+        <h1 className="text-3xl font-semibold sm:text-4xl">Review and edit</h1>
+        <h2 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
           Your professional judgement is key
-        </h3>
+        </h2>
         <p className="mx-auto max-w-2xl text-lg leading-relaxed text-gray-700">
           The AI summary is only a starting point. Use your professional
-          judgement to finalise summaries.
+          judgement to finalise summaries. When you're ready copy and paste the
+          summary into nDelius or your system of choice.
         </p>
       </div>
 

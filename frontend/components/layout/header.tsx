@@ -12,7 +12,7 @@ interface HeaderProps {
   className?: string;
 }
 
-export default function Header({ className }: HeaderProps) {
+export default function Header({ className = undefined }: HeaderProps) {
   const { selectedRecordingMode } = useTranscripts();
   const router = useRouter();
   const pathname = usePathname();
@@ -45,7 +45,7 @@ export default function Header({ className }: HeaderProps) {
                 className="font-medium text-black"
                 style={{ fontSize: "1.4rem" }}
               >
-                Transcriber
+                Transcribe
               </span>
             </Link>
           </div>
@@ -93,7 +93,3 @@ export default function Header({ className }: HeaderProps) {
     </header>
   );
 }
-
-Header.defaultProps = {
-  className: undefined,
-};

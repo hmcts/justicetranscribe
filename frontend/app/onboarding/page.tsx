@@ -7,7 +7,7 @@ import { apiClient } from "@/lib/api-client";
 
 // Step Components
 import Step1Welcome from "@/components/onboarding/step1-welcome";
-import Step2BasicTutorial from "@/components/onboarding/step2-basic-tutorial";
+import Step2BasicTutorial from "@/components/onboarding/step2-transcribe";
 import Step3ReviewEdit from "@/components/onboarding/step3-review-edit";
 import Step4Ready from "@/components/onboarding/step4-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
@@ -28,6 +28,24 @@ export default function OnboardingPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentStep]);
+
+  // Update page title for accessibility (WCAG 2.4.2 Page Titled)
+  useEffect(() => {
+    if (hasValidLicense === false) {
+      document.title = "Justice Transcribe coming soon – access pending";
+      return;
+    }
+
+    const titlesByStep = {
+      1: "Welcome – Justice Transcribe onboarding (step 1 of 4)",
+      2: "Transcribe a meeting – Justice Transcribe onboarding (step 2 of 4)",
+      3: "Review and edit – Justice Transcribe onboarding (step 3 of 4)",
+      4: "You're ready – Justice Transcribe onboarding (step 4 of 4)",
+    } as const;
+
+    document.title =
+      titlesByStep[currentStep as 1 | 2 | 3 | 4] || "Justice Transcribe";
+  }, [currentStep, hasValidLicense]);
 
   // Fetch onboarding status on page load to show warning banner
   useEffect(() => {
