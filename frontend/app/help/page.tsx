@@ -215,23 +215,24 @@ export default function HelpPage() {
 
         {/* Need additional support: moved directly under tutorials and emphasized */}
         <section
-          className="mb-12 rounded-lg border border-blue-200 bg-blue-50 p-6"
+          className="mb-6 rounded-lg border border-green-200 bg-green-50 p-6"
           aria-labelledby="need-support-heading"
         >
-          <h2 id="need-support-heading" className="mb-2 text-xl font-semibold text-blue-900">
+          <h2 id="need-support-heading" className="mb-2 text-xl font-bold text-green-700">
             Need additional support?
           </h2>
-          <p className="mb-4 text-blue-900">
+          <p className="mb-4 text-black">
             Join our Microsoft Teams channel for real-time assistance from our support team.
           </p>
-          <Button variant="default" asChild className="bg-blue-600 text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+          <Button variant="default" asChild className="bg-green-600 text-white hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2">
             <a
               href="https://teams.microsoft.com/l/team/19%3AEo8kdcW8DWqHbl1e-hbFsTHXqJt9uBVr077C7X2Z0NU1%40thread.tacv2/conversations?groupId=4e32ea9c-dfcc-4150-9ebf-f1f73ea873ce&tenantId=c6874728-71e6-41fe-a9e1-2e8c36776ad8"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Join Teams channel for support (opens in new tab)"
             >
-              Join Teams Channel <ExternalLink className="ml-1 size-4" aria-hidden="true" />
+              <ExternalLink className="mr-2 size-4" aria-hidden="true" />
+              Join Teams Channel
             </a>
           </Button>
         </section>
