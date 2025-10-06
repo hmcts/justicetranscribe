@@ -13,6 +13,9 @@ import Step4Ready from "@/components/onboarding/step4-ready";
 import LicenseCheckFail from "@/components/onboarding/license-check-fail";
 
 const TOTAL_STEPS = 4;
+// Gating: required watch time in seconds (hardcoded, change as needed)
+const STEP2_REQUIRED_SECONDS = 30;
+const STEP3_REQUIRED_SECONDS = 30;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -24,10 +27,77 @@ export default function OnboardingPage() {
   } | null>(null);
   // Removed formData as step 2 is no longer used
 
+  // Countdown gating state
+  const [step2RemainingSeconds, setStep2RemainingSeconds] = useState<number>(0);
+  const [step2GateActive, setStep2GateActive] = useState<boolean>(false);
+  const [step2Completed, setStep2Completed] = useState<boolean>(false);
+  const [step3RemainingSeconds, setStep3RemainingSeconds] = useState<number>(0);
+  const [step3GateActive, setStep3GateActive] = useState<boolean>(false);
+  const [step3Completed, setStep3Completed] = useState<boolean>(false);
+
   // Scroll to top when step changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentStep]);
+
+  // Start/stop the Step 2/3 countdown when entering/leaving those steps
+  useEffect(() => {
+    let intervalId2: ReturnType<typeof setInterval> | null = null;
+    let intervalId3: ReturnType<typeof setInterval> | null = null;
+    if (currentStep === 2) {
+      // Only start timer if user hasn't already completed it
+      if (!step2Completed) {
+        setStep2GateActive(true);
+        setStep2RemainingSeconds(STEP2_REQUIRED_SECONDS);
+        intervalId2 = setInterval(() => {
+          setStep2RemainingSeconds((prev) => {
+            const next = Math.max(0, prev - 1);
+            if (next === 0) {
+              setStep2GateActive(false);
+              setStep2Completed(true);
+              if (intervalId2) clearInterval(intervalId2);
+            }
+            return next;
+          });
+        }, 1000);
+      } else {
+        // Already completed, no gate needed
+        setStep2GateActive(false);
+        setStep2RemainingSeconds(0);
+      }
+    } else if (currentStep === 3) {
+      // Only start timer if user hasn't already completed it
+      if (!step3Completed) {
+        setStep3GateActive(true);
+        setStep3RemainingSeconds(STEP3_REQUIRED_SECONDS);
+        intervalId3 = setInterval(() => {
+          setStep3RemainingSeconds((prev) => {
+            const next = Math.max(0, prev - 1);
+            if (next === 0) {
+              setStep3GateActive(false);
+              setStep3Completed(true);
+              if (intervalId3) clearInterval(intervalId3);
+            }
+            return next;
+          });
+        }, 1000);
+      } else {
+        // Already completed, no gate needed
+        setStep3GateActive(false);
+        setStep3RemainingSeconds(0);
+      }
+    } else {
+      // Reset gate state when navigating off steps 2 and 3
+      setStep2GateActive(false);
+      setStep2RemainingSeconds(0);
+      setStep3GateActive(false);
+      setStep3RemainingSeconds(0);
+    }
+    return () => {
+      if (intervalId2) clearInterval(intervalId2);
+      if (intervalId3) clearInterval(intervalId3);
+    };
+  }, [currentStep, step2Completed, step3Completed]);
 
   // Update page title for accessibility (WCAG 2.4.2 Page Titled)
   useEffect(() => {
@@ -64,7 +134,13 @@ export default function OnboardingPage() {
   }, []);
 
   const canContinue = () => {
-    // No validation needed as step 2 is removed
+    // Gate step 2 until countdown completes
+    if (currentStep === 2 && step2GateActive) {
+      return false;
+    }
+    if (currentStep === 3 && step3GateActive) {
+      return false;
+    }
     return true;
   };
 
@@ -151,7 +227,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       {/* Skip to main content for screen readers */}
       <a
         href="#main-content"
@@ -175,14 +251,24 @@ export default function OnboardingPage() {
 
       <div
         id="main-content"
-        className="container mx-auto max-w-2xl px-3 pb-16 pt-4"
+        className={
+          (currentStep === 2 || currentStep === 3) && hasValidLicense !== false
+            ? "w-full max-w-7xl mx-auto px-4 pb-24 md:pb-0 pt-6"
+            : "container mx-auto max-w-2xl px-3 pb-0 pt-4"
+        }
       >
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
         {/* Step content - centered vertically */}
-        <div className="flex min-h-[calc(100vh-200px)] flex-col justify-center">
-          {renderStep()}
-        </div>
+        {(currentStep === 2 || currentStep === 3) && hasValidLicense !== false ? (
+          <>{renderStep()}</>
+        ) : currentStep === 1 || currentStep === 4 ? (
+          <>{renderStep()}</>
+        ) : (
+          <div className="flex min-h-[calc(100svh-64px)] flex-col justify-center">
+            {renderStep()}
+          </div>
+        )}
 
         {/* Navigation - Show for all steps, hide for license check fail */}
         {hasValidLicense !== false && (
@@ -229,15 +315,27 @@ export default function OnboardingPage() {
                     <Button onClick={handleBack} variant="outline">
                       Back
                     </Button>
-                    <Button
-                      onClick={handleNext}
-                      disabled={!canContinue()}
-                      className={
-                        !canContinue() ? "cursor-not-allowed opacity-50" : ""
-                      }
-                    >
-                      Continue
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      {(currentStep === 2 && step2GateActive) && (
+                        <span className="text-sm text-muted-foreground" aria-live="polite">
+                          You can continue in {`${Math.floor(step2RemainingSeconds / 60)}:${String(step2RemainingSeconds % 60).padStart(2, "0")}`}
+                        </span>
+                      )}
+                      {(currentStep === 3 && step3GateActive) && (
+                        <span className="text-sm text-muted-foreground" aria-live="polite">
+                          You can continue in {`${Math.floor(step3RemainingSeconds / 60)}:${String(step3RemainingSeconds % 60).padStart(2, "0")}`}
+                        </span>
+                      )}
+                      <Button
+                        onClick={handleNext}
+                        disabled={!canContinue()}
+                        className={
+                          !canContinue() ? "cursor-not-allowed opacity-50" : ""
+                        }
+                      >
+                        Continue
+                      </Button>
+                    </div>
                   </div>
                 );
               })()}
