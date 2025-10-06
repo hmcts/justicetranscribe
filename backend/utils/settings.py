@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "local"
     # Onboarding Override for Development Testing
     FORCE_ONBOARDING_DEV: bool = False
+    # Allowlist Bypass for Local Development
+    BYPASS_ALLOWLIST_DEV: bool = False
     GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT: str
     GOV_NOTIFY_API_KEY: str
     # JWT Verification Settings - Strict by default
