@@ -31,7 +31,13 @@ install: ## Install backend dependencies
 	cd backend && uv sync --group fastapi --group dev
 	cd frontend && npm install
 backend: ## Run development server
-	cd backend && ENVIRONMENT=local uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+	@if [ -f .env ]; then \
+		echo "📄 Loading environment variables from .env file..."; \
+		cd backend && ENVIRONMENT=local uv run --env-file ../.env uvicorn main:app --reload --host 0.0.0.0 --port 8000; \
+	else \
+		echo "⚠️  No .env file found. Make sure to create one from .env.example"; \
+		cd backend && ENVIRONMENT=local uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000; \
+	fi
 frontend: ## Run development server
 	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 INTERNAL_API_BASE=http://localhost:8000 ENVIRONMENT=local NODE_ENV=development npm run dev
 database:
