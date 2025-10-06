@@ -31,34 +31,40 @@ export default function AccessGate({
           console.log("✅ Setting status:", newStatus);
           setAccessStatus(newStatus);
           
-          // Handle redirects
-          const currentPathname = window.location.pathname;
-          const currentSearch = window.location.search;
-          const onComingSoon = currentPathname?.startsWith("/coming-soon");
-          const onOnboarding = currentPathname?.startsWith("/onboarding");
-          const isTranscriptPage = currentSearch?.includes("id=");
-          
-          if (should_show_coming_soon && !onComingSoon) {
-            console.log("🔄 Redirecting to coming-soon");
-            window.location.href = "/coming-soon";
-          } else if (!should_show_coming_soon && should_show_onboarding && !onOnboarding && !isTranscriptPage) {
-            console.log("🔄 Redirecting to onboarding");
-            window.location.href = "/onboarding";
-          } else if (!should_show_coming_soon && !should_show_onboarding && onComingSoon) {
-            console.log("🔄 Redirecting to home");
-            window.location.href = "/";
-          } else {
-            console.log("✅ No redirect needed");
+          // Handle redirects - check if we're in browser environment
+          if (typeof window !== 'undefined') {
+            const currentPathname = window.location.pathname;
+            const currentSearch = window.location.search;
+            const onComingSoon = currentPathname?.startsWith("/coming-soon");
+            const onOnboarding = currentPathname?.startsWith("/onboarding");
+            // More specific check for transcript pages - look for ?id= or &id= pattern
+            const isTranscriptPage = currentSearch?.match(/[?&]id=/);
+            
+            if (should_show_coming_soon && !onComingSoon) {
+              console.log("🔄 Redirecting to coming-soon");
+              window.location.href = "/coming-soon";
+            } else if (!should_show_coming_soon && should_show_onboarding && !onOnboarding && !isTranscriptPage) {
+              console.log("🔄 Redirecting to onboarding");
+              window.location.href = "/onboarding";
+            } else if (!should_show_coming_soon && !should_show_onboarding && onComingSoon) {
+              console.log("🔄 Redirecting to home");
+              window.location.href = "/";
+            } else {
+              console.log("✅ No redirect needed");
+            }
           }
         }
       } catch (e) {
         console.warn("❌ Access gate check failed:", e);
         if (isMounted) {
           setAccessStatus('denied');
-          const currentPathname = window.location.pathname;
-          const onComingSoon = currentPathname?.startsWith("/coming-soon");
-          if (!onComingSoon) {
-            window.location.href = "/coming-soon";
+          // Check if we're in browser environment before accessing window
+          if (typeof window !== 'undefined') {
+            const currentPathname = window.location.pathname;
+            const onComingSoon = currentPathname?.startsWith("/coming-soon");
+            if (!onComingSoon) {
+              window.location.href = "/coming-soon";
+            }
           }
         }
       }
