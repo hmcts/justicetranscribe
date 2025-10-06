@@ -14,7 +14,7 @@ const SANITY_API_VERSION = process.env.NEXT_PUBLIC_SANITY_API_VERSION;
 
 // Reuse the same tutorial document as Step 2
 const SANITY_VIDEO_DOCUMENT_TYPE = "videoTutorial";
-const SANITY_VIDEO_DOCUMENT_UUID = "146f7345-0da6-48b5-9a24-851bc7548298";
+const SANITY_VIDEO_DOCUMENT_UUID = "7cc10ecb-e007-4072-a9f3-a7f8712287ad";
 const SANITY_VIDEO_DOCUMENT_ID = `${SANITY_VIDEO_DOCUMENT_TYPE};${SANITY_VIDEO_DOCUMENT_UUID}`;
 
 export default function Step3ReviewEdit() {

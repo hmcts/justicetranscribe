@@ -156,7 +156,7 @@ export default function HelpPage() {
                       </div>
                       {/* Duration pill */}
                       <div className="absolute right-5 top-4 z-10 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
-                        3:20
+                        6:50
                       </div>
                       {/* Title bottom-left - smaller, left aligned */}
                       <div className="absolute bottom-5 left-5 z-10 pr-6">
@@ -188,70 +188,28 @@ export default function HelpPage() {
                 </Dialog>
             ) : null}
 
-            {/* Advanced Tutorial Tile */}
-            {isLoadingAdvanced ? (
-              <div className="aspect-video w-full animate-pulse rounded-2xl bg-gray-200" />
-            ) : errorAdvanced ? (
-              <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorAdvanced}</div>
-            ) : videoAdvanced ? (
-              <Dialog>
-                  <DialogTrigger asChild>
-                    <button
-                      type="button"
-                      className="group relative block w-full overflow-hidden rounded-2xl bg-muted/20 transition-transform duration-300 ease-out hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      aria-label="Open advanced tutorial video"
-                    >
-                      {/* Media */}
-                      <div className="relative aspect-video w-full">
-                        {videoAdvanced.thumbnailUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={videoAdvanced.thumbnailUrl}
-                            alt={videoAdvanced.thumbnailAlt || videoAdvanced.title || "Tutorial thumbnail"}
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-600" />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />
-                      </div>
-                      {/* Label top-left */}
-                      <div className="absolute left-5 top-4 z-10 text-left text-white/90">
-                        <span className="text-sm font-medium tracking-wide">Video Tutorial</span>
-                      </div>
-                      {/* Duration pill */}
-                      <div className="absolute right-5 top-4 z-10 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
-                        3:20
-                      </div>
-                      {/* Title bottom-left */}
-                      <div className="absolute bottom-5 left-5 z-10 pr-6">
-                        <p className="text-lg font-semibold leading-tight text-white drop-shadow-sm md:text-xl">
-                          Advanced Tutorial
-                        </p>
-                      </div>
-                      {/* Hover Play Button */}
-                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                        <div className="translate-y-1 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
-                          <div className="rounded-full bg-white/90 p-5 shadow-md">
-                            <Play className="size-6 text-blue-600" />
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-3xl p-0">
-                    <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
-                      <video
-                        controls
-                        autoPlay
-                        playsInline
-                        src={videoAdvanced.videoUrl}
-                        className="h-full w-full object-contain"
-                      />
-                    </div>
-                  </DialogContent>
-                </Dialog>
-            ) : null}
+            {/* Advanced Tutorial Tile - Coming Soon */}
+            <div className="group relative block w-full overflow-hidden rounded-2xl bg-muted/20 transition-transform duration-300 ease-out hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-600">
+              {/* Media */}
+              <div className="relative aspect-video w-full">
+                <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-600" />
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />
+                {/* Drum roll emoji overlay */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-6xl">🥁</div>
+                </div>
+              </div>
+              {/* Label top-left */}
+              <div className="absolute left-5 top-4 z-10 text-left text-white/90">
+                <span className="text-sm font-medium tracking-wide">Advanced Tutorial</span>
+              </div>
+              {/* Title bottom-left */}
+              <div className="absolute bottom-5 left-5 z-10 pr-6">
+                <p className="text-lg font-semibold leading-tight text-white drop-shadow-sm md:text-xl">
+                  Coming Soon
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
