@@ -4,9 +4,9 @@ export default function Step4Ready() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-4 text-center">
-        <h2 className="text-4xl font-semibold sm:text-5xl">
+        <h1 className="text-4xl font-semibold sm:text-5xl">
           You&apos;re ready 🎉
-        </h2>
+        </h1>
         <p className="text-xl text-gray-700">
           Start today to spend less time note taking and more time listening
         </p>

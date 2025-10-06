@@ -24,8 +24,8 @@ export default function HelpPage() {
         </div>
 
         {/* Tutorial Cards */}
-        <section className="mb-12">
-          <h2 className="mb-8 text-center text-2xl font-semibold">Tutorials</h2>
+        <section className="mb-6" aria-labelledby="tutorials-heading">
+          <h2 id="tutorials-heading" className="sr-only">Tutorials</h2>
           <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
             {/* Basic Tutorial Card */}
             <Card className="group transition-shadow hover:shadow-md">
@@ -91,6 +91,29 @@ export default function HelpPage() {
           </div>
         </section>
 
+        {/* Need additional support: moved directly under tutorials and emphasized */}
+        <section
+          className="mb-12 rounded-lg border border-blue-200 bg-blue-50 p-6"
+          aria-labelledby="need-support-heading"
+        >
+          <h2 id="need-support-heading" className="mb-2 text-xl font-semibold text-blue-900">
+            Need additional support?
+          </h2>
+          <p className="mb-4 text-blue-900">
+            Join our Microsoft Teams channel for real-time assistance from our support team.
+          </p>
+          <Button variant="default" asChild className="bg-blue-600 text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
+            <a
+              href="https://teams.microsoft.com/l/team/19%3AEo8kdcW8DWqHbl1e-hbFsTHXqJt9uBVr077C7X2Z0NU1%40thread.tacv2/conversations?groupId=4e32ea9c-dfcc-4150-9ebf-f1f73ea873ce&tenantId=c6874728-71e6-41fe-a9e1-2e8c36776ad8"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Join Teams channel for support (opens in new tab)"
+            >
+              Join Teams Channel <ExternalLink className="ml-1 size-4" aria-hidden="true" />
+            </a>
+          </Button>
+        </section>
+
         {/* Individual Sections */}
         <div className="space-y-6">
           {/* Phone/VPN Issue */}
@@ -151,26 +174,7 @@ export default function HelpPage() {
             </ol>
           </section>
 
-          {/* Need additional support */}
-          <section className="rounded-lg border p-6">
-            <h3 className="mb-2 text-lg font-semibold">
-              Need additional support?
-            </h3>
-            <p className="mb-3">
-              Join our Microsoft Teams channel for real-time assistance from our
-              support team.
-            </p>
-            <Button variant="outline" asChild>
-              <a
-                href="https://teams.microsoft.com/l/team/19%3AEo8kdcW8DWqHbl1e-hbFsTHXqJt9uBVr077C7X2Z0NU1%40thread.tacv2/conversations?groupId=4e32ea9c-dfcc-4150-9ebf-f1f73ea873ce&tenantId=c6874728-71e6-41fe-a9e1-2e8c36776ad8"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Join Teams channel for support - opens in new tab"
-              >
-                Join Teams Channel <ExternalLink className="ml-1 size-4" />
-              </a>
-            </Button>
-          </section>
+          {/* Need additional support: moved above, so removed duplicate here */}
 
           {/* Policies & Guidelines */}
           <section className="rounded-lg border p-6">
@@ -183,7 +187,7 @@ export default function HelpPage() {
             </p>
             <Button variant="outline" asChild>
               <a
-                href="https://ai.justice.gov.uk/action-plan"
+                href="https://intranet.justice.gov.uk/guidance/it-services/ai-in-moj/"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="View AI Policy & Guidance - opens in new tab"
@@ -200,17 +204,16 @@ export default function HelpPage() {
               Conversation Script for People on Probation
             </h3>
             <p className="mb-3">
-              Download this document for a simple script to explain Justice
-              Transcribe to people on probation. It explains what it does, why
-              we use it, and how we handle data safely and compliantly.
+              See this document for a simple script to explain Justice Transcribe to people on probation. It explains what it does, why we use it, and how we handle data safely and compliantly.
             </p>
             <Button variant="outline" asChild>
               <a
-                href="/downloads/probation-flyer.pdf"
-                download
-                aria-label="Download Conversation Script for People on Probation"
+                href="https://justiceuk.sharepoint.com/:w:/s/JusticeAIUnit/EVMV3NmTchVCgtY-UAlpjSwBDZ9PEe10_HFadAquZUksPw?e=0V5WqE"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open Conversation Script for People on Probation - opens in new tab"
               >
-                Download Conversation Script{" "}
+                Open Conversation Script
                 <ExternalLink className="ml-1 size-4" />
               </a>
             </Button>
@@ -218,21 +221,18 @@ export default function HelpPage() {
 
           {/* SARs Request Guidance */}
           <section className="rounded-lg border p-6">
-            <h3 className="mb-2 text-lg font-semibold">
-              SARs Request Guidance
-            </h3>
+            <h3 className="mb-2 text-lg font-semibold">SARs Request Guidance</h3>
             <p className="mb-3">
-              Guidance for Probation Officers on how to comply with Subject
-              Access Requests (SARs) when using Justice Transcribe.
+              For guidance on how to comply with Subject Access Requests (SARs) email us on
+              <a
+                href="mailto:transcribe@justice.gov.uk"
+                className="mx-1 font-medium underline"
+                aria-label="Email transcribe@justice.gov.uk"
+              >
+                transcribe@justice.gov.uk
+              </a>
+              .
             </p>
-            <Button
-              variant="outline"
-              disabled
-              className="cursor-not-allowed opacity-50"
-            >
-              Download SARs Guidance
-              <ExternalLink className="ml-1 size-4" />
-            </Button>
           </section>
         </div>
       </div>
