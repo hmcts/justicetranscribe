@@ -1,16 +1,112 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
 import { Play, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+// (no Card import; custom tiles instead)
+
+type SanityVideoData = {
+  title?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  thumbnailAlt?: string;
+};
+
+const SANITY_PROJECT_ID = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID;
+const SANITY_DATASET = process.env.NEXT_PUBLIC_SANITY_DATASET;
+const SANITY_API_VERSION = process.env.NEXT_PUBLIC_SANITY_API_VERSION;
+
+// Same tutorial document type (IDs split for basic/advanced for easy future change)
+const SANITY_VIDEO_DOCUMENT_TYPE = "videoTutorial";
+const SANITY_BASIC_TUTORIAL_UUID = "7d6e810c-087e-422a-af0a-62632e305bab";
+const SANITY_ADVANCED_TUTORIAL_UUID = "146f7345-0da6-48b5-9a24-851bc7548298";
+const SANITY_BASIC_TUTORIAL_ID = `${SANITY_VIDEO_DOCUMENT_TYPE};${SANITY_BASIC_TUTORIAL_UUID}`;
+const SANITY_ADVANCED_TUTORIAL_ID = `${SANITY_VIDEO_DOCUMENT_TYPE};${SANITY_ADVANCED_TUTORIAL_UUID}`;
 
 export default function HelpPage() {
+  const [videoBasic, setVideoBasic] = useState<SanityVideoData | null>(null);
+  const [isLoadingBasic, setIsLoadingBasic] = useState<boolean>(true);
+  const [errorBasic, setErrorBasic] = useState<string | null>(null);
+
+  const [videoAdvanced, setVideoAdvanced] = useState<SanityVideoData | null>(null);
+  const [isLoadingAdvanced, setIsLoadingAdvanced] = useState<boolean>(true);
+  const [errorAdvanced, setErrorAdvanced] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchVideo = async () => {
+      if (!SANITY_PROJECT_ID || !SANITY_DATASET || !SANITY_API_VERSION) {
+        setErrorBasic(
+          "Missing Sanity env vars. Set NEXT_PUBLIC_SANITY_PROJECT_ID, NEXT_PUBLIC_SANITY_DATASET, NEXT_PUBLIC_SANITY_API_VERSION."
+        );
+        setIsLoadingBasic(false);
+        setIsLoadingAdvanced(false);
+        return;
+      }
+
+      const query = `*[_type == "videoTutorial" && _id in [$id, $uuid, "drafts." + $uuid]][0]{
+        title,
+        "videoUrl": coalesce(video.asset->url, file.asset->url, url),
+        "thumbnailUrl": coalesce(image.asset->url, thumbnail.asset->url),
+        "thumbnailAlt": coalesce(image.alt, "")
+      }`;
+
+      const apiVersion = (SANITY_API_VERSION || "").startsWith("v")
+        ? SANITY_API_VERSION
+        : `v${SANITY_API_VERSION}`;
+
+      const encodedQuery = encodeURIComponent(query);
+
+      const buildEndpoint = (id: string, uuid: string) => {
+        const encodedId = encodeURIComponent(JSON.stringify(id));
+        const encodedUuid = encodeURIComponent(JSON.stringify(uuid));
+        return `https://${SANITY_PROJECT_ID}.api.sanity.io/${apiVersion}/data/query/${SANITY_DATASET}?query=${encodedQuery}&%24id=${encodedId}&%24uuid=${encodedUuid}&perspective=published`;
+      };
+
+      // Fetch both videos in parallel
+      try {
+        const [resBasic, resAdvanced] = await Promise.all([
+          fetch(buildEndpoint(SANITY_BASIC_TUTORIAL_ID, SANITY_BASIC_TUTORIAL_UUID), { cache: "no-store" }),
+          fetch(buildEndpoint(SANITY_ADVANCED_TUTORIAL_ID, SANITY_ADVANCED_TUTORIAL_UUID), { cache: "no-store" }),
+        ]);
+
+        // Basic
+        if (!resBasic.ok) {
+          const body = await resBasic.text();
+          throw new Error(`Basic request failed (${resBasic.status}): ${body}`);
+        }
+        const jsonBasic = await resBasic.json();
+        const resultBasic: SanityVideoData | null = jsonBasic?.result ?? null;
+        if (!resultBasic || !resultBasic.videoUrl) {
+          throw new Error("Basic video not found or missing playable URL.");
+        }
+        setVideoBasic(resultBasic);
+
+        // Advanced
+        if (!resAdvanced.ok) {
+          const body = await resAdvanced.text();
+          throw new Error(`Advanced request failed (${resAdvanced.status}): ${body}`);
+        }
+        const jsonAdvanced = await resAdvanced.json();
+        const resultAdvanced: SanityVideoData | null = jsonAdvanced?.result ?? null;
+        if (!resultAdvanced || !resultAdvanced.videoUrl) {
+          throw new Error("Advanced video not found or missing playable URL.");
+        }
+        setVideoAdvanced(resultAdvanced);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Failed to load videos.";
+        // Set both errors for visibility
+        setErrorBasic(msg);
+        setErrorAdvanced(msg);
+      } finally {
+        setIsLoadingBasic(false);
+        setIsLoadingAdvanced(false);
+      }
+    };
+
+    fetchVideo();
+  }, []);
   return (
     <div className="min-h-screen bg-background">
       {/* Main Content */}
@@ -26,68 +122,136 @@ export default function HelpPage() {
         {/* Tutorial Cards */}
         <section className="mb-6" aria-labelledby="tutorials-heading">
           <h2 id="tutorials-heading" className="sr-only">Tutorials</h2>
-          <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
-            {/* Basic Tutorial Card */}
-            <Card className="group transition-shadow hover:shadow-md">
-              <CardHeader className="pb-4 text-center">
-                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-muted/80">
-                  <Play
-                    className="size-8 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                </div>
-                <CardTitle className="text-xl">Basic Tutorial</CardTitle>
-                <CardDescription>
-                  Must-know actions to succeed straight away
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="text-center">
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Coming soon
-                </p>
-                <Button
-                  variant="default"
-                  size="lg"
-                  disabled
-                  className="w-full"
-                  aria-label="Play basic tutorial - coming soon"
-                >
-                  <Play className="mr-2 size-4" />
-                  Play Basic Tutorial
-                </Button>
-              </CardContent>
-            </Card>
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
+            {/* Basic Tutorial Tile */}
+            {isLoadingBasic ? (
+              <div className="aspect-video w-full animate-pulse rounded-2xl bg-gray-200" />
+            ) : errorBasic ? (
+              <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorBasic}</div>
+            ) : videoBasic ? (
+              <Dialog>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="group relative block w-full overflow-hidden rounded-2xl bg-muted/20 transition-transform duration-300 ease-out hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      aria-label="Open basic tutorial video"
+                    >
+                      {/* Media */}
+                      <div className="relative aspect-video w-full">
+                        {videoBasic.thumbnailUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={videoBasic.thumbnailUrl}
+                            alt={videoBasic.thumbnailAlt || videoBasic.title || "Tutorial thumbnail"}
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-600" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />
+                      </div>
+                      {/* Label top-left */}
+                      <div className="absolute left-5 top-4 z-10 text-left text-white/90">
+                        <span className="text-sm font-medium tracking-wide">Video Tutorial</span>
+                      </div>
+                      {/* Duration pill */}
+                      <div className="absolute right-5 top-4 z-10 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+                        3:20
+                      </div>
+                      {/* Title bottom-left - smaller, left aligned */}
+                      <div className="absolute bottom-5 left-5 z-10 pr-6">
+                        <p className="text-lg font-semibold leading-tight text-white drop-shadow-sm md:text-xl">
+                          {videoBasic.title || "Welcome to Justice Transcribe"}
+                        </p>
+                      </div>
+                      {/* Hover Play Button */}
+                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                        <div className="translate-y-1 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+                          <div className="rounded-full bg-white/90 p-5 shadow-md">
+                            <Play className="size-6 text-blue-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl p-0">
+                    <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
+                      <video
+                        controls
+                        autoPlay
+                        playsInline
+                        src={videoBasic.videoUrl}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+            ) : null}
 
-            {/* Advanced Tutorial Card */}
-            <Card className="group transition-shadow hover:shadow-md">
-              <CardHeader className="pb-4 text-center">
-                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-muted/80">
-                  <Play
-                    className="size-8 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                </div>
-                <CardTitle className="text-xl">Advanced Tutorial</CardTitle>
-                <CardDescription>
-                  Time-saving tricks with AI edit for summaries
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="text-center">
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Coming soon
-                </p>
-                <Button
-                  variant="default"
-                  size="lg"
-                  disabled
-                  className="w-full"
-                  aria-label="Play advanced tutorial - coming soon"
-                >
-                  <Play className="mr-2 size-4" />
-                  Play Advanced Tutorial
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Advanced Tutorial Tile */}
+            {isLoadingAdvanced ? (
+              <div className="aspect-video w-full animate-pulse rounded-2xl bg-gray-200" />
+            ) : errorAdvanced ? (
+              <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorAdvanced}</div>
+            ) : videoAdvanced ? (
+              <Dialog>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="group relative block w-full overflow-hidden rounded-2xl bg-muted/20 transition-transform duration-300 ease-out hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      aria-label="Open advanced tutorial video"
+                    >
+                      {/* Media */}
+                      <div className="relative aspect-video w-full">
+                        {videoAdvanced.thumbnailUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={videoAdvanced.thumbnailUrl}
+                            alt={videoAdvanced.thumbnailAlt || videoAdvanced.title || "Tutorial thumbnail"}
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-600" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />
+                      </div>
+                      {/* Label top-left */}
+                      <div className="absolute left-5 top-4 z-10 text-left text-white/90">
+                        <span className="text-sm font-medium tracking-wide">Video Tutorial</span>
+                      </div>
+                      {/* Duration pill */}
+                      <div className="absolute right-5 top-4 z-10 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+                        3:20
+                      </div>
+                      {/* Title bottom-left */}
+                      <div className="absolute bottom-5 left-5 z-10 pr-6">
+                        <p className="text-lg font-semibold leading-tight text-white drop-shadow-sm md:text-xl">
+                          Advanced Tutorial
+                        </p>
+                      </div>
+                      {/* Hover Play Button */}
+                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                        <div className="translate-y-1 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+                          <div className="rounded-full bg-white/90 p-5 shadow-md">
+                            <Play className="size-6 text-blue-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl p-0">
+                    <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
+                      <video
+                        controls
+                        autoPlay
+                        playsInline
+                        src={videoAdvanced.videoUrl}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+            ) : null}
           </div>
         </section>
 
@@ -187,7 +351,7 @@ export default function HelpPage() {
             </p>
             <Button variant="outline" asChild>
               <a
-                href="https://intranet.justice.gov.uk/guidance/it-services/ai-in-moj/"
+                href="https://intranet.justice.gov.uk/guidance/it-services/ai-in-moj/ai-usage-guidelines/"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="View AI Policy & Guidance - opens in new tab"
