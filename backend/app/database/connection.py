@@ -4,6 +4,7 @@ Database connection utilities for both sync and async operations.
 This module provides database session management for the application.
 """
 
+import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,39 @@ from utils.settings import get_settings
 def get_engine():
     """Get synchronous database engine."""
     database_url = get_settings().DATABASE_CONNECTION_STRING
+    # Handle SSL mode for psycopg2 - ensure valid sslmode values
+    if "sslmode=" in database_url:
+        # Find all sslmode parameters and their values
+        sslmode_matches = re.findall(r"sslmode=([^&]*)", database_url)
+
+        if sslmode_matches:
+            # Use the last sslmode value found (most specific)
+            sslmode_value = sslmode_matches[-1].strip()
+
+            # Validate and normalize sslmode value for psycopg2
+            valid_sslmodes = ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+
+            # Normalize common invalid values
+            sslmode_mapping = {
+                "true": "require",
+                "false": "disable",
+                "1": "require",
+                "0": "disable",
+                "yes": "require",
+                "no": "disable",
+                "on": "require",
+                "off": "disable"
+            }
+
+            if sslmode_value in sslmode_mapping:
+                sslmode_value = sslmode_mapping[sslmode_value]
+            elif sslmode_value not in valid_sslmodes:
+                # Default to require for unknown invalid values
+                sslmode_value = "require"
+
+            # Replace all sslmode parameters with valid value
+            database_url = re.sub(r"sslmode=[^&]*", f"sslmode={sslmode_value}", database_url)
+
     return create_engine(database_url, echo=False)
 
 
