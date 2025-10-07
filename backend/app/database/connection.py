@@ -30,6 +30,24 @@ def get_async_engine():
     else:
         async_database_url = database_url
 
+    # Handle SSL mode for asyncpg - convert sslmode to ssl parameter
+    if "sslmode=" in async_database_url:
+        # Extract sslmode value
+        import re
+        sslmode_match = re.search(r"sslmode=([^&]+)", async_database_url)
+        if sslmode_match:
+            sslmode_value = sslmode_match.group(1)
+            # Convert sslmode to ssl parameter for asyncpg
+            if sslmode_value in ["require", "prefer", "allow"]:
+                ssl_value = "true"
+            elif sslmode_value == "disable":
+                ssl_value = "false"
+            else:
+                ssl_value = "true"  # Default to secure
+
+            # Replace sslmode with ssl
+            async_database_url = re.sub(r"sslmode=[^&]+", f"ssl={ssl_value}", async_database_url)
+
     return create_async_engine(async_database_url, echo=False)
 
 
