@@ -1,7 +1,7 @@
 """Add blob cleanup fields to TranscriptionJob
 
 Revision ID: 34a9930bd1f7
-Revises: 2157146b45d5
+Revises: ed7aa9a4e0f2
 Create Date: 2025-10-07 14:32:24.396510
 
 """
