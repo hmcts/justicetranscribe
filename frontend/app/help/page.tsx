@@ -224,7 +224,22 @@ export default function HelpPage() {
           <p className="mb-4 text-black">
             Join our Microsoft Teams channel for real-time assistance from our support team.
           </p>
-          <Button variant="default" asChild className="bg-green-600 text-white hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2">
+          <Button 
+            asChild 
+            className="text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10652F] focus-visible:ring-offset-2"
+            style={{ 
+              backgroundColor: "#10652F",
+              borderColor: "#10652F"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#0d4f26";
+              e.currentTarget.style.borderColor = "#0d4f26";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#10652F";
+              e.currentTarget.style.borderColor = "#10652F";
+            }}
+          >
             <a
               href="https://teams.microsoft.com/l/team/19%3AEo8kdcW8DWqHbl1e-hbFsTHXqJt9uBVr077C7X2Z0NU1%40thread.tacv2/conversations?groupId=4e32ea9c-dfcc-4150-9ebf-f1f73ea873ce&tenantId=c6874728-71e6-41fe-a9e1-2e8c36776ad8"
               target="_blank"
@@ -308,7 +323,10 @@ export default function HelpPage() {
               Review our organization&apos;s AI usage policies and best
               practices.
             </p>
-            <Button variant="outline" asChild>
+            <Button 
+              className="bg-[#10652F] hover:bg-[#0d4f26] text-white border-[#10652F] hover:border-[#0d4f26]" 
+              asChild
+            >
               <a
                 href="https://intranet.justice.gov.uk/guidance/it-services/ai-in-moj/ai-usage-guidelines/"
                 target="_blank"
