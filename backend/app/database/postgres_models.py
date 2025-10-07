@@ -3,8 +3,9 @@ from enum import Enum
 from typing import Literal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column
+from sqlalchemy import Column, select
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Field, Relationship, SQLModel
 
 # Global config for all models
@@ -85,3 +86,83 @@ class TranscriptionJob(BaseTable, table=True):
     dialogue_entries: list[DialogueEntry] = Field(sa_column=Column(JSONB))
     error_message: str | None = Field(default=None)
     s3_audio_url: str | None = Field(default=None)
+    # Blob deletion cleanup fields
+    needs_cleanup: bool = Field(default=False)
+    cleanup_failure_reason: str | None = Field(default=None)
+
+
+# Database helper functions for blob deletion service
+async def get_transcription_job_by_id(session: AsyncSession, job_id: UUID) -> TranscriptionJob | None:
+    """
+    Get a transcription job by its ID.
+
+    Args:
+        session: The database session
+        job_id: The UUID of the transcription job
+
+    Returns:
+        TranscriptionJob | None: The transcription job if found, None otherwise
+    """
+    stmt = select(TranscriptionJob).where(TranscriptionJob.id == job_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_transcription_jobs_needing_cleanup(session: AsyncSession) -> list[TranscriptionJob]:
+    """
+    Get all transcription jobs that need manual cleanup.
+
+    Args:
+        session: The database session
+
+    Returns:
+        list[TranscriptionJob]: List of transcription jobs flagged for manual cleanup
+    """
+    stmt = select(TranscriptionJob).where(TranscriptionJob.needs_cleanup)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def mark_cleanup_complete(session: AsyncSession, job_id: UUID) -> bool:
+    """
+    Mark a transcription job as having completed cleanup successfully.
+
+    Args:
+        session: The database session
+        job_id: The UUID of the transcription job
+
+    Returns:
+        bool: True if the job was found and updated, False otherwise
+    """
+    job = await get_transcription_job_by_id(session, job_id)
+    if job:
+        job.needs_cleanup = False
+        job.cleanup_failure_reason = None
+        await session.commit()
+        return True
+    return False
+
+
+async def mark_cleanup_failed(
+    session: AsyncSession,
+    job_id: UUID,
+    error_message: str
+) -> bool:
+    """
+    Mark a transcription job as having failed cleanup and flag for manual intervention.
+
+    Args:
+        session: The database session
+        job_id: The UUID of the transcription job
+        error_message: The error message describing the failure
+
+    Returns:
+        bool: True if the job was found and updated, False otherwise
+    """
+    job = await get_transcription_job_by_id(session, job_id)
+    if job:
+        job.needs_cleanup = True
+        job.cleanup_failure_reason = error_message
+        await session.commit()
+        return True
+    return False
