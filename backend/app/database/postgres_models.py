@@ -138,7 +138,6 @@ async def mark_cleanup_complete(session: AsyncSession, job_id: UUID) -> bool:
     if job:
         job.needs_cleanup = False
         job.cleanup_failure_reason = None
-        await session.commit()
         return True
     return False
 
@@ -163,6 +162,5 @@ async def mark_cleanup_failed(
     if job:
         job.needs_cleanup = True
         job.cleanup_failure_reason = error_message
-        await session.commit()
         return True
     return False
