@@ -1,12 +1,13 @@
 """Test Azure Storage utilities for transcription upload to Azure Blob Storage."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from azure.core.exceptions import ClientAuthenticationError, ResourceExistsError, ResourceNotFoundError
 
 from app.audio.azure_utils import (
+    AsyncAzureBlobManager,
     AzureBlobManager,
     _extract_account_key_from_connection_string,
     _extract_account_name_from_connection_string,
@@ -703,5 +704,150 @@ class TestAzureBlobManager:
         # Assertions
         assert result is False
         mock_logger.error.assert_called_once_with("Failed to check if blob exists test_container/test_blob.txt: General error")
+
+
+# =============================================================================
+# AsyncAzureBlobManager Unit Tests (Proper Async Mocking)
+# =============================================================================
+
+@pytest.mark.asyncio
+class TestAsyncAzureBlobManager:
+    """Test cases for AsyncAzureBlobManager class with proper async mocking."""
+
+    @pytest.fixture
+    def mock_settings(self):
+        """Mock settings for testing."""
+        with patch("app.audio.azure_utils.get_settings") as mock_get_settings:
+            mock_settings = MagicMock()
+            mock_settings.AZURE_STORAGE_CONNECTION_STRING = "test_connection_string"
+            mock_settings.AZURE_STORAGE_ACCOUNT_NAME = "test_account"
+            mock_settings.AZURE_STORAGE_CONTAINER_NAME = "test_container"
+            mock_get_settings.return_value = mock_settings
+            yield mock_settings
+
+    @pytest.fixture
+    def async_blob_manager(self, mock_settings):  # noqa: ARG002
+        """Create AsyncAzureBlobManager instance for testing."""
+        return AsyncAzureBlobManager()
+
+    @pytest.fixture
+    def sample_file_path(self, tmp_path):
+        """Create a sample file for testing."""
+        file_path = tmp_path / "test_file.txt"
+        file_path.write_text("test content")
+        return file_path
+
+    @pytest.fixture
+    def mock_async_context_manager(self):
+        """Create a proper async context manager mock."""
+        class AsyncContextManagerMock:
+            def __init__(self, obj_to_return):
+                self.obj = obj_to_return
+
+            async def __aenter__(self):
+                return self.obj
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return None
+
+        return AsyncContextManagerMock
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    @patch("app.audio.azure_utils.logger")
+    async def test_create_blob_from_file_success(self, mock_logger, mock_async_blob_service_client_class, async_blob_manager, sample_file_path, mock_async_context_manager):
+        """Test successful async blob creation with proper async mocking."""
+        # Setup mocks using the proper async patterns
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+
+        # Configure the async context manager
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+
+        # Configure async methods properly - upload_blob is awaited in the async code
+        mock_blob_client.upload_blob = AsyncMock()  # This needs to be AsyncMock since it's awaited
+
+        # Test
+        result = await async_blob_manager.create_blob_from_file(sample_file_path, "test_blob.txt")
+
+        # Assertions
+        assert result is True
+        mock_async_blob_service_client_class.from_connection_string.assert_called_once_with("test_connection_string")
+        mock_blob_service_client.get_blob_client.assert_called_once_with(
+            container="test_container",
+            blob="test_blob.txt"
+        )
+        mock_blob_client.upload_blob.assert_awaited_once()
+        mock_logger.info.assert_called_once_with("Successfully created blob: test_container/test_blob.txt")
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    @patch("app.audio.azure_utils.logger")
+    async def test_create_blob_from_file_file_not_found(self, mock_logger, mock_async_blob_service_client_class, async_blob_manager):
+        """Test async blob creation when file doesn't exist."""
+        # Setup mocks
+        mock_async_blob_service_client_class.from_connection_string.side_effect = FileNotFoundError("File not found")
+
+        # Test
+        result = await async_blob_manager.create_blob_from_file(Path("nonexistent.txt"), "test_blob.txt")
+
+        # Assertions
+        assert result is False
+        mock_logger.error.assert_called_once_with("File not found: nonexistent.txt")
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    @patch("app.audio.azure_utils.logger")
+    async def test_delete_blob_success(self, mock_logger, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test successful async blob deletion."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+
+        # Configure async methods properly - delete_blob is awaited in the async code
+        mock_blob_client.delete_blob = AsyncMock()  # This needs to be AsyncMock since it's awaited
+
+        # Test
+        result = await async_blob_manager.delete_blob("test_blob.txt")
+
+        # Assertions
+        assert result is True
+        mock_blob_client.delete_blob.assert_awaited_once_with(delete_snapshots="include")
+        mock_logger.info.assert_called_once_with("Successfully deleted blob: test_container/test_blob.txt")
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_blob_exists_true(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test async blob existence check when blob exists."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        # exists() is awaited in the async code, so it needs to be AsyncMock
+        mock_blob_client.exists = AsyncMock(return_value=True)
+
+        # Test
+        result = await async_blob_manager.blob_exists("test_blob.txt")
+
+        # Assertions
+        assert result is True
+        mock_blob_client.exists.assert_awaited_once()
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_blob_exists_false(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test async blob existence check when blob doesn't exist."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        # exists() is awaited in the async code, so it needs to be AsyncMock
+        mock_blob_client.exists = AsyncMock(return_value=False)
+
+        # Test
+        result = await async_blob_manager.blob_exists("test_blob.txt")
+
+        # Assertions
+        assert result is False
 
 
