@@ -138,15 +138,8 @@ class UserAllowlistCache:
 
     def _parse_and_validate_content(self, content: bytes, blob_name: str) -> pd.DataFrame:  # noqa: ARG002
         """Parse blob content and validate the resulting DataFrame."""
-        # Parse and validate
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            # Fallback to cp1252 encoding if UTF-8 fails
-            logger.warning("UTF-8 decoding failed for Azure blob, trying cp1252 encoding")
-            text = content.decode("cp1252")
-
-        allowlist_df = self._parse_allowlist_csv(text)
+        # Parse and validate - handle encoding at byte level
+        allowlist_df = self._parse_allowlist_csv_from_bytes(content)
 
         # Validate data quality
         if not self._validate_allowlist_data(allowlist_df):
@@ -165,9 +158,9 @@ class UserAllowlistCache:
             local_file = self._get_local_fallback_path(blob_name)
             if Path(local_file).exists():
                 # Use aiofiles for async file operations
-                async with aiofiles.open(local_file, encoding="utf-8") as f:
-                    text = await f.read()
-                allowlist_df = self._parse_allowlist_csv(text)
+                async with aiofiles.open(local_file, mode="rb") as f:
+                    content = await f.read()
+                allowlist_df = self._parse_allowlist_csv_from_bytes(content)
                 if self._validate_allowlist_data(allowlist_df):
                     logger.info("✅ Using local fallback file: %s", local_file)
                     return allowlist_df
@@ -203,11 +196,43 @@ class UserAllowlistCache:
 
         return str(data_dir / filename)
 
+    def _parse_allowlist_csv_from_bytes(self, content: bytes) -> pd.DataFrame:
+        """Parse allowlist CSV from bytes with proper encoding fallback.
+
+        Parameters
+        ----------
+        content : bytes
+            Raw CSV content as bytes.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with provider and email columns, emails lowercased.
+        """
+        try:
+            # Try UTF-8 first
+            text = content.decode("utf-8")
+            allowlist_df = pd.read_csv(StringIO(text))
+        except UnicodeDecodeError:
+            # Fallback to cp1252 encoding if UTF-8 fails
+            logger.warning("UTF-8 decoding failed, trying cp1252 encoding")
+            try:
+                text = content.decode("cp1252")
+                allowlist_df = pd.read_csv(StringIO(text))
+            except Exception:
+                # If both fail, try with explicit column names
+                logger.warning("cp1252 also failed, trying with explicit column names")
+                text = content.decode("cp1252", errors="ignore")  # Use errors="ignore" as last resort
+                allowlist_df = pd.read_csv(StringIO(text), names=["email", "provider"])
+
+        # Clean up the DataFrame
+        return self._clean_and_normalize_dataframe(allowlist_df)
+
     def _parse_allowlist_csv(self, text: str) -> pd.DataFrame:
         """Parse allowlist CSV text into a pandas DataFrame.
 
         Handles both capitalized (Email, Provider) and lowercase (email, provider) column names.
-        Cleans up records that begin with newline characters and handles encoding issues.
+        Cleans up records that begin with newline characters.
 
         Parameters
         ----------
@@ -230,19 +255,25 @@ class UserAllowlistCache:
 
         cleaned_text = "\n".join(cleaned_lines)
 
-        try:
-            # Try UTF-8 first
-            allowlist_df = pd.read_csv(StringIO(cleaned_text))
-        except UnicodeDecodeError:
-            # Fallback to cp1252 encoding if UTF-8 fails
-            logger.warning("UTF-8 decoding failed, trying cp1252 encoding")
-            try:
-                allowlist_df = pd.read_csv(StringIO(cleaned_text), encoding="cp1252")
-            except Exception:
-                # If both fail, try with explicit column names
-                logger.warning("cp1252 also failed, trying with explicit column names")
-                allowlist_df = pd.read_csv(StringIO(cleaned_text), encoding="cp1252", names=["email", "provider"])
+        # Parse CSV
+        allowlist_df = pd.read_csv(StringIO(cleaned_text))
 
+        # Clean up the DataFrame
+        return self._clean_and_normalize_dataframe(allowlist_df)
+
+    def _clean_and_normalize_dataframe(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Clean and normalize the allowlist DataFrame.
+
+        Parameters
+        ----------
+        allowlist_df : pd.DataFrame
+            Raw DataFrame from CSV parsing.
+
+        Returns
+        -------
+        pd.DataFrame
+            Cleaned and normalized DataFrame with provider and email columns.
+        """
         # Normalize column names to lowercase first for consistent handling
         allowlist_df.columns = allowlist_df.columns.str.lower().str.strip()
 
