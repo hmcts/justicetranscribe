@@ -4,9 +4,9 @@ Database connection utilities for both sync and async operations.
 This module provides database session management for the application.
 """
 
-import re
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlmodel import create_engine
@@ -14,23 +14,48 @@ from sqlmodel import create_engine
 from utils.settings import get_settings
 
 
-# Sync database setup
-def get_engine():
-    """Get synchronous database engine."""
-    database_url = get_settings().DATABASE_CONNECTION_STRING
-    # Handle SSL mode for psycopg2 - ensure valid sslmode values
-    if "sslmode=" in database_url:
-        # Find all sslmode parameters and their values
-        sslmode_matches = re.findall(r"sslmode=([^&]*)", database_url)
+def _normalize_ssl_mode(database_url: str, for_async: bool = False) -> str:
+    """
+    Normalize SSL mode parameters in database connection string.
 
-        if sslmode_matches:
-            # Use the last sslmode value found (most specific)
-            sslmode_value = sslmode_matches[-1].strip().lower()  # Case-insensitive
+    Args:
+        database_url: The database connection string
+        for_async: If True, convert sslmode to ssl for asyncpg compatibility
 
-            # Validate and normalize sslmode value for psycopg2
+    Returns:
+        str: Normalized database connection string
+    """
+    try:
+        # Parse the URL
+        parsed = urlparse(database_url)
+        query_params = parse_qs(parsed.query)
+
+        # Check if sslmode exists
+        if "sslmode" not in query_params:
+            return database_url
+
+        # Get the last sslmode value (most specific)
+        sslmode_value = query_params["sslmode"][-1].strip().lower()
+
+        if for_async:
+            # Convert sslmode to ssl for asyncpg
+            if sslmode_value in ["require", "prefer", "allow"]:
+                ssl_value = "true"
+            elif sslmode_value == "disable":
+                ssl_value = "false"
+            elif sslmode_value == "":
+                ssl_value = "true"  # Default to secure
+            else:
+                ssl_value = "true"  # Default to secure for unknown values
+
+            # Remove sslmode and add ssl
+            del query_params["sslmode"]
+            query_params["ssl"] = [ssl_value]
+        else:
+            # Normalize sslmode for psycopg2
             valid_sslmodes = ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
 
-            # Normalize common invalid values (case-insensitive)
+            # Normalize common invalid values
             sslmode_mapping = {
                 "true": "require",
                 "false": "disable",
@@ -45,15 +70,27 @@ def get_engine():
             if sslmode_value in sslmode_mapping:
                 sslmode_value = sslmode_mapping[sslmode_value]
             elif sslmode_value not in valid_sslmodes:
-                # Default to require for unknown invalid values
-                sslmode_value = "require"
+                sslmode_value = "require"  # Default to secure
 
-            # Remove all existing sslmode parameters first, then add the correct one
-            database_url = re.sub(r"[?&]sslmode=[^&]*", "", database_url)
-            # Add the correct sslmode parameter
-            separator = "&" if "?" in database_url else "?"
-            database_url = f"{database_url}{separator}sslmode={sslmode_value}"
+            # Update sslmode value
+            query_params["sslmode"] = [sslmode_value]
 
+        # Rebuild the URL
+        new_query = urlencode(query_params, doseq=True)
+        new_parsed = parsed._replace(query=new_query)
+        return urlunparse(new_parsed)
+
+    except Exception:
+        # If URL parsing fails, return original URL
+        return database_url
+
+
+# Sync database setup
+def get_engine():
+    """Get synchronous database engine."""
+    database_url = get_settings().DATABASE_CONNECTION_STRING
+    # Normalize SSL mode for psycopg2
+    database_url = _normalize_ssl_mode(database_url, for_async=False)
     return create_engine(database_url, echo=False)
 
 
@@ -67,33 +104,8 @@ def get_async_engine():
     else:
         async_database_url = database_url
 
-    # Handle SSL mode for asyncpg - convert sslmode to ssl parameter
-    if "sslmode=" in async_database_url:
-        import re
-        # Find all sslmode parameters and their values
-        sslmode_matches = re.findall(r"sslmode=([^&]*)", async_database_url)
-
-        if sslmode_matches:
-            # Use the last sslmode value found (most specific)
-            sslmode_value = sslmode_matches[-1].strip().lower()  # Case-insensitive
-
-            # Convert sslmode to ssl parameter for asyncpg
-            if sslmode_value in ["require", "prefer", "allow"]:
-                ssl_value = "true"
-            elif sslmode_value == "disable":
-                ssl_value = "false"
-            elif sslmode_value == "":
-                # Handle sslmode= without value - default to secure
-                ssl_value = "true"
-            else:
-                ssl_value = "true"  # Default to secure for unknown values
-
-            # Remove all existing sslmode parameters first, then add ssl parameter
-            async_database_url = re.sub(r"[?&]sslmode=[^&]*", "", async_database_url)
-            # Add the ssl parameter
-            separator = "&" if "?" in async_database_url else "?"
-            async_database_url = f"{async_database_url}{separator}ssl={ssl_value}"
-
+    # Normalize SSL mode for asyncpg (convert sslmode to ssl)
+    async_database_url = _normalize_ssl_mode(async_database_url, for_async=True)
     return create_async_engine(async_database_url, echo=False)
 
 
