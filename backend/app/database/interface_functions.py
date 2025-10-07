@@ -7,7 +7,6 @@ from fastapi import HTTPException
 from sqlalchemy import event
 from sqlmodel import Session, select
 
-from app.minutes.types import TranscriptionMetadata
 from app.database.postgres_database import engine
 from app.database.postgres_models import (
     BaseTable,
@@ -17,6 +16,7 @@ from app.database.postgres_models import (
     TranscriptionJob,
     User,
 )
+from app.minutes.types import TranscriptionMetadata
 
 
 @event.listens_for(Session, "before_flush")
@@ -213,10 +213,10 @@ def save_transcription_job(
             entry.model_dump() if hasattr(entry, "model_dump") else entry
             for entry in job.dialogue_entries
         ]
-        merged = session.merge(job)
+        session.add(job)
         session.commit()
-        session.refresh(merged)
-        return merged
+        session.refresh(job)
+        return job
 
 
 def get_transcription_jobs(
