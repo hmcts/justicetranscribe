@@ -11,8 +11,6 @@ import aiofiles
 import pandas as pd
 from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 
-from app.audio.azure_utils import AsyncAzureBlobManager
-
 logger = logging.getLogger(__name__)
 
 
@@ -107,25 +105,25 @@ class UserAllowlistCache:
         container: str,
         blob_name: str
     ) -> bytes:
-        """Download blob content using AsyncAzureBlobManager with fallback."""
+        """Download blob content using AsyncBlobServiceClient with fallback."""
         try:
-            blob_manager = AsyncAzureBlobManager(connection_string)
-
-            # Check if blob exists first
-            if not await blob_manager.blob_exists(blob_name, container):
-                error_msg = "Blob not found"
-                raise FileNotFoundError(error_msg) from None
-
-            # Download using our tested method
+            # Use single client for both existence check and download
             async with AsyncBlobServiceClient.from_connection_string(connection_string) as blob_service_client:
                 blob_client = blob_service_client.get_blob_client(
                     container=container, blob=blob_name
                 )
+
+                # Check if blob exists first
+                if not await blob_client.exists():
+                    error_msg = "Blob not found"
+                    raise FileNotFoundError(error_msg) from None
+
+                # Download using the same client
                 stream = await blob_client.download_blob()
                 return await stream.readall()
 
         except Exception as azure_utils_error:
-            logger.warning("AsyncAzureBlobManager failed, falling back to direct AsyncBlobServiceClient: %s", azure_utils_error)
+            logger.warning("AsyncBlobServiceClient failed, falling back to direct pattern: %s", azure_utils_error)
 
             # Fallback to existing working pattern
             blob_service_client = AsyncBlobServiceClient.from_connection_string(connection_string)

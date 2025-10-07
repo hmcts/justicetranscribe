@@ -14,7 +14,6 @@ from tenacity import (
 )
 from uwotm8 import convert_american_to_british_spelling
 
-from app.audio.azure_utils import AsyncAzureBlobManager
 from app.audio.utils import (
     cleanup_files,
     convert_input_dialogue_entries_to_dialogue_entries,
@@ -55,14 +54,7 @@ async def perform_transcription_steps_with_azure_and_aws(
 
             # Try our tested AsyncAzureBlobManager first, fallback to existing pattern
             try:
-                blob_manager = AsyncAzureBlobManager()
-
-                # Check if blob exists first
-                if not await blob_manager.blob_exists(user_upload_blob_path):
-                    error_msg = "Blob not found"
-                    raise FileNotFoundError(error_msg) from None
-
-                # Download the blob content using our tested method
+                # Use single client for both existence check and download
                 async with AsyncBlobServiceClient.from_connection_string(
                     get_settings().AZURE_STORAGE_CONNECTION_STRING
                 ) as blob_service_client:
@@ -70,6 +62,13 @@ async def perform_transcription_steps_with_azure_and_aws(
                         container=get_settings().AZURE_STORAGE_CONTAINER_NAME,
                         blob=user_upload_blob_path,
                     )
+
+                    # Check if blob exists first
+                    if not await blob_client.exists():
+                        error_msg = "Blob not found"
+                        raise FileNotFoundError(error_msg) from None
+
+                    # Download using the same client
                     download_stream = await blob_client.download_blob()
                     content = await download_stream.readall()
                     temp_file.write(content)
