@@ -11,6 +11,8 @@ import aiofiles
 import pandas as pd
 from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 
+from app.audio.azure_utils import AsyncAzureBlobManager
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,59 +87,94 @@ class UserAllowlistCache:
         last_exception = None
         for attempt in range(max_retries):
             try:
-                # Create a new client for each attempt
-                blob_service_client = AsyncBlobServiceClient.from_connection_string(
-                    connection_string
-                )
-
-                async with blob_service_client:
-                    blob_client = blob_service_client.get_blob_client(
-                        container=container, blob=blob_name
-                    )
-                    stream = await blob_client.download_blob()
-                    content: bytes = await stream.readall()
-
-                    # Parse and validate inside the context manager
-                    try:
-                        text = content.decode("utf-8")
-                    except UnicodeDecodeError:
-                        # Fallback to cp1252 encoding if UTF-8 fails
-                        logger.warning("UTF-8 decoding failed for Azure blob, trying cp1252 encoding")
-                        text = content.decode("cp1252")
-
-                    allowlist_df = self._parse_allowlist_csv(text)
-
-                    # Validate data quality
-                    if not self._validate_allowlist_data(allowlist_df):
-                        error_msg = "Allowlist data failed validation checks"
-                        raise ValueError(error_msg)
-
-                    logger.info("Successfully loaded allowlist from Azure: %s", blob_name)
-                    return allowlist_df
-
+                content = await self._download_blob_content(connection_string, container, blob_name)
+                allowlist_df = self._parse_and_validate_content(content, blob_name)
+                logger.info("Successfully loaded allowlist from Azure: %s", blob_name)
             except Exception as e:
                 last_exception = e
                 logger.warning("Attempt %d/%d failed: %s", attempt + 1, max_retries, e)
                 if attempt < max_retries - 1:  # Not the last attempt
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            else:
+                return allowlist_df
 
         # All Azure attempts failed - try local fallback in development
-        if os.getenv("ENVIRONMENT", "").lower() == "local":
-            logger.warning("Azure blob not found. Attempting local file fallback for development...")
-            try:
-                local_file = self._get_local_fallback_path(blob_name)
-                if Path(local_file).exists():
-                    # Use aiofiles for async file operations
-                    async with aiofiles.open(local_file, encoding="utf-8") as f:
-                        text = await f.read()
-                    allowlist_df = self._parse_allowlist_csv(text)
-                    if self._validate_allowlist_data(allowlist_df):
-                        logger.info("✅ Using local fallback file: %s", local_file)
-                        return allowlist_df
-                else:
-                    logger.error("Local fallback file not found: %s", local_file)
-            except Exception:
-                logger.exception("Local fallback also failed")
+        return await self._try_local_fallback(blob_name, last_exception)
+
+    async def _download_blob_content(
+        self,
+        connection_string: str,
+        container: str,
+        blob_name: str
+    ) -> bytes:
+        """Download blob content using AsyncAzureBlobManager with fallback."""
+        try:
+            blob_manager = AsyncAzureBlobManager(connection_string)
+
+            # Check if blob exists first
+            if not await blob_manager.blob_exists(blob_name, container):
+                error_msg = "Blob not found"
+                raise FileNotFoundError(error_msg) from None
+
+            # Download using our tested method
+            async with AsyncBlobServiceClient.from_connection_string(connection_string) as blob_service_client:
+                blob_client = blob_service_client.get_blob_client(
+                    container=container, blob=blob_name
+                )
+                stream = await blob_client.download_blob()
+                return await stream.readall()
+
+        except Exception as azure_utils_error:
+            logger.warning("AsyncAzureBlobManager failed, falling back to direct AsyncBlobServiceClient: %s", azure_utils_error)
+
+            # Fallback to existing working pattern
+            blob_service_client = AsyncBlobServiceClient.from_connection_string(connection_string)
+            async with blob_service_client:
+                blob_client = blob_service_client.get_blob_client(
+                    container=container, blob=blob_name
+                )
+                stream = await blob_client.download_blob()
+                return await stream.readall()
+
+    def _parse_and_validate_content(self, content: bytes, blob_name: str) -> pd.DataFrame:  # noqa: ARG002
+        """Parse blob content and validate the resulting DataFrame."""
+        # Parse and validate
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            # Fallback to cp1252 encoding if UTF-8 fails
+            logger.warning("UTF-8 decoding failed for Azure blob, trying cp1252 encoding")
+            text = content.decode("cp1252")
+
+        allowlist_df = self._parse_allowlist_csv(text)
+
+        # Validate data quality
+        if not self._validate_allowlist_data(allowlist_df):
+            error_msg = "Allowlist data failed validation checks"
+            raise ValueError(error_msg)
+
+        return allowlist_df
+
+    async def _try_local_fallback(self, blob_name: str, last_exception: Exception) -> pd.DataFrame:
+        """Try local file fallback for development environment."""
+        if os.getenv("ENVIRONMENT", "").lower() != "local":
+            raise last_exception
+
+        logger.warning("Azure blob not found. Attempting local file fallback for development...")
+        try:
+            local_file = self._get_local_fallback_path(blob_name)
+            if Path(local_file).exists():
+                # Use aiofiles for async file operations
+                async with aiofiles.open(local_file, encoding="utf-8") as f:
+                    text = await f.read()
+                allowlist_df = self._parse_allowlist_csv(text)
+                if self._validate_allowlist_data(allowlist_df):
+                    logger.info("✅ Using local fallback file: %s", local_file)
+                    return allowlist_df
+            else:
+                logger.error("Local fallback file not found: %s", local_file)
+        except Exception:
+            logger.exception("Local fallback also failed")
 
         # If we get here, all retries failed
         raise last_exception
