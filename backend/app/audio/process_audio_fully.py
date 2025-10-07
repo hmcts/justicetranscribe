@@ -70,19 +70,22 @@ async def transcribe_and_generate_llm_output(
             )
 
             # Trigger automated blob deletion after successful transcription
-            try:
-                blob_deletion_service = BlobDeletionService()
-                asyncio.create_task(  # noqa: RUF006
-                    blob_deletion_service.process_transcription_cleanup(
-                        transcription_job_id=transcription_job.id,
-                        blob_path=user_upload_blob_storage_file_key,
-                        user_email=user.email
+            if transcription_job and transcription_job.id:
+                try:
+                    blob_deletion_service = BlobDeletionService()
+                    asyncio.create_task(  # noqa: RUF006
+                        blob_deletion_service.process_transcription_cleanup(
+                            transcription_job_id=transcription_job.id,
+                            blob_path=user_upload_blob_storage_file_key,
+                            user_email=user.email
+                        )
                     )
-                )
-                logger.info(f"Started automated blob deletion for job {transcription_job.id}")
-            except Exception as cleanup_error:
-                logger.error(f"Failed to start blob deletion for job {transcription_job.id}: {cleanup_error}")
-                # Don't fail the transcription if cleanup fails to start
+                    logger.info(f"Started automated blob deletion for job {transcription_job.id}")
+                except Exception as cleanup_error:
+                    logger.error(f"Failed to start blob deletion for job {transcription_job.id}: {cleanup_error}")
+                    # Don't fail the transcription if cleanup fails to start
+            else:
+                logger.error("Failed to save transcription job, skipping blob deletion")
 
         except Exception as e:
             save_transcription_job(
