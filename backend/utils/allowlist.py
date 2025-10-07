@@ -98,7 +98,13 @@ class UserAllowlistCache:
                     content: bytes = await stream.readall()
 
                     # Parse and validate inside the context manager
-                    text = content.decode("utf-8")
+                    try:
+                        text = content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        # Fallback to cp1252 encoding if UTF-8 fails
+                        logger.warning("UTF-8 decoding failed for Azure blob, trying cp1252 encoding")
+                        text = content.decode("cp1252")
+
                     allowlist_df = self._parse_allowlist_csv(text)
 
                     # Validate data quality
@@ -164,6 +170,7 @@ class UserAllowlistCache:
         """Parse allowlist CSV text into a pandas DataFrame.
 
         Handles both capitalized (Email, Provider) and lowercase (email, provider) column names.
+        Cleans up records that begin with newline characters and handles encoding issues.
 
         Parameters
         ----------
@@ -175,7 +182,29 @@ class UserAllowlistCache:
         pd.DataFrame
             DataFrame with provider and email columns, emails lowercased.
         """
-        allowlist_df = pd.read_csv(StringIO(text))
+        # Clean up text: remove leading newlines from lines and normalize line endings
+        lines = text.split("\n")
+        cleaned_lines = []
+        for line in lines:
+            # Remove leading newline characters and other whitespace
+            cleaned_line = line.lstrip("\n\r\t ").rstrip("\n\r\t ")
+            if cleaned_line:  # Only keep non-empty lines
+                cleaned_lines.append(cleaned_line)
+
+        cleaned_text = "\n".join(cleaned_lines)
+
+        try:
+            # Try UTF-8 first
+            allowlist_df = pd.read_csv(StringIO(cleaned_text))
+        except UnicodeDecodeError:
+            # Fallback to cp1252 encoding if UTF-8 fails
+            logger.warning("UTF-8 decoding failed, trying cp1252 encoding")
+            try:
+                allowlist_df = pd.read_csv(StringIO(cleaned_text), encoding="cp1252")
+            except Exception:
+                # If both fail, try with explicit column names
+                logger.warning("cp1252 also failed, trying with explicit column names")
+                allowlist_df = pd.read_csv(StringIO(cleaned_text), encoding="cp1252", names=["email", "provider"])
 
         # Normalize column names to lowercase first for consistent handling
         allowlist_df.columns = allowlist_df.columns.str.lower().str.strip()
@@ -189,8 +218,10 @@ class UserAllowlistCache:
             error_msg = f"CSV must contain 'provider' or 'Provider' column. Found columns: {list(allowlist_df.columns)}"
             raise ValueError(error_msg)
 
-        # Normalize email addresses
+        # Normalize email addresses and clean up any remaining newline characters
         allowlist_df["email"] = allowlist_df["email"].astype(str).str.strip().str.lower()
+        allowlist_df["email"] = allowlist_df["email"].str.replace(r"^\n+", "", regex=True)  # Remove leading newlines
+        allowlist_df["email"] = allowlist_df["email"].str.replace(r"\n+$", "", regex=True)  # Remove trailing newlines
 
         # Remove empty emails and NaN values
         allowlist_df = allowlist_df[(allowlist_df["email"].str.len() > 0) & (allowlist_df["email"] != "nan")]
@@ -354,7 +385,9 @@ def get_allowlist_cache(ttl_seconds: int = 300) -> UserAllowlistCache:
     UserAllowlistCache
         The global cache instance.
     """
-    global _global_cache
+    # Use module-level variable with proper access pattern
+    # PLW0603: Using global for singleton pattern is acceptable here
+    global _global_cache  # noqa: PLW0603
     if _global_cache is None:
         _global_cache = UserAllowlistCache(ttl_seconds)
     return _global_cache
