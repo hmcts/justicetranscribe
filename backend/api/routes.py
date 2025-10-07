@@ -106,14 +106,20 @@ async def get_onboarding_status(
     )
 
     # Check allowlist status using environment-specific configuration
-    allowlist_config = settings.get_allowlist_config()
-    allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
-    is_allowlisted = await allowlist_cache.is_user_allowlisted(
-        current_user.email,
-        settings.AZURE_STORAGE_CONNECTION_STRING,
-        allowlist_config["container"],
-        allowlist_config["blob_name"]
-    )
+    # Check for local development bypass first
+    if (settings.ENVIRONMENT == "local" and
+        settings.BYPASS_ALLOWLIST_DEV and
+        current_user.email == "developer@localhost.com"):
+        is_allowlisted = True
+    else:
+        allowlist_config = settings.get_allowlist_config()
+        allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
+        is_allowlisted = await allowlist_cache.is_user_allowlisted(
+            current_user.email,
+            settings.AZURE_STORAGE_CONNECTION_STRING,
+            allowlist_config["container"],
+            allowlist_config["blob_name"]
+        )
 
     return OnboardingStatusResponse(
         has_completed_onboarding=current_user.has_completed_onboarding,

@@ -1,6 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import React, { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 
 export default function AccessGate({
@@ -8,104 +7,82 @@ export default function AccessGate({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [accessStatus, setAccessStatus] = useState<'checking' | 'allowed' | 'denied' | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
-  const checkInProgress = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const checkAccess = useCallback(async () => {
-    // Prevent multiple concurrent checks
-    if (checkInProgress.current || isChecking) {
-      return;
-    }
-
-    checkInProgress.current = true;
-    setIsChecking(true);
-    setAccessStatus('checking');
-
-    // Create abort controller for cleanup
-    abortControllerRef.current = new AbortController();
-
-    try {
-      const res = await apiClient.request<{
-        is_allowlisted: boolean;
-        should_show_coming_soon: boolean;
-      }>("/user/onboarding-status", {
-        signal: abortControllerRef.current.signal,
-      });
+  useEffect(() => {
+    let isMounted = true;
+    
+    const checkAccess = async () => {
+      console.log("🔍 Starting access check");
       
-      if (res.data) {
-        const { should_show_coming_soon } = res.data;
-        const newStatus = should_show_coming_soon ? 'denied' : 'allowed';
-        setAccessStatus(newStatus);
-        setIsChecking(false);
+      try {
+        const res = await apiClient.request<{
+          is_allowlisted: boolean;
+          should_show_coming_soon: boolean;
+          should_show_onboarding: boolean;
+          has_completed_onboarding: boolean;
+        }>("/user/onboarding-status");
         
-        // Redirect if needed
-        const onComingSoon = pathname?.startsWith("/coming-soon");
-        if (should_show_coming_soon && !onComingSoon) {
-          router.push("/coming-soon");
-        } else if (!should_show_coming_soon && onComingSoon) {
-          router.push("/");
-        }
-      }
-    } catch (e) {
-      // Only handle error if not aborted
-      if (e instanceof Error && e.name !== 'AbortError') {
-        console.warn("Access gate check failed:", e);
-        setAccessStatus('denied');
-        setIsChecking(false);
+        console.log("📡 API response:", res.data);
         
-        const onComingSoon = pathname?.startsWith("/coming-soon");
-        if (!onComingSoon) {
-          router.push("/coming-soon");
+        if (isMounted && res.data) {
+          const { should_show_coming_soon, should_show_onboarding } = res.data;
+          const newStatus = should_show_coming_soon ? 'denied' : 'allowed';
+          console.log("✅ Setting status:", newStatus);
+          setAccessStatus(newStatus);
+          
+          // Handle redirects - check if we're in browser environment
+          if (typeof window !== 'undefined') {
+            const currentPathname = window.location.pathname;
+            const currentSearch = window.location.search;
+            const onComingSoon = currentPathname?.startsWith("/coming-soon");
+            const onOnboarding = currentPathname?.startsWith("/onboarding");
+            // More specific check for transcript pages - look for ?id= or &id= pattern
+            const isTranscriptPage = currentSearch?.match(/[?&]id=/);
+            
+            if (should_show_coming_soon && !onComingSoon) {
+              console.log("🔄 Redirecting to coming-soon");
+              window.location.href = "/coming-soon";
+            } else if (!should_show_coming_soon && should_show_onboarding && !onOnboarding && !isTranscriptPage) {
+              console.log("🔄 Redirecting to onboarding");
+              window.location.href = "/onboarding";
+            } else if (!should_show_coming_soon && !should_show_onboarding && onComingSoon) {
+              console.log("🔄 Redirecting to home");
+              window.location.href = "/";
+            } else {
+              console.log("✅ No redirect needed");
+            }
+          }
         }
-      }
-    } finally {
-      checkInProgress.current = false;
-      abortControllerRef.current = null;
-    }
-  }, [router, pathname, isChecking]);
-
-  useEffect(() => {
-    const onComingSoon = pathname?.startsWith("/coming-soon");
-    
-    // If we already checked and know the status
-    if (accessStatus === 'denied' && !onComingSoon) {
-      // Denied access, redirect to coming-soon
-      router.push("/coming-soon");
-      return;
-    }
-    
-    if (accessStatus === 'allowed' && onComingSoon) {
-      // Allowed but on coming-soon page, redirect home
-      router.push("/");
-      return;
-    }
-    
-    // If we already know the status and user is on correct page, we're done
-    if (accessStatus !== null && accessStatus !== 'checking' && !isChecking) {
-      return;
-    }
-    
-    // Need to check access - do it once
-    if (accessStatus === null && !isChecking) {
-      checkAccess();
-    }
-  }, [router, pathname, accessStatus, isChecking, checkAccess]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      } catch (e) {
+        console.warn("❌ Access gate check failed:", e);
+        if (isMounted) {
+          setAccessStatus('denied');
+          // Check if we're in browser environment before accessing window
+          if (typeof window !== 'undefined') {
+            const currentPathname = window.location.pathname;
+            const onComingSoon = currentPathname?.startsWith("/coming-soon");
+            if (!onComingSoon) {
+              window.location.href = "/coming-soon";
+            }
+          }
+        }
       }
     };
-  }, []);
 
-  // Show loading screen only while actively checking
-  if (accessStatus === 'checking' || isChecking) {
+    // Only check if we haven't checked yet
+    if (accessStatus === null) {
+      setAccessStatus('checking');
+      checkAccess();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty dependency array - only run once
+
+  // Show loading screen while checking
+  if (accessStatus === 'checking') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
         <div 

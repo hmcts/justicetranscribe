@@ -90,8 +90,7 @@ export default function DialogueHeader({
             }}
           />
         ) : (
-          <button
-            type="button"
+          <h1
             className="mb-0 rounded-md px-2 py-1 text-left text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
             onClick={() => setIsEditing(true)}
             onKeyDown={(e) => {
@@ -100,9 +99,12 @@ export default function DialogueHeader({
                 setIsEditing(true);
               }
             }}
+            role="button"
+            tabIndex={0}
+            aria-label={`Edit meeting title: ${currentTranscription?.title || DEFAULT_MEETING_TITLE}`}
           >
             {currentTranscription?.title || DEFAULT_MEETING_TITLE}
-          </button>
+          </h1>
         )}
         <button
           className="text-muted-foreground hover:text-foreground"
