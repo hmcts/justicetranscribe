@@ -25,12 +25,12 @@ def get_engine():
 
         if sslmode_matches:
             # Use the last sslmode value found (most specific)
-            sslmode_value = sslmode_matches[-1].strip()
+            sslmode_value = sslmode_matches[-1].strip().lower()  # Case-insensitive
 
             # Validate and normalize sslmode value for psycopg2
             valid_sslmodes = ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
 
-            # Normalize common invalid values
+            # Normalize common invalid values (case-insensitive)
             sslmode_mapping = {
                 "true": "require",
                 "false": "disable",
@@ -48,8 +48,11 @@ def get_engine():
                 # Default to require for unknown invalid values
                 sslmode_value = "require"
 
-            # Replace all sslmode parameters with valid value
-            database_url = re.sub(r"sslmode=[^&]*", f"sslmode={sslmode_value}", database_url)
+            # Remove all existing sslmode parameters first, then add the correct one
+            database_url = re.sub(r"[?&]sslmode=[^&]*", "", database_url)
+            # Add the correct sslmode parameter
+            separator = "&" if "?" in database_url else "?"
+            database_url = f"{database_url}{separator}sslmode={sslmode_value}"
 
     return create_engine(database_url, echo=False)
 
@@ -72,7 +75,7 @@ def get_async_engine():
 
         if sslmode_matches:
             # Use the last sslmode value found (most specific)
-            sslmode_value = sslmode_matches[-1].strip()
+            sslmode_value = sslmode_matches[-1].strip().lower()  # Case-insensitive
 
             # Convert sslmode to ssl parameter for asyncpg
             if sslmode_value in ["require", "prefer", "allow"]:
@@ -85,8 +88,11 @@ def get_async_engine():
             else:
                 ssl_value = "true"  # Default to secure for unknown values
 
-            # Replace all sslmode parameters with ssl
-            async_database_url = re.sub(r"sslmode=[^&]*", f"ssl={ssl_value}", async_database_url)
+            # Remove all existing sslmode parameters first, then add ssl parameter
+            async_database_url = re.sub(r"[?&]sslmode=[^&]*", "", async_database_url)
+            # Add the ssl parameter
+            separator = "&" if "?" in async_database_url else "?"
+            async_database_url = f"{async_database_url}{separator}ssl={ssl_value}"
 
     return create_async_engine(async_database_url, echo=False)
 
