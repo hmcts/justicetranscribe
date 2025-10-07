@@ -2,10 +2,20 @@ import asyncio
 
 import sentry_sdk
 
+from app.audio.blob_deletion_service import BlobDeletionService
 from app.audio.speakers import process_speakers_and_dialogue_entries
 from app.audio.transcription import transcribe_audio
 from app.audio.utils import (
     get_url_for_transcription,
+)
+from app.database.interface_functions import (
+    save_transcription,
+    save_transcription_job,
+)
+from app.database.postgres_models import (
+    Transcription,
+    TranscriptionJob,
+    User,
 )
 from app.logger import logger
 from app.minutes.llm_calls import (
@@ -17,15 +27,6 @@ from app.minutes.templates.templates_metadata import (
     general_template,
 )
 from utils.gov_notify import send_email
-from app.database.interface_functions import (
-    save_transcription,
-    save_transcription_job,
-)
-from app.database.postgres_models import (
-    Transcription,
-    TranscriptionJob,
-    User,
-)
 
 
 async def generate_and_save_meeting_title(
@@ -60,13 +61,29 @@ async def transcribe_and_generate_llm_output(
             updated_dialogue_entries = await process_speakers_and_dialogue_entries(
                 dialogue_entries, user.email
             )
-            save_transcription_job(
+            transcription_job = save_transcription_job(
                 TranscriptionJob(
                     transcription_id=transcription.id,
                     dialogue_entries=updated_dialogue_entries,
                     s3_audio_url=user_upload_blob_storage_file_key,
                 )
             )
+
+            # Trigger automated blob deletion after successful transcription
+            try:
+                blob_deletion_service = BlobDeletionService()
+                asyncio.create_task(  # noqa: RUF006
+                    blob_deletion_service.process_transcription_cleanup(
+                        transcription_job_id=transcription_job.id,
+                        blob_path=user_upload_blob_storage_file_key,
+                        user_email=user.email
+                    )
+                )
+                logger.info(f"Started automated blob deletion for job {transcription_job.id}")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to start blob deletion for job {transcription_job.id}: {cleanup_error}")
+                # Don't fail the transcription if cleanup fails to start
+
         except Exception as e:
             save_transcription_job(
                 TranscriptionJob(
