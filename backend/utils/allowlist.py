@@ -88,13 +88,12 @@ class UserAllowlistCache:
                 content = await self._download_blob_content(connection_string, container, blob_name)
                 allowlist_df = self._parse_and_validate_content(content, blob_name)
                 logger.info("Successfully loaded allowlist from Azure: %s", blob_name)
+                return allowlist_df  # noqa: TRY300 - Return immediately on success, not after all retries
             except Exception as e:
                 last_exception = e
                 logger.warning("Attempt %d/%d failed: %s", attempt + 1, max_retries, e)
                 if attempt < max_retries - 1:  # Not the last attempt
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
-            else:
-                return allowlist_df
 
         # All Azure attempts failed - try local fallback in development
         return await self._try_local_fallback(blob_name, last_exception)
