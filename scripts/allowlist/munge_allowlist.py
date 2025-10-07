@@ -37,7 +37,7 @@ def _load_ai_justice_unit_data() -> pd.DataFrame:
             "email": [
                 "ayse.mutlu@justice.gov.uk",
                 "dan.james@justice.gov.uk",
-                "developer@localhost.com",
+                # "developer@localhost.com",
                 "franziska.hasford@justice.gov.uk",
                 "john.daley@justice.gov.uk",
                 "louis.allgood@justice.gov.uk",
