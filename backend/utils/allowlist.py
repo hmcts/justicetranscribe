@@ -85,30 +85,10 @@ class UserAllowlistCache:
         last_exception = None
         for attempt in range(max_retries):
             try:
-                # Create a new client for each attempt
-                blob_service_client = AsyncBlobServiceClient.from_connection_string(
-                    connection_string
-                )
-
-                async with blob_service_client:
-                    blob_client = blob_service_client.get_blob_client(
-                        container=container, blob=blob_name
-                    )
-                    stream = await blob_client.download_blob()
-                    content: bytes = await stream.readall()
-
-                    # Parse and validate inside the context manager
-                    text = content.decode("utf-8")
-                    allowlist_df = self._parse_allowlist_csv(text)
-
-                    # Validate data quality
-                    if not self._validate_allowlist_data(allowlist_df):
-                        error_msg = "Allowlist data failed validation checks"
-                        raise ValueError(error_msg)
-
-                    logger.info("Successfully loaded allowlist from Azure: %s", blob_name)
-                    return allowlist_df
-
+                content = await self._download_blob_content(connection_string, container, blob_name)
+                allowlist_df = self._parse_and_validate_content(content, blob_name)
+                logger.info("Successfully loaded allowlist from Azure: %s", blob_name)
+                return allowlist_df  # noqa: TRY300 - Return immediately on success, not after all retries
             except Exception as e:
                 last_exception = e
                 logger.warning("Attempt %d/%d failed: %s", attempt + 1, max_retries, e)
@@ -116,22 +96,75 @@ class UserAllowlistCache:
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
 
         # All Azure attempts failed - try local fallback in development
-        if os.getenv("ENVIRONMENT", "").lower() == "local":
-            logger.warning("Azure blob not found. Attempting local file fallback for development...")
-            try:
-                local_file = self._get_local_fallback_path(blob_name)
-                if Path(local_file).exists():
-                    # Use aiofiles for async file operations
-                    async with aiofiles.open(local_file, encoding="utf-8") as f:
-                        text = await f.read()
-                    allowlist_df = self._parse_allowlist_csv(text)
-                    if self._validate_allowlist_data(allowlist_df):
-                        logger.info("✅ Using local fallback file: %s", local_file)
-                        return allowlist_df
-                else:
-                    logger.error("Local fallback file not found: %s", local_file)
-            except Exception:
-                logger.exception("Local fallback also failed")
+        return await self._try_local_fallback(blob_name, last_exception)
+
+    async def _download_blob_content(
+        self,
+        connection_string: str,
+        container: str,
+        blob_name: str
+    ) -> bytes:
+        """Download blob content using AsyncBlobServiceClient with fallback."""
+        try:
+            # Use single client for both existence check and download
+            async with AsyncBlobServiceClient.from_connection_string(connection_string) as blob_service_client:
+                blob_client = blob_service_client.get_blob_client(
+                    container=container, blob=blob_name
+                )
+
+                # Check if blob exists first
+                if not await blob_client.exists():
+                    error_msg = "Blob not found"
+                    raise FileNotFoundError(error_msg) from None
+
+                # Download using the same client
+                stream = await blob_client.download_blob()
+                return await stream.readall()
+
+        except Exception as azure_utils_error:
+            logger.warning("AsyncBlobServiceClient failed, falling back to direct pattern: %s", azure_utils_error)
+
+            # Fallback to existing working pattern
+            blob_service_client = AsyncBlobServiceClient.from_connection_string(connection_string)
+            async with blob_service_client:
+                blob_client = blob_service_client.get_blob_client(
+                    container=container, blob=blob_name
+                )
+                stream = await blob_client.download_blob()
+                return await stream.readall()
+
+    def _parse_and_validate_content(self, content: bytes, blob_name: str) -> pd.DataFrame:  # noqa: ARG002
+        """Parse blob content and validate the resulting DataFrame."""
+        # Parse and validate - handle encoding at byte level
+        allowlist_df = self._parse_allowlist_csv_from_bytes(content)
+
+        # Validate data quality
+        if not self._validate_allowlist_data(allowlist_df):
+            error_msg = "Allowlist data failed validation checks"
+            raise ValueError(error_msg)
+
+        return allowlist_df
+
+    async def _try_local_fallback(self, blob_name: str, last_exception: Exception) -> pd.DataFrame:
+        """Try local file fallback for development environment."""
+        if os.getenv("ENVIRONMENT", "").lower() != "local":
+            raise last_exception
+
+        logger.warning("Azure blob not found. Attempting local file fallback for development...")
+        try:
+            local_file = self._get_local_fallback_path(blob_name)
+            if Path(local_file).exists():
+                # Use aiofiles for async file operations
+                async with aiofiles.open(local_file, mode="rb") as f:
+                    content = await f.read()
+                allowlist_df = self._parse_allowlist_csv_from_bytes(content)
+                if self._validate_allowlist_data(allowlist_df):
+                    logger.info("✅ Using local fallback file: %s", local_file)
+                    return allowlist_df
+            else:
+                logger.error("Local fallback file not found: %s", local_file)
+        except Exception:
+            logger.exception("Local fallback also failed")
 
         # If we get here, all retries failed
         raise last_exception
@@ -160,10 +193,43 @@ class UserAllowlistCache:
 
         return str(data_dir / filename)
 
+    def _parse_allowlist_csv_from_bytes(self, content: bytes) -> pd.DataFrame:
+        """Parse allowlist CSV from bytes with proper encoding fallback.
+
+        Parameters
+        ----------
+        content : bytes
+            Raw CSV content as bytes.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with provider and email columns, emails lowercased.
+        """
+        try:
+            # Try UTF-8 first
+            text = content.decode("utf-8")
+            allowlist_df = pd.read_csv(StringIO(text))
+        except UnicodeDecodeError:
+            # Fallback to cp1252 encoding if UTF-8 fails
+            logger.warning("UTF-8 decoding failed, trying cp1252 encoding")
+            try:
+                text = content.decode("cp1252")
+                allowlist_df = pd.read_csv(StringIO(text))
+            except Exception:
+                # If both fail, try with explicit column names
+                logger.warning("cp1252 also failed, trying with explicit column names")
+                text = content.decode("cp1252", errors="ignore")  # Use errors="ignore" as last resort
+                allowlist_df = pd.read_csv(StringIO(text), names=["email", "provider"])
+
+        # Clean up the DataFrame
+        return self._clean_and_normalize_dataframe(allowlist_df)
+
     def _parse_allowlist_csv(self, text: str) -> pd.DataFrame:
         """Parse allowlist CSV text into a pandas DataFrame.
 
         Handles both capitalized (Email, Provider) and lowercase (email, provider) column names.
+        Cleans up records that begin with newline characters.
 
         Parameters
         ----------
@@ -175,8 +241,36 @@ class UserAllowlistCache:
         pd.DataFrame
             DataFrame with provider and email columns, emails lowercased.
         """
-        allowlist_df = pd.read_csv(StringIO(text))
+        # Clean up text: remove leading newlines from lines and normalize line endings
+        lines = text.split("\n")
+        cleaned_lines = []
+        for line in lines:
+            # Remove leading newline characters and other whitespace
+            cleaned_line = line.lstrip("\n\r\t ").rstrip("\n\r\t ")
+            if cleaned_line:  # Only keep non-empty lines
+                cleaned_lines.append(cleaned_line)
 
+        cleaned_text = "\n".join(cleaned_lines)
+
+        # Parse CSV
+        allowlist_df = pd.read_csv(StringIO(cleaned_text))
+
+        # Clean up the DataFrame
+        return self._clean_and_normalize_dataframe(allowlist_df)
+
+    def _clean_and_normalize_dataframe(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Clean and normalize the allowlist DataFrame.
+
+        Parameters
+        ----------
+        allowlist_df : pd.DataFrame
+            Raw DataFrame from CSV parsing.
+
+        Returns
+        -------
+        pd.DataFrame
+            Cleaned and normalized DataFrame with provider and email columns.
+        """
         # Normalize column names to lowercase first for consistent handling
         allowlist_df.columns = allowlist_df.columns.str.lower().str.strip()
 
@@ -189,8 +283,10 @@ class UserAllowlistCache:
             error_msg = f"CSV must contain 'provider' or 'Provider' column. Found columns: {list(allowlist_df.columns)}"
             raise ValueError(error_msg)
 
-        # Normalize email addresses
+        # Normalize email addresses and clean up any remaining newline characters
         allowlist_df["email"] = allowlist_df["email"].astype(str).str.strip().str.lower()
+        allowlist_df["email"] = allowlist_df["email"].str.replace(r"^\n+", "", regex=True)  # Remove leading newlines
+        allowlist_df["email"] = allowlist_df["email"].str.replace(r"\n+$", "", regex=True)  # Remove trailing newlines
 
         # Remove empty emails and NaN values
         allowlist_df = allowlist_df[(allowlist_df["email"].str.len() > 0) & (allowlist_df["email"] != "nan")]
@@ -354,7 +450,9 @@ def get_allowlist_cache(ttl_seconds: int = 300) -> UserAllowlistCache:
     UserAllowlistCache
         The global cache instance.
     """
-    global _global_cache
+    # Use module-level variable with proper access pattern
+    # PLW0603: Using global for singleton pattern is acceptable here
+    global _global_cache  # noqa: PLW0603
     if _global_cache is None:
         _global_cache = UserAllowlistCache(ttl_seconds)
     return _global_cache

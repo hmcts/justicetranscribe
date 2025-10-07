@@ -23,7 +23,17 @@ from utils.settings import get_settings
 
 @asynccontextmanager
 async def get_blob_service_client():
-    """Get Azure Blob Service Client with async context manager."""
+    """Get Azure Blob Service Client with async context manager.
+
+    This function serves as a fallback for Azure blob operations when
+    :class:`AsyncAzureBlobManager` encounters issues. It provides the
+    original working implementation for maximum reliability.
+
+    .. note::
+        Primary blob operations should use :class:`AsyncAzureBlobManager`
+        from :mod:`app.audio.azure_utils` for better error handling and testing.
+        This function is kept as a reliable fallback mechanism.
+    """
     # Always use the real Azure Storage connection string
     connection_string = get_settings().AZURE_STORAGE_CONNECTION_STRING
 
