@@ -139,8 +139,9 @@ class BlobDeletionService:
                 if transcription_job:
                     transcription_job.needs_cleanup = False
                     transcription_job.cleanup_failure_reason = None
-                    await session.commit()
                     logger.info(f"Marked transcription job {transcription_job_id} as cleanup complete")
+                else:
+                    logger.warning(f"Transcription job {transcription_job_id} not found for cleanup completion")
 
         except Exception as e:
             logger.error(f"Failed to mark cleanup complete for {transcription_job_id}: {e}")
@@ -171,8 +172,9 @@ class BlobDeletionService:
                     transcription_job.needs_cleanup = True
                     full_error_msg = f"{error_message} (User: {user_email}, Blob: {blob_path}, Time: {datetime.now(UTC).isoformat()})"
                     transcription_job.cleanup_failure_reason = full_error_msg
-                    await session.commit()
                     logger.error(f"Flagged transcription job {transcription_job_id} for manual cleanup: {full_error_msg}")
+                else:
+                    logger.warning(f"Transcription job {transcription_job_id} not found for cleanup failure marking")
 
         except Exception as e:
             logger.error(f"Failed to mark cleanup failed for {transcription_job_id}: {e}")
