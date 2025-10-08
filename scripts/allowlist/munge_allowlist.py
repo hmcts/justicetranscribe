@@ -37,7 +37,7 @@ def _load_ai_justice_unit_data() -> pd.DataFrame:
             "email": [
                 "ayse.mutlu@justice.gov.uk",
                 "dan.james@justice.gov.uk",
-                # "developer@localhost.com",
+                "developer@localhost.com",
                 "franziska.hasford@justice.gov.uk",
                 "john.daley@justice.gov.uk",
                 "louis.allgood@justice.gov.uk",
@@ -105,10 +105,12 @@ def create_allowlist(environment: str) -> Path:
     
     # Combine all data
     out_df = pd.concat([pilot_df, ai_justice_unit, manually_onboarded], ignore_index=True)
-    out_df = out_df.drop_duplicates()
     
-    # Normalize data
+    # Normalize data (lowercase, strip whitespace)
     out_df = _normalize_dataframe(out_df)
+    
+    # Drop duplicates AFTER normalization to catch case-insensitive duplicates
+    out_df = out_df.drop_duplicates(subset=['email'], keep='first').reset_index(drop=True)
     
     # Filter data based on environment
     if environment == "dev":
