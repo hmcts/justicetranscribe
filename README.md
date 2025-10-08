@@ -86,6 +86,10 @@ docker-compose up
 
 ```
 
+**Allowlist Management:**
+
+Helper utilities are available for managing user access allowlists. See [scripts/allowlist/README.md](scripts/allowlist/README.md) for detailed documentation.
+
 ### Environment Variables
 
 The backend uses environment variables from `.env` files:
