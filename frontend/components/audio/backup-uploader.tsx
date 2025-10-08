@@ -162,10 +162,6 @@ function BackupUploader({
           // Sentry.captureException(error);
           alert(`error deleting backup: ${error}`);
         }
-        
-        // EXPLICIT NULLIFICATION: Help Next.js garbage collection
-        // @ts-ignore - Explicitly nullify blob to help GC
-        blob = null;
       } catch (error) {
         setUploadError(
           error instanceof Error

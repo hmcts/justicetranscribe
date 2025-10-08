@@ -356,10 +356,6 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
             alert(`error deleting backup chunks: ${error}`);
           }
         }
-        
-        // EXPLICIT NULLIFICATION: Help Next.js garbage collection
-        // @ts-ignore - Explicitly nullify blob to help GC
-        blob = null;
       };
 
       // Sequential retry logic without loops or recursion
