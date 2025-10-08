@@ -4,6 +4,7 @@ from typing import Any
 
 import aiofiles
 import httpx
+from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 from fastapi import HTTPException
 from tenacity import (
     retry,
@@ -51,17 +52,39 @@ async def perform_transcription_steps_with_azure_and_aws(
                 f"Downloading file from Azure Blob Storage: {user_upload_blob_path} to {temp_file.name}"
             )
 
-            # Use async Azure Blob client
-            async with get_blob_service_client() as blob_service_client:
-                blob_client = blob_service_client.get_blob_client(
-                    container=get_settings().AZURE_STORAGE_CONTAINER_NAME,
-                    blob=user_upload_blob_path,
-                )
+            # Try our tested AsyncAzureBlobManager first, fallback to existing pattern
+            try:
+                # Use single client for both existence check and download
+                async with AsyncBlobServiceClient.from_connection_string(
+                    get_settings().AZURE_STORAGE_CONNECTION_STRING
+                ) as blob_service_client:
+                    blob_client = blob_service_client.get_blob_client(
+                        container=get_settings().AZURE_STORAGE_CONTAINER_NAME,
+                        blob=user_upload_blob_path,
+                    )
 
-                # Download the blob content
-                download_stream = await blob_client.download_blob()
-                content = await download_stream.readall()
-                temp_file.write(content)
+                    # Check if blob exists first
+                    if not await blob_client.exists():
+                        error_msg = "Blob not found"
+                        raise FileNotFoundError(error_msg) from None
+
+                    # Download using the same client
+                    download_stream = await blob_client.download_blob()
+                    content = await download_stream.readall()
+                    temp_file.write(content)
+
+            except Exception as azure_utils_error:
+                logger.warning(f"AsyncAzureBlobManager failed, falling back to get_blob_service_client: {azure_utils_error}")
+
+                # Fallback to existing working pattern
+                async with get_blob_service_client() as blob_service_client:
+                    blob_client = blob_service_client.get_blob_client(
+                        container=get_settings().AZURE_STORAGE_CONTAINER_NAME,
+                        blob=user_upload_blob_path,
+                    )
+                    download_stream = await blob_client.download_blob()
+                    content = await download_stream.readall()
+                    temp_file.write(content)
 
             temp_file_path = Path(temp_file.name)
 

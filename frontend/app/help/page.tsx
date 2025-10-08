@@ -312,8 +312,6 @@ export default function HelpPage() {
             </ol>
           </section>
 
-          {/* Need additional support: moved above, so removed duplicate here */}
-
           {/* Policies & Guidelines */}
           <section className="rounded-lg border p-6">
             <h3 className="mb-2 text-lg font-semibold">
