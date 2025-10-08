@@ -1,129 +1,101 @@
 """
 Database connection utilities for both sync and async operations.
-
-This module provides database session management for the application.
 """
 
+import re
+import ssl
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, urlparse
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlmodel import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlmodel import create_engine as create_sync_engine
 
 from utils.settings import get_settings
 
 
-def _normalize_ssl_mode(database_url: str, for_async: bool = False) -> str:
+def _requires_ssl(database_url: str) -> bool:
+    """Return True if SSL is required (sslmode present or Azure Flexible Server host)."""
+    parsed = urlparse(database_url)
+    q = parse_qs(parsed.query or "")
+    if "sslmode" in q:
+        # require/verify-* imply SSL; disable means no SSL
+        mode = (q["sslmode"][-1] or "").lower()
+        return mode != "disable"
+    # Azure Flexible Server always expects TLS
+    return parsed.hostname and parsed.hostname.endswith("postgres.database.azure.com")
+
+
+def _to_asyncpg_url(database_url: str, require_ssl: bool) -> str:
     """
-    Normalize SSL mode parameters in database connection string.
-
-    Args:
-        database_url: The database connection string
-        for_async: If True, convert sslmode to ssl for asyncpg compatibility
-
-    Returns:
-        str: Normalized database connection string
+    Convert postgresql:// URL to postgresql+asyncpg://.
+    If require_ssl is True, normalize any sslmode=... to ssl=true (asyncpg-style).
+    Otherwise, strip sslmode (if present) and avoid adding ssl=true.
     """
-    try:
-        # Parse the URL
-        parsed = urlparse(database_url)
-        query_params = parse_qs(parsed.query)
+    url = re.sub(r"^postgresql://", "postgresql+asyncpg://", database_url, count=1)
 
-        # Check if sslmode exists
-        if "sslmode" not in query_params:
-            return database_url
+    # Remove any existing asyncpg-incompatible sslmode param
+    url = re.sub(r"([?&])sslmode=[^&]+(&)?", lambda m: m.group(1) if m.group(2) else "", url)
 
-        # Get the last sslmode value (most specific)
-        sslmode_value = query_params["sslmode"][-1].strip().lower()
+    if require_ssl:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}ssl=true"
 
-        if for_async:
-            # Convert sslmode to ssl for asyncpg
-            if sslmode_value in ["require", "prefer", "allow"]:
-                ssl_value = "true"
-            elif sslmode_value == "disable":
-                ssl_value = "false"
-            elif sslmode_value == "":
-                ssl_value = "true"  # Default to secure
-            else:
-                ssl_value = "true"  # Default to secure for unknown values
-
-            # Remove sslmode and add ssl
-            del query_params["sslmode"]
-            query_params["ssl"] = [ssl_value]
-        else:
-            # Normalize sslmode for psycopg2
-            valid_sslmodes = ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
-
-            # Normalize common invalid values
-            sslmode_mapping = {
-                "true": "require",
-                "false": "disable",
-                "1": "require",
-                "0": "disable",
-                "yes": "require",
-                "no": "disable",
-                "on": "require",
-                "off": "disable"
-            }
-
-            if sslmode_value in sslmode_mapping:
-                sslmode_value = sslmode_mapping[sslmode_value]
-            elif sslmode_value not in valid_sslmodes:
-                sslmode_value = "require"  # Default to secure
-
-            # Update sslmode value
-            query_params["sslmode"] = [sslmode_value]
-
-        # Rebuild the URL
-        new_query = urlencode(query_params, doseq=True)
-        new_parsed = parsed._replace(query=new_query)
-        return urlunparse(new_parsed)
-
-    except Exception:
-        # If URL parsing fails, return original URL
-        return database_url
+    # Clean up any trailing ? or & (edge cases)
+    url = re.sub(r"[?&]$", "", url)
+    return url
 
 
-# Sync database setup
+# ---------- Sync engine (psycopg2 via SQLModel) ----------
 def get_engine():
     """Get synchronous database engine."""
     database_url = get_settings().DATABASE_CONNECTION_STRING
-    # Normalize SSL mode for psycopg2
-    database_url = _normalize_ssl_mode(database_url, for_async=False)
-    return create_engine(database_url, echo=False)
+    return create_sync_engine(database_url, echo=False, pool_pre_ping=True)
 
 
-# Async database setup
+# ---------- Async engine (asyncpg) ----------
+_async_engine_singleton = None
+_AsyncSessionLocal = None
+
 def get_async_engine():
-    """Get asynchronous database engine."""
-    database_url = get_settings().DATABASE_CONNECTION_STRING
-    # Convert postgresql:// to postgresql+asyncpg:// for async operations
-    if database_url.startswith("postgresql://"):
-        async_database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    else:
-        async_database_url = database_url
+    global _async_engine_singleton, _AsyncSessionLocal  # noqa: PLW0603 - Singleton pattern requires global state
+    if _async_engine_singleton is not None:
+        return _async_engine_singleton
 
-    # Normalize SSL mode for asyncpg (convert sslmode to ssl)
-    async_database_url = _normalize_ssl_mode(async_database_url, for_async=True)
-    return create_async_engine(async_database_url, echo=False)
+    settings = get_settings()
+    db_url = settings.DATABASE_CONNECTION_STRING
+    need_ssl = _requires_ssl(db_url)
+
+    asyncpg_url = _to_asyncpg_url(db_url, require_ssl=need_ssl)
+
+    connect_args = {}
+    if need_ssl:
+        # Verify server cert using system CAs (ensure ca-certificates installed in image)
+        connect_args["ssl"] = ssl.create_default_context()
+
+    _async_engine_singleton = create_async_engine(
+        asyncpg_url,
+        connect_args=connect_args,
+        pool_pre_ping=True,
+        pool_recycle=900,
+    )
+    _AsyncSessionLocal = async_sessionmaker(
+        _async_engine_singleton, expire_on_commit=False, class_=AsyncSession
+    )
+    return _async_engine_singleton
 
 
 @asynccontextmanager
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
-    Get an async database session.
-
-    Yields:
-        AsyncSession: The async database session
+    Yield an async SQLAlchemy session with commit/rollback semantics.
     """
-    async_engine = get_async_engine()
-    async with AsyncSession(async_engine) as session:
+    # Ensure engine/sessionmaker are initialized lazily
+    get_async_engine()
+    async with _AsyncSessionLocal() as session:  # type: ignore[arg-type]
         try:
             yield session
             await session.commit()
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
