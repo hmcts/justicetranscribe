@@ -228,11 +228,11 @@ async def get_upload_url(
 
 
 async def process_transcription(
-    user_upload_blob_storage_file_key: str, user: User, transcription_id: str | None = None
+    user_upload_blob_storage_file_key: str, user_id: UUID, user_email: str, transcription_id: str | None = None
 ) -> None:
     """Parent function that handles the TranscriptionJob state management."""
     await transcribe_and_generate_llm_output(
-        user_upload_blob_storage_file_key, user, transcription_id
+        user_upload_blob_storage_file_key, user_id, user_email, transcription_id
     )
 
 
@@ -242,9 +242,11 @@ async def start_transcription_job(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ) -> None:
     try:
+        # Pass only primitives to background task, not the User object (SQLAlchemy model)
+        # to avoid keeping database sessions open
         asyncio.create_task(  # noqa: RUF006
             process_transcription(
-                request.user_upload_s3_file_key, current_user, request.transcription_id
+                request.user_upload_s3_file_key, current_user.id, current_user.email, request.transcription_id
             )
         )
 
@@ -258,13 +260,17 @@ async def generate_or_edit_minutes(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
     new_minute_version_id = str(uuid.uuid4())
+    
+    # Extract primitives from SQLAlchemy object before passing to background task
+    user_id = current_user.id
+    user_email = current_user.email
 
     async def process_request():
         try:
             # First verify the user has access to this transcription
             get_transcription_by_id(
                 request.transcription_id,
-                current_user.id,
+                user_id,
                 tz=pytz.UTC,  # We don't need timezone conversion for this check
             )
 
@@ -286,7 +292,7 @@ async def generate_or_edit_minutes(
                     dialogue_entries,
                     request.transcription_id,
                     request.template,
-                    current_user.email,
+                    user_email,
                     minute_version_id=new_minute_version_id,
                 )
             elif request.action_type == "edit":
@@ -302,7 +308,7 @@ async def generate_or_edit_minutes(
                     new_minute_version_id,
                     request.edit_instructions,
                     request.transcription_id,
-                    current_user.email,
+                    user_email,
                 )
 
         except HTTPException:

@@ -27,19 +27,20 @@ from app.minutes.templates.templates_metadata import (
     general_template,
 )
 from utils.gov_notify import send_email
+from uuid import UUID
 
 
 async def generate_and_save_meeting_title(
-    dialogue_entries: list, transcription: Transcription, user: User
+    dialogue_entries: list, transcription: Transcription, user_id: UUID, user_email: str
 ) -> Transcription:
     try:
         logger.info(
             f"Generating meeting title for {len(dialogue_entries)} dialogue entries"
         )
-        provisional_title = await generate_meeting_title(dialogue_entries, user.email)
+        provisional_title = await generate_meeting_title(dialogue_entries, user_email)
         existing_transcription = transcription
         existing_transcription.title = provisional_title
-        return save_transcription(existing_transcription, user.id)
+        return save_transcription(existing_transcription, user_id)
     except Exception as e:
         logger.error(f"Error saving transcription: {e}")
         sentry_sdk.capture_exception(e)
@@ -47,19 +48,19 @@ async def generate_and_save_meeting_title(
 
 
 async def transcribe_and_generate_llm_output(
-    user_upload_blob_storage_file_key: str, user: User, transcription_id: str | None = None
+    user_upload_blob_storage_file_key: str, user_id: UUID, user_email: str, transcription_id: str | None = None
 ):
     # Start a Sentry transaction for the whole function
     with sentry_sdk.start_transaction(
         op="task", name="Transcribe and Generate LLM Output"
     ) as transaction:  # noqa: F841
         transcription_data = Transcription(id=transcription_id)
-        transcription = save_transcription(transcription_data, user.id)
+        transcription = save_transcription(transcription_data, user_id)
 
         try:
             dialogue_entries = await transcribe_audio(user_upload_blob_storage_file_key)
             updated_dialogue_entries = await process_speakers_and_dialogue_entries(
-                dialogue_entries, user.email
+                dialogue_entries, user_email
             )
             transcription_job = save_transcription_job(
                 TranscriptionJob(
@@ -77,7 +78,7 @@ async def transcribe_and_generate_llm_output(
                         blob_deletion_service.process_transcription_cleanup(
                             transcription_job_id=transcription_job.id,
                             blob_path=user_upload_blob_storage_file_key,
-                            user_email=user.email
+                            user_email=user_email
                         )
                     )
                     logger.info(f"Started automated blob deletion for job {transcription_job.id}")
@@ -101,14 +102,14 @@ async def transcribe_and_generate_llm_output(
 
         # Start all three tasks in parallel
         general_task = generate_llm_output_task(
-            updated_dialogue_entries, transcription.id, general_template, user.email
+            updated_dialogue_entries, transcription.id, general_template, user_email
         )
         title_task = generate_and_save_meeting_title(
-            updated_dialogue_entries, transcription, user
+            updated_dialogue_entries, transcription, user_id, user_email
         )
         asyncio.create_task(  # noqa: RUF006
             generate_llm_output_task(
-                updated_dialogue_entries, transcription.id, crissa_template, user.email
+                updated_dialogue_entries, transcription.id, crissa_template, user_email
             )
         )
 
@@ -121,7 +122,7 @@ async def transcribe_and_generate_llm_output(
 
         try:
             send_email(
-                user.email,
+                user_email,
                 get_url_for_transcription(transcription.id),
                 transcription.title or "",
             )
