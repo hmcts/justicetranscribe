@@ -68,3 +68,4 @@ backend/coverage.json
 **/htmlcov/
 **/coverage.xml
 **/coverage.json
+./data/

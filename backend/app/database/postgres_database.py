@@ -20,10 +20,15 @@ if not DATABASE_URL:
     msg = "DATABASE_CONNECTION_STRING is not set"
     raise ValueError(msg)
 
-# Create engine
+# Create engine with connection pool configuration
 engine = create_engine(
     DATABASE_URL,
     echo=False,
+    pool_size=20,  # Increase base pool size
+    max_overflow=40,  # Increase overflow for burst traffic
+    pool_timeout=30,  # Keep existing timeout
+    pool_recycle=3600,  # Recycle connections after 1 hour
+    pool_pre_ping=True,  # Verify connections before using
 )
 
 

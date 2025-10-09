@@ -56,6 +56,8 @@ function AudioRecorderComponent({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const backupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentBackupIdRef = useRef<string | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const visibilityListenerRef = useRef<(() => void) | null>(null);
 
   const handlePermissionGranted = (devices: AudioDevice[]) => {
     setAudioDevices(devices);
@@ -70,12 +72,16 @@ function AudioRecorderComponent({
         const lock = await navigator.wakeLock.request("screen");
         setWakeLock(lock);
 
-        document.addEventListener("visibilitychange", async () => {
+        // Create and store the listener so we can remove it later
+        const visibilityHandler = async () => {
           if (document.visibilityState === "visible" && !wakeLock) {
             const newLock = await navigator.wakeLock.request("screen");
             setWakeLock(newLock);
           }
-        });
+        };
+        
+        visibilityListenerRef.current = visibilityHandler;
+        document.addEventListener("visibilitychange", visibilityHandler);
       }
     } catch (err) {
       console.log("Wake Lock error:", err);
@@ -91,6 +97,12 @@ function AudioRecorderComponent({
         console.log("Wake Lock release error:", err);
       }
     }
+    
+    // Remove the visibility change event listener to prevent memory leak
+    if (visibilityListenerRef.current) {
+      document.removeEventListener("visibilitychange", visibilityListenerRef.current);
+      visibilityListenerRef.current = null;
+    }
   }, [wakeLock]);
 
   useEffect(() => {
@@ -100,6 +112,12 @@ function AudioRecorderComponent({
   }, [releaseWakeLock]);
 
   const clearAudio = () => {
+    // Properly revoke object URL to free memory
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    
     setRecordedAudio(null);
     if (audioRef.current) {
       audioRef.current.src = "";
@@ -218,14 +236,19 @@ function AudioRecorderComponent({
         stopPeriodicBackup();
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
         }
-        streamRef.current = null;
+        
         mediaRecorderRef.current = null;
+        setMediaStream(null);
         setIsRecording(false);
         setRecordingTime(0);
+        
         if (timerRef.current) {
           clearInterval(timerRef.current);
+          timerRef.current = null;
         }
+        
         currentBackupIdRef.current = null;
         releaseWakeLock();
       };
@@ -283,8 +306,6 @@ function AudioRecorderComponent({
     }
   };
 
-  const audioSource = recordedAudio ? URL.createObjectURL(recordedAudio) : "";
-
   useEffect(() => {
     if (recordedAudio || isRecording) {
       setIsRecording(true);
@@ -292,15 +313,27 @@ function AudioRecorderComponent({
   }, [isRecording, setIsRecording, recordedAudio]);
 
   useEffect(() => {
-    if (audioRef.current && audioSource) {
+    // Clean up previous URL before creating a new one
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    
+    // Create new URL only when we have audio to play
+    if (recordedAudio && audioRef.current) {
+      const audioSource = URL.createObjectURL(recordedAudio);
+      audioUrlRef.current = audioSource;
       audioRef.current.src = audioSource;
     }
+    
+    // Cleanup function to revoke URL when component unmounts or recordedAudio changes
     return () => {
-      if (audioSource) {
-        URL.revokeObjectURL(audioSource);
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
       }
     };
-  }, [audioSource]);
+  }, [recordedAudio]);
 
   return (
     <div className="space-y-4">
