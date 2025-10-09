@@ -353,6 +353,9 @@ class UserAllowlistCache:
         tuple[bool, pd.DataFrame]
             Tuple of (success, cleaned_dataframe). Success is True if there are valid rows after cleaning.
         """
+        # Store original DataFrame for error cases
+        original_df = allowlist_df.copy()
+
         try:
             original_count = len(allowlist_df)
 
@@ -419,7 +422,7 @@ class UserAllowlistCache:
 
         except Exception:
             logger.exception("Allowlist data validation error")
-            return False, allowlist_df
+            return False, original_df
 
     async def is_user_allowlisted(
         self,
