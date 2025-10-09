@@ -354,75 +354,103 @@ class UserAllowlistCache:
             Tuple of (success, cleaned_dataframe). Success is True if there are valid rows after cleaning.
         """
         # Store original DataFrame for error cases
-        original_df = allowlist_df.copy()
+        try:
+            original_df = allowlist_df.copy()
+        except AttributeError:
+            # Fallback for mock objects or DataFrames without copy method
+            original_df = allowlist_df
 
         try:
             original_count = len(allowlist_df)
 
             # 1. Check required columns exist - handle gracefully
-            required_columns = ["provider", "email"]
-            missing_columns = [col for col in required_columns if col not in allowlist_df.columns]
-            if missing_columns:
-                logger.error("Missing required columns: %s. Found columns: %s", missing_columns, list(allowlist_df.columns))
+            if not self._check_required_columns(allowlist_df):
                 return False, allowlist_df
 
-            # 2. Handle null values in provider column - log warning and filter out
-            if allowlist_df["provider"].isna().any():
-                null_provider_count = allowlist_df["provider"].isna().sum()
-                logger.warning("Found %d rows with null provider values, filtering them out", null_provider_count)
-                allowlist_df = allowlist_df.dropna(subset=["provider"])
-
-            # 3. Handle null values in email column - log warning and filter out
-            if allowlist_df["email"].isna().any():
-                null_email_count = allowlist_df["email"].isna().sum()
-                logger.warning("Found %d rows with null email values, filtering them out", null_email_count)
-                allowlist_df = allowlist_df.dropna(subset=["email"])
-
-            # 4. Check if we have any rows left after null filtering
+            # 2. Handle null values - log warning and filter out
+            allowlist_df = self._filter_null_values(allowlist_df)
             if len(allowlist_df) == 0:
                 logger.error("No valid rows remaining after filtering null values")
                 return False, allowlist_df
 
-            # 5. Validate email format - log warning and filter out invalid emails
-            email_pattern = r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
-            invalid_emails_mask = ~allowlist_df["email"].str.match(email_pattern)
-            if invalid_emails_mask.any():
-                invalid_count = invalid_emails_mask.sum()
-                invalid_emails = allowlist_df[invalid_emails_mask]["email"].tolist()
-                logger.warning("Found %d emails with invalid format, filtering them out: %s",
-                             invalid_count, ", ".join(invalid_emails[:10]))  # Show first 10
-                allowlist_df = allowlist_df[~invalid_emails_mask]
+            # 3. Validate email format - log warning and filter out invalid emails
+            allowlist_df = self._filter_invalid_emails(allowlist_df)
 
-            # 6. Check emails are from allowed domains - log warning and filter out invalid domains
-            allowed_domains = ["@justice.gov.uk", "@localhost.com"]
-            valid_domain_mask = allowlist_df["email"].apply(
-                lambda email: any(email.endswith(domain) for domain in allowed_domains)
-            )
-            if not valid_domain_mask.all():
-                invalid_domain_count = (~valid_domain_mask).sum()
-                invalid_domain_emails = allowlist_df[~valid_domain_mask]["email"].tolist()
-                logger.warning("Found %d emails not from allowed domains (@justice.gov.uk or @localhost.com), filtering them out: %s",
-                             invalid_domain_count, ", ".join(invalid_domain_emails[:10]))  # Show first 10
-                allowlist_df = allowlist_df[valid_domain_mask]
+            # 4. Check emails are from allowed domains - log warning and filter out invalid domains
+            allowlist_df = self._filter_invalid_domains(allowlist_df)
 
-            # 7. Final check - do we have any valid rows left?
+            # 5. Final check - do we have any valid rows left?
             if len(allowlist_df) == 0:
                 logger.error("No valid rows remaining after all filtering")
                 return False, allowlist_df
             else:
-                # 8. Log summary of cleaning
-                final_count = len(allowlist_df)
-                if final_count < original_count:
-                    logger.info("Allowlist data cleaned: %d rows removed, %d valid rows remaining",
-                               original_count - final_count, final_count)
-                else:
-                    logger.info("Allowlist data validation passed. %d rows validated.", final_count)
-
+                # 6. Log summary of cleaning
+                self._log_cleaning_summary(allowlist_df, original_count)
                 return True, allowlist_df
 
         except Exception:
             logger.exception("Allowlist data validation error")
             return False, original_df
+
+    def _check_required_columns(self, allowlist_df: pd.DataFrame) -> bool:
+        """Check if required columns exist."""
+        required_columns = ["provider", "email"]
+        missing_columns = [col for col in required_columns if col not in allowlist_df.columns]
+        if missing_columns:
+            logger.error("Missing required columns: %s. Found columns: %s", missing_columns, list(allowlist_df.columns))
+            return False
+        return True
+
+    def _filter_null_values(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Filter out rows with null values in provider or email columns."""
+        # Handle null values in provider column
+        if allowlist_df["provider"].isna().any():
+            null_provider_count = allowlist_df["provider"].isna().sum()
+            logger.warning("Found %d rows with null provider values, filtering them out", null_provider_count)
+            allowlist_df = allowlist_df.dropna(subset=["provider"])
+
+        # Handle null values in email column
+        if allowlist_df["email"].isna().any():
+            null_email_count = allowlist_df["email"].isna().sum()
+            logger.warning("Found %d rows with null email values, filtering them out", null_email_count)
+            allowlist_df = allowlist_df.dropna(subset=["email"])
+
+        return allowlist_df
+
+    def _filter_invalid_emails(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Filter out rows with invalid email formats."""
+        email_pattern = r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+        invalid_emails_mask = ~allowlist_df["email"].str.match(email_pattern)
+        if invalid_emails_mask.any():
+            invalid_count = invalid_emails_mask.sum()
+            invalid_emails = allowlist_df[invalid_emails_mask]["email"].tolist()
+            logger.warning("Found %d emails with invalid format, filtering them out: %s",
+                         invalid_count, ", ".join(invalid_emails[:10]))  # Show first 10
+            allowlist_df = allowlist_df[~invalid_emails_mask]
+        return allowlist_df
+
+    def _filter_invalid_domains(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Filter out rows with emails from disallowed domains."""
+        allowed_domains = ["@justice.gov.uk", "@localhost.com"]
+        valid_domain_mask = allowlist_df["email"].apply(
+            lambda email: any(email.endswith(domain) for domain in allowed_domains)
+        )
+        if not valid_domain_mask.all():
+            invalid_domain_count = (~valid_domain_mask).sum()
+            invalid_domain_emails = allowlist_df[~valid_domain_mask]["email"].tolist()
+            logger.warning("Found %d emails not from allowed domains (@justice.gov.uk or @localhost.com), filtering them out: %s",
+                         invalid_domain_count, ", ".join(invalid_domain_emails[:10]))  # Show first 10
+            allowlist_df = allowlist_df[valid_domain_mask]
+        return allowlist_df
+
+    def _log_cleaning_summary(self, allowlist_df: pd.DataFrame, original_count: int) -> None:
+        """Log summary of data cleaning operations."""
+        final_count = len(allowlist_df)
+        if final_count < original_count:
+            logger.info("Allowlist data cleaned: %d rows removed, %d valid rows remaining",
+                       original_count - final_count, final_count)
+        else:
+            logger.info("Allowlist data validation passed. %d rows validated.", final_count)
 
     async def is_user_allowlisted(
         self,
