@@ -1,5 +1,5 @@
 # Add this near the top of your Makefile
-.PHONY: setup-dev setup-prod setup-preprod install backend frontend database db-up db-down db-reset db-migrate db-upgrade test allowlist-dev allowlist-prod allowlist-both allowlist-update-dev allowlist-update-prod allowlist-merge-dev allowlist-merge-prod allowlist-upload-dev allowlist-upload-prod
+.PHONY: setup-dev setup-prod setup-preprod install backend frontend database db-up db-down db-reset db-migrate db-upgrade test allowlist-dev allowlist-prod allowlist-both allowlist-update-dev allowlist-update-prod allowlist-merge-dev allowlist-merge-prod allowlist-upload-dev allowlist-upload-prod allowlist-dedupe-dev allowlist-dedupe-prod
 # Complete Dev Environment Setup
 setup-dev:
 	@echo "🚀 Setting up DEV environment end-to-end..."
@@ -54,6 +54,7 @@ db-upgrade: ## Apply all pending database migrations
 	cd backend && uv run alembic upgrade head
 test: ## Run tests (when available)
 	cd backend && uv run pytest
+
 # JusticeAIUnit Allowlist Management
 # Update development allowlist
 allowlist-dev:
@@ -140,3 +141,13 @@ allowlist-upload-prod:
 	echo ""; \
 	echo "📤 Step 2/2: Merging and uploading to Azure..."; \
 	cd scripts/allowlist && python merge_and_upload_allowlist.py --env prod --file "$$CREATED_FILE"
+
+# Allowlist Deduplication
+# Remove duplicate emails (case-insensitive) from allowlist in Azure storage
+allowlist-dedupe-dev: ## Deduplicate dev allowlist
+	cd scripts/allowlist && python deduplicate_allowlist.py --env dev
+
+allowlist-dedupe-prod: ## Deduplicate prod allowlist
+	@echo "⚠️  WARNING: You are deduplicating PRODUCTION allowlist!"
+	@read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ]
+	cd scripts/allowlist && python deduplicate_allowlist.py --env prod
