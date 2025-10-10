@@ -12,6 +12,7 @@ import AudioPlayerComponent from "@/components/audio/audio-player";
 import { AudioBackup, audioBackupDB } from "@/lib/indexeddb-backup";
 import { useTranscripts } from "@/providers/transcripts";
 import { apiClient } from "@/lib/api-client";
+import { uploadBlobAsChunks } from "@/lib/azure-upload";
 import posthog from "posthog-js";
 
 interface BackupUploaderProps {
@@ -31,100 +32,21 @@ function BackupUploader({
   const { setIsProcessingTranscription } = useTranscripts();
 
   // CHUNKED UPLOAD FALLBACK: Azure Block Blob API compliant chunked upload
-  const uploadBlobAsChunks = useCallback(
+  const uploadBlobInChunks = useCallback(
     async (blob: Blob, mimeType: string): Promise<string> => {
-      const chunkSize = 1024 * 1024; // 1MB chunks
-      const totalChunks = Math.ceil(blob.size / chunkSize);
-      
-      // Get a new upload URL for chunked upload
-      const fileExtension = mimeType.includes("mp4") ? "mp4" : "webm";
-      const urlResult = await apiClient.getUploadUrl(fileExtension);
-      
-      if (urlResult.error) {
-        throw new Error("Failed to get upload URL for chunked upload");
+      try {
+        const result = await uploadBlobAsChunks({
+          blob,
+          mimeType,
+          onProgress: (progress) => {
+            setProcessingStatus({ state: "uploading", progress });
+          },
+        });
+        return result.fileKey;
+      } catch (error) {
+        console.error("❌ Chunked upload fallback failed:", error);
+        throw error;
       }
-      
-      const { upload_url, user_upload_s3_file_key } = urlResult.data!;
-      
-      // Parse the base URL (without query params)
-      const url = new URL(upload_url);
-      const baseUrl = `${url.origin}${url.pathname}`;
-      const sasParams = url.search; // Keep the SAS token params
-      
-      const blockIds: string[] = [];
-      
-      // Phase 1: Upload each chunk as a block
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, blob.size);
-        const chunk = blob.slice(start, end);
-        
-        // Generate a block ID (must be base64 encoded, same length for all blocks)
-        const blockId = btoa(String(i).padStart(6, '0'));
-        blockIds.push(blockId);
-        
-        // Use Azure's PutBlock API: ?comp=block&blockid=<id>
-        const blockUploadUrl = `${baseUrl}?comp=block&blockid=${encodeURIComponent(blockId)}${sasParams.substring(1) ? '&' + sasParams.substring(1) : ''}`;
-        
-        setProcessingStatus({ 
-          state: "uploading", 
-          progress: Math.round((i / (totalChunks + 1)) * 100) 
-        });
-        
-        // Upload individual block
-        const xhr = new XMLHttpRequest();
-        await new Promise((resolve, reject) => {
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-            } else {
-              reject(new Error(`Block ${i} upload failed with status ${xhr.status}`));
-            }
-          });
-          
-          xhr.addEventListener("error", () => {
-            reject(new Error(`Network error uploading block ${i}`));
-          });
-          
-          xhr.open("PUT", blockUploadUrl);
-          xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
-          xhr.send(chunk);
-        });
-      }
-      
-      // Phase 2: Commit all blocks using PutBlockList
-      const commitUrl = `${baseUrl}?comp=blocklist${sasParams.substring(1) ? '&' + sasParams.substring(1) : ''}`;
-      
-      // Create the block list XML
-      const blockListXml = `<?xml version="1.0" encoding="utf-8"?>
-<BlockList>
-${blockIds.map(id => `  <Latest>${id}</Latest>`).join('\n')}
-</BlockList>`;
-      
-      await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.response);
-          } else {
-            reject(new Error(`Block list commit failed with status ${xhr.status}`));
-          }
-        });
-        
-        xhr.addEventListener("error", () => {
-          reject(new Error("Network error committing block list"));
-        });
-        
-        xhr.open("PUT", commitUrl);
-        xhr.setRequestHeader("Content-Type", "application/xml");
-        xhr.send(blockListXml);
-      });
-      
-      setProcessingStatus({ state: "uploading", progress: 100 });
-      
-      // Return the new file key to use for transcription
-      return user_upload_s3_file_key;
     },
     []
   );
@@ -184,8 +106,8 @@ ${blockIds.map(id => `  <Latest>${id}</Latest>`).join('\n')}
           
           // CHUNKED UPLOAD FALLBACK: If single upload fails, split and upload as chunks
           try {
-            // uploadBlobAsChunks gets a new upload URL and returns the new file key
-            finalFileKey = await uploadBlobAsChunks(blob, blob.type);
+            // uploadBlobInChunks gets a new upload URL and returns the new file key
+            finalFileKey = await uploadBlobInChunks(blob, blob.type);
           } catch (chunkedError) {
             console.error("❌ Both single and chunked upload failed:", chunkedError);
             const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);

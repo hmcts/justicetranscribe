@@ -28,6 +28,7 @@ import { apiClient } from "@/lib/api-client";
 import * as Sentry from "@sentry/nextjs";
 import ErrorReportCard from "@/components/ui/error-report-card";
 import { getDuration } from "@/components/audio/processing-status";
+import { uploadChunksFromBackup } from "@/lib/azure-upload";
 import AudioRecorderComponent from "./audio-recorder";
 import ScreenRecorder from "./screen-recorder";
 
@@ -223,104 +224,20 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   const uploadChunksAsFallback = useCallback(
     async (backupId: string, mimeType: string): Promise<string> => {
       try {
-        const chunks = await audioBackupDB.getChunks(backupId);
-        if (chunks.length === 0) {
-          throw new Error("No chunks found for fallback upload");
-        }
-
-        // Get a new upload URL for chunked upload
-        const fileExtension = mimeType.includes("mp4") ? "mp4" : "webm";
-        const urlResult = await apiClient.getUploadUrl(fileExtension);
-        
-        if (urlResult.error) {
-          throw new Error("Failed to get upload URL for chunked upload");
-        }
-        
-        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
-        
-        // Parse the base URL (without query params)
-        const url = new URL(upload_url);
-        const baseUrl = `${url.origin}${url.pathname}`;
-        const sasParams = url.search; // Keep the SAS token params
-        
-        const blockIds: string[] = [];
-        
-        // Phase 1: Upload each chunk as a block
-        for (let i = 0; i < chunks.length; i++) {
-          const chunk = chunks[i];
-          // Generate a block ID (must be base64 encoded, same length for all blocks)
-          const blockId = btoa(String(i).padStart(6, '0'));
-          blockIds.push(blockId);
-          
-          // Use Azure's PutBlock API: ?comp=block&blockid=<id>
-          const blockUploadUrl = `${baseUrl}?comp=block&blockid=${encodeURIComponent(blockId)}${sasParams.substring(1) ? '&' + sasParams.substring(1) : ''}`;
-          
-          setProcessingStatus({ 
-            state: "uploading", 
-            progress: Math.round((i / (chunks.length + 1)) * 100) 
-          });
-          
-          await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            
-            xhr.addEventListener("load", () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                resolve();
-              } else {
-                reject(new Error(`Block ${i} upload failed with status ${xhr.status}: ${xhr.statusText}`));
-              }
-            });
-            
-            xhr.addEventListener("error", () => {
-              reject(new Error(`Network error uploading block ${i}`));
-            });
-            
-            xhr.open("PUT", blockUploadUrl);
-            xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
-            xhr.send(chunk.data);
-          });
-        }
-        
-        // Phase 2: Commit all blocks using PutBlockList
-        const commitUrl = `${baseUrl}?comp=blocklist${sasParams.substring(1) ? '&' + sasParams.substring(1) : ''}`;
-        
-        // Create the block list XML
-        const blockListXml = `<?xml version="1.0" encoding="utf-8"?>
-<BlockList>
-${blockIds.map(id => `  <Latest>${id}</Latest>`).join('\n')}
-</BlockList>`;
-        
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve();
-            } else {
-              reject(new Error(`Block list commit failed with status ${xhr.status}: ${xhr.statusText}`));
-            }
-          });
-          
-          xhr.addEventListener("error", () => {
-            reject(new Error("Network error committing block list"));
-          });
-          
-          xhr.open("PUT", commitUrl);
-          xhr.setRequestHeader("Content-Type", "application/xml");
-          xhr.send(blockListXml);
-        });
-        
-        setProcessingStatus({ state: "uploading", progress: 100 });
-        
-        // Return the new file key to use for transcription
-        return user_upload_s3_file_key;
-        
+        const result = await uploadChunksFromBackup(
+          backupId,
+          mimeType,
+          (progress) => {
+            setProcessingStatus({ state: "uploading", progress });
+          }
+        );
+        return result.fileKey;
       } catch (error) {
         console.error("❌ Chunked upload fallback failed:", error);
         throw error;
       }
     },
-    [uploadFile]
+    []
   );
 
   const startTranscription = useCallback(
