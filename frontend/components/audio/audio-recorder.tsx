@@ -222,10 +222,6 @@ function AudioRecorderComponent({
               duration_seconds: recordingTime,
               file_size_bytes: audioBlob.size,
             });
-            
-            // EXPLICIT NULLIFICATION: Help Next.js garbage collection
-            // @ts-ignore - Explicitly nullify to help GC
-            audioBlob = null;
           } catch (err) {
             console.error("Failed to reconstruct final blob:", err);
             onRecordingStop(null, currentBackupIdRef.current);
@@ -234,7 +230,7 @@ function AudioRecorderComponent({
           onRecordingStop(null, currentBackupIdRef.current);
         }
 
-        // EXPLICIT NULLIFICATION: Help Next.js garbage collection
+        // Clean up media resources and reset refs
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
