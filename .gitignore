@@ -1,3 +1,4 @@
+data/*
 .pre-commit-config-local.yaml
 
 # Terraform
@@ -67,3 +68,4 @@ backend/coverage.json
 **/htmlcov/
 **/coverage.xml
 **/coverage.json
+./data/

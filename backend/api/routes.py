@@ -42,6 +42,7 @@ from app.minutes.templates.templates_metadata import (
 )
 from app.minutes.types import (
     GenerateMinutesRequest,
+    OnboardingStatusResponse,
     StartTranscriptionJobRequest,
     TemplateResponse,
     TranscriptionMetadata,
@@ -49,6 +50,7 @@ from app.minutes.types import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
+from utils.allowlist import get_allowlist_cache
 from utils.dependencies import get_current_user
 from utils.langfuse_models import (
     LangfuseScoreRequest,
@@ -70,12 +72,32 @@ async def health_check():
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
-@router.get("/user/onboarding-status")
+@router.get("/user/onboarding-status", response_model=OnboardingStatusResponse)
 async def get_onboarding_status(
     current_user: User = Depends(get_current_user),  # noqa: B008
-):
-    """Get user's onboarding status and check for dev override"""
+) -> OnboardingStatusResponse:
+    """
+    Get user's onboarding status and allowlist check.
 
+    This endpoint provides comprehensive status information for the frontend
+    to determine what UI to display to the user. It checks both onboarding
+    completion status and allowlist membership.
+
+    Parameters
+    ----------
+    current_user : User
+        The authenticated user from the dependency injection.
+
+    Returns
+    -------
+    OnboardingStatusResponse
+        Complete status information including onboarding and allowlist status.
+
+    Raises
+    ------
+    HTTPException
+        If user authentication fails or allowlist check fails.
+    """
     # Check if onboarding should be forced in development
     settings = get_settings()
     force_onboarding = (
@@ -83,13 +105,31 @@ async def get_onboarding_status(
         settings.ENVIRONMENT in ["local", "dev"]
     )
 
-    return {
-        "has_completed_onboarding": current_user.has_completed_onboarding,
-        "force_onboarding_override": force_onboarding,
-        "should_show_onboarding": not current_user.has_completed_onboarding or force_onboarding,
-        "user_id": str(current_user.id),
-        "environment": settings.ENVIRONMENT,
-    }
+    # Check allowlist status using environment-specific configuration
+    # Check for local development bypass first
+    if (settings.ENVIRONMENT == "local" and
+        settings.BYPASS_ALLOWLIST_DEV and
+        current_user.email == "developer@localhost.com"):
+        is_allowlisted = True
+    else:
+        allowlist_config = settings.get_allowlist_config()
+        allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
+        is_allowlisted = await allowlist_cache.is_user_allowlisted(
+            current_user.email,
+            settings.AZURE_STORAGE_CONNECTION_STRING,
+            allowlist_config["container"],
+            allowlist_config["blob_name"]
+        )
+
+    return OnboardingStatusResponse(
+        has_completed_onboarding=current_user.has_completed_onboarding,
+        force_onboarding_override=force_onboarding,
+        should_show_onboarding=(not current_user.has_completed_onboarding) or force_onboarding,
+        user_id=current_user.id,
+        environment=settings.ENVIRONMENT,
+        is_allowlisted=is_allowlisted,
+        should_show_coming_soon=not is_allowlisted,
+    )
 
 
 @router.post("/user/complete-onboarding")
@@ -188,11 +228,11 @@ async def get_upload_url(
 
 
 async def process_transcription(
-    user_upload_blob_storage_file_key: str, user: User, transcription_id: str | None = None
+    user_upload_blob_storage_file_key: str, user_id: UUID, user_email: str, transcription_id: str | None = None
 ) -> None:
     """Parent function that handles the TranscriptionJob state management."""
     await transcribe_and_generate_llm_output(
-        user_upload_blob_storage_file_key, user, transcription_id
+        user_upload_blob_storage_file_key, user_id, user_email, transcription_id
     )
 
 
@@ -202,9 +242,11 @@ async def start_transcription_job(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ) -> None:
     try:
+        # Pass only primitives to background task, not the User object (SQLAlchemy model)
+        # to avoid keeping database sessions open
         asyncio.create_task(  # noqa: RUF006
             process_transcription(
-                request.user_upload_s3_file_key, current_user, request.transcription_id
+                request.user_upload_s3_file_key, current_user.id, current_user.email, request.transcription_id
             )
         )
 
@@ -219,12 +261,16 @@ async def generate_or_edit_minutes(
 ):
     new_minute_version_id = str(uuid.uuid4())
 
+    # Extract primitives from SQLAlchemy object before passing to background task
+    user_id = current_user.id
+    user_email = current_user.email
+
     async def process_request():
         try:
             # First verify the user has access to this transcription
             get_transcription_by_id(
                 request.transcription_id,
-                current_user.id,
+                user_id,
                 tz=pytz.UTC,  # We don't need timezone conversion for this check
             )
 
@@ -246,7 +292,7 @@ async def generate_or_edit_minutes(
                     dialogue_entries,
                     request.transcription_id,
                     request.template,
-                    current_user.email,
+                    user_email,
                     minute_version_id=new_minute_version_id,
                 )
             elif request.action_type == "edit":
@@ -262,7 +308,7 @@ async def generate_or_edit_minutes(
                     new_minute_version_id,
                     request.edit_instructions,
                     request.transcription_id,
-                    current_user.email,
+                    user_email,
                 )
 
         except HTTPException:
