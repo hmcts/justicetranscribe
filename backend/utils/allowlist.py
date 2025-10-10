@@ -285,14 +285,16 @@ class UserAllowlistCache:
         # Normalize column names to lowercase first for consistent handling
         allowlist_df.columns = allowlist_df.columns.str.lower().str.strip()
 
-        # Ensure required columns exist (now checking lowercase)
+        # Check for email column (required) - handle "Email" vs "email" gracefully
         if "email" not in allowlist_df.columns:
             error_msg = f"CSV must contain 'email' or 'Email' column. Found columns: {list(allowlist_df.columns)}"
             raise ValueError(error_msg)
 
+        # Check for provider column (optional) - warn if missing
         if "provider" not in allowlist_df.columns:
-            error_msg = f"CSV must contain 'provider' or 'Provider' column. Found columns: {list(allowlist_df.columns)}"
-            raise ValueError(error_msg)
+            logger.warning("CSV missing 'provider' or 'Provider' column. Found columns: %s", list(allowlist_df.columns))
+            # Add a default provider column if missing
+            allowlist_df["provider"] = "unknown"
 
         # Normalize email addresses and clean up any remaining newline characters
         allowlist_df["email"] = allowlist_df["email"].astype(str).str.strip().str.lower()
@@ -335,7 +337,11 @@ class UserAllowlistCache:
                 original_count - final_count
             )
 
-        return allowlist_df[["provider", "email"]]
+        # Return columns based on what's available
+        if "provider" in allowlist_df.columns:
+            return allowlist_df[["provider", "email"]]
+        else:
+            return allowlist_df[["email"]]
 
     def _validate_allowlist_data(self, allowlist_df: pd.DataFrame) -> tuple[bool, pd.DataFrame]:
         """Validate allowlist data with resilient error handling.
@@ -394,22 +400,26 @@ class UserAllowlistCache:
 
     def _check_required_columns(self, allowlist_df: pd.DataFrame) -> bool:
         """Check if required columns exist."""
-        required_columns = ["provider", "email"]
-        missing_columns = [col for col in required_columns if col not in allowlist_df.columns]
-        if missing_columns:
-            logger.error("Missing required columns: %s. Found columns: %s", missing_columns, list(allowlist_df.columns))
+        # Only email is truly required
+        if "email" not in allowlist_df.columns:
+            logger.error("Missing required 'email' column. Found columns: %s", list(allowlist_df.columns))
             return False
+
+        # Provider is optional - warn if missing
+        if "provider" not in allowlist_df.columns:
+            logger.warning("Missing optional 'provider' column. Found columns: %s", list(allowlist_df.columns))
+
         return True
 
     def _filter_null_values(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
         """Filter out rows with null values in provider or email columns."""
-        # Handle null values in provider column
-        if allowlist_df["provider"].isna().any():
+        # Handle null values in provider column (if it exists)
+        if "provider" in allowlist_df.columns and allowlist_df["provider"].isna().any():
             null_provider_count = allowlist_df["provider"].isna().sum()
             logger.warning("Found %d rows with null provider values, filtering them out", null_provider_count)
             allowlist_df = allowlist_df.dropna(subset=["provider"])
 
-        # Handle null values in email column
+        # Handle null values in email column (required)
         if allowlist_df["email"].isna().any():
             null_email_count = allowlist_df["email"].isna().sum()
             logger.warning("Found %d rows with null email values, filtering them out", null_email_count)
