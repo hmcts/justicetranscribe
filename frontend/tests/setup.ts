@@ -8,7 +8,7 @@ import { beforeAll, afterEach, vi } from "vitest";
 beforeAll(() => {
   // Set test environment variables
   process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
-  process.env.NODE_ENV = "test";
+  // Note: NODE_ENV is automatically set to "test" by Vitest
 });
 
 // Clean up after each test
