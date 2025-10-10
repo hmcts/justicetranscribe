@@ -192,6 +192,9 @@ user3@justice.gov.uk,unknown
       - Truly new users: 20
       - Duplicates removed: 5
       - Final total: 170
+   
+   📧 New user emails (for follow-up):
+      user1@justice.gov.uk; user2@justice.gov.uk; user3@justice.gov.uk; ...
    ```
 
 4. **File paths:** Always use relative paths from repo root:
