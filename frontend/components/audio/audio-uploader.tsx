@@ -219,17 +219,16 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     []
   );
 
-  // CHUNKED UPLOAD FALLBACK: Upload individual chunks when single upload fails
+  // CHUNKED UPLOAD FALLBACK: Azure Block Blob API compliant chunked upload
   const uploadChunksAsFallback = useCallback(
-    async (backupId: string, mimeType: string): Promise<void> => {
+    async (backupId: string, mimeType: string): Promise<string> => {
       try {
         const chunks = await audioBackupDB.getChunks(backupId);
         if (chunks.length === 0) {
           throw new Error("No chunks found for fallback upload");
         }
 
-        
-        // Get upload URL for chunked upload
+        // Get a new upload URL for chunked upload
         const fileExtension = mimeType.includes("mp4") ? "mp4" : "webm";
         const urlResult = await apiClient.getUploadUrl(fileExtension);
         
@@ -237,22 +236,84 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           throw new Error("Failed to get upload URL for chunked upload");
         }
         
-        const { upload_url } = urlResult.data!;
+        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
         
-        // Upload each chunk individually
+        // Parse the base URL (without query params)
+        const url = new URL(upload_url);
+        const baseUrl = `${url.origin}${url.pathname}`;
+        const sasParams = url.search; // Keep the SAS token params
+        
+        const blockIds: string[] = [];
+        
+        // Phase 1: Upload each chunk as a block
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          const chunkUploadUrl = `${upload_url}&chunk=${i}&total=${chunks.length}`;
+          // Generate a block ID (must be base64 encoded, same length for all blocks)
+          const blockId = btoa(String(i).padStart(6, '0'));
+          blockIds.push(blockId);
+          
+          // Use Azure's PutBlock API: ?comp=block&blockid=<id>
+          const blockUploadUrl = `${baseUrl}?comp=block&blockid=${encodeURIComponent(blockId)}${sasParams.substring(1) ? '&' + sasParams.substring(1) : ''}`;
           
           setProcessingStatus({ 
             state: "uploading", 
-            progress: Math.round((i / chunks.length) * 100) 
+            progress: Math.round((i / (chunks.length + 1)) * 100) 
           });
           
-          await uploadFile(chunk.data, chunkUploadUrl);
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.addEventListener("load", () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve();
+              } else {
+                reject(new Error(`Block ${i} upload failed with status ${xhr.status}: ${xhr.statusText}`));
+              }
+            });
+            
+            xhr.addEventListener("error", () => {
+              reject(new Error(`Network error uploading block ${i}`));
+            });
+            
+            xhr.open("PUT", blockUploadUrl);
+            xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
+            xhr.send(chunk.data);
+          });
         }
         
+        // Phase 2: Commit all blocks using PutBlockList
+        const commitUrl = `${baseUrl}?comp=blocklist${sasParams.substring(1) ? '&' + sasParams.substring(1) : ''}`;
+        
+        // Create the block list XML
+        const blockListXml = `<?xml version="1.0" encoding="utf-8"?>
+<BlockList>
+${blockIds.map(id => `  <Latest>${id}</Latest>`).join('\n')}
+</BlockList>`;
+        
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Block list commit failed with status ${xhr.status}: ${xhr.statusText}`));
+            }
+          });
+          
+          xhr.addEventListener("error", () => {
+            reject(new Error("Network error committing block list"));
+          });
+          
+          xhr.open("PUT", commitUrl);
+          xhr.setRequestHeader("Content-Type", "application/xml");
+          xhr.send(blockListXml);
+        });
+        
         setProcessingStatus({ state: "uploading", progress: 100 });
+        
+        // Return the new file key to use for transcription
+        return user_upload_s3_file_key;
         
       } catch (error) {
         console.error("❌ Chunked upload fallback failed:", error);
@@ -310,14 +371,19 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         }
 
         // Try single file upload first
+        let finalFileKey = user_upload_s3_file_key;
         try {
           await uploadFile(blob, upload_url);
         } catch (uploadError) {
+          console.warn("Single file upload failed, attempting chunked upload fallback:", uploadError);
           
           // CHUNKED UPLOAD FALLBACK: If single upload fails, try uploading chunks
           if (currentBackupId) {
             try {
-              await uploadChunksAsFallback(currentBackupId, blob.type);
+              // uploadChunksAsFallback gets a new upload URL and returns the new file key
+              finalFileKey = await uploadChunksAsFallback(currentBackupId, blob.type);
+              currentUserUploadKey = finalFileKey;
+              setUserUploadKey(finalFileKey);
             } catch (chunkedError) {
               console.error("❌ Both single and chunked upload failed:", chunkedError);
               const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
@@ -330,7 +396,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         }
 
         const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          user_upload_s3_file_key
+          finalFileKey
         );
 
         if (transcriptionJobResult.error) {
