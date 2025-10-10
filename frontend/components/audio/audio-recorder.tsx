@@ -42,12 +42,6 @@ function AudioRecorderComponent({
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
-
-  // DEBUG: Make audioBackupDB available in console immediately
-  useEffect(() => {
-    (window as any).audioBackupDB = audioBackupDB;
-  }, []);
-
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [showProcessingRecording, setShowProcessingRecording] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
