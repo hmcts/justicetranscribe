@@ -138,10 +138,17 @@ class UserAllowlistCache:
         # Parse and validate - handle encoding at byte level
         allowlist_df = self._parse_allowlist_csv_from_bytes(content)
 
-        # Validate data quality
-        if not self._validate_allowlist_data(allowlist_df):
+        # Clean and normalize the data first
+        allowlist_df = self._clean_and_normalize_dataframe(allowlist_df)
+
+        # Then validate the cleaned data
+        is_valid, cleaned_df = self._validate_allowlist_data(allowlist_df)
+        if not is_valid:
             error_msg = "Allowlist data failed validation checks"
             raise ValueError(error_msg)
+
+        # Use the cleaned data
+        allowlist_df = cleaned_df
 
         return allowlist_df
 
@@ -158,9 +165,13 @@ class UserAllowlistCache:
                 async with aiofiles.open(local_file, mode="rb") as f:
                     content = await f.read()
                 allowlist_df = self._parse_allowlist_csv_from_bytes(content)
-                if self._validate_allowlist_data(allowlist_df):
+                # Clean and normalize the data first
+                allowlist_df = self._clean_and_normalize_dataframe(allowlist_df)
+                # Then validate the cleaned data
+                is_valid, cleaned_df = self._validate_allowlist_data(allowlist_df)
+                if is_valid:
                     logger.info("✅ Using local fallback file: %s", local_file)
-                    return allowlist_df
+                    return cleaned_df
             else:
                 logger.error("Local fallback file not found: %s", local_file)
         except Exception:
@@ -274,14 +285,16 @@ class UserAllowlistCache:
         # Normalize column names to lowercase first for consistent handling
         allowlist_df.columns = allowlist_df.columns.str.lower().str.strip()
 
-        # Ensure required columns exist (now checking lowercase)
+        # Check for email column (required) - handle "Email" vs "email" gracefully
         if "email" not in allowlist_df.columns:
             error_msg = f"CSV must contain 'email' or 'Email' column. Found columns: {list(allowlist_df.columns)}"
             raise ValueError(error_msg)
 
+        # Check for provider column (optional) - warn if missing
         if "provider" not in allowlist_df.columns:
-            error_msg = f"CSV must contain 'provider' or 'Provider' column. Found columns: {list(allowlist_df.columns)}"
-            raise ValueError(error_msg)
+            logger.warning("CSV missing 'provider' or 'Provider' column. Found columns: %s", list(allowlist_df.columns))
+            # Add a default provider column if missing
+            allowlist_df["provider"] = "unknown"
 
         # Normalize email addresses and clean up any remaining newline characters
         allowlist_df["email"] = allowlist_df["email"].astype(str).str.strip().str.lower()
@@ -291,73 +304,160 @@ class UserAllowlistCache:
         # Remove empty emails and NaN values
         allowlist_df = allowlist_df[(allowlist_df["email"].str.len() > 0) & (allowlist_df["email"] != "nan")]
 
-        return allowlist_df[["provider", "email"]].drop_duplicates()
+        # Handle case-insensitive duplicate removal with logging
+        original_count = len(allowlist_df)
 
-    def _validate_allowlist_data(self, allowlist_df: pd.DataFrame) -> bool:  # noqa: PLR0911
-        """Validate allowlist data using simple pandas checks.
+        # Check for duplicates before removing them (case-insensitive email matching)
+        # Use keep='first' to identify only the duplicate rows (excluding first occurrence)
+        duplicates_mask = allowlist_df.duplicated(subset=["email"], keep="first")
+        duplicate_count = duplicates_mask.sum()
 
-        Performs critical data quality checks on the allowlist DataFrame.
+        if duplicate_count > 0:
+            # Get the unique duplicate emails (excluding first occurrence)
+            duplicate_emails = allowlist_df[duplicates_mask]["email"].unique()
+            logger.warning(
+                "Found %d duplicate email entries in allowlist (case-insensitive). "
+                "Removing %d duplicate rows, keeping first occurrence. "
+                "Duplicate emails: %s",
+                duplicate_count,
+                duplicate_count,
+                ", ".join(duplicate_emails)
+            )
+
+        # Remove duplicates, keeping first occurrence (case-insensitive email matching)
+        allowlist_df = allowlist_df.drop_duplicates(subset=["email"], keep="first")
+
+        final_count = len(allowlist_df)
+        if duplicate_count > 0:
+            logger.info(
+                "Allowlist deduplication complete. Original: %d rows, Final: %d rows, "
+                "Duplicates removed: %d",
+                original_count,
+                final_count,
+                original_count - final_count
+            )
+
+        # Return both columns (provider is always present after normalization)
+        return allowlist_df[["provider", "email"]]
+
+    def _validate_allowlist_data(self, allowlist_df: pd.DataFrame) -> tuple[bool, pd.DataFrame]:
+        """Validate allowlist data with resilient error handling.
+
+        Performs data quality checks and cleaning on the allowlist DataFrame.
+        Logs warnings for data quality issues but only fails if no valid rows remain.
 
         Parameters
         ----------
         allowlist_df : pd.DataFrame
-            The allowlist DataFrame to validate.
+            The allowlist DataFrame to validate and clean.
 
         Returns
         -------
-        bool
-            True if data passes all critical validation checks, False otherwise.
-
-        Note
-        ----
-        This method implements fail-fast behavior: if validation fails,
-        the allowlist data is considered invalid and will not be cached.
-        This ensures data quality but may cause temporary service disruption
-        if the allowlist file becomes corrupted.
+        tuple[bool, pd.DataFrame]
+            Tuple of (success, cleaned_dataframe). Success is True if there are valid rows after cleaning.
         """
+        # Store original DataFrame for error cases
         try:
-            # 1. Check required columns exist
-            required_columns = ["provider", "email"]
-            if not all(col in allowlist_df.columns for col in required_columns):
-                logger.error("Missing required columns. Expected: %s, got: %s", required_columns, list(allowlist_df.columns))
-                return False
-            # 2. Check for null values in critical columns
-            elif allowlist_df[required_columns].isna().any().any():
-                logger.error("Found null values in required columns")
-                return False
-            # 3. Check at least one row exists
-            elif len(allowlist_df) == 0:
-                logger.error("Allowlist data is empty")
-                return False
-            # 4. Check for duplicate emails
-            elif allowlist_df["email"].duplicated().any():
-                logger.error("Found duplicate emails in allowlist data")
-                return False
-            # 5. Validate email format (basic regex check)
+            original_df = allowlist_df.copy()
+        except AttributeError:
+            # Fallback for mock objects or DataFrames without copy method
+            original_df = allowlist_df
+
+        try:
+            original_count = len(allowlist_df)
+
+            # 1. Check required columns exist - handle gracefully
+            if not self._check_required_columns(allowlist_df):
+                return False, allowlist_df
+
+            # 2. Handle null values - log warning and filter out
+            allowlist_df = self._filter_null_values(allowlist_df)
+            if len(allowlist_df) == 0:
+                logger.error("No valid rows remaining after filtering null values")
+                return False, allowlist_df
+
+            # 3. Validate email format - log warning and filter out invalid emails
+            allowlist_df = self._filter_invalid_emails(allowlist_df)
+
+            # 4. Check emails are from allowed domains - log warning and filter out invalid domains
+            allowlist_df = self._filter_invalid_domains(allowlist_df)
+
+            # 5. Final check - do we have any valid rows left?
+            if len(allowlist_df) == 0:
+                logger.error("No valid rows remaining after all filtering")
+                return False, allowlist_df
             else:
-                email_pattern = r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
-                invalid_emails = ~allowlist_df["email"].str.match(email_pattern)
-                if invalid_emails.any():
-                    invalid_count = invalid_emails.sum()
-                    logger.error("Found %d emails with invalid format", invalid_count)
-                    return False
-                # 6. Check emails are from justice.gov.uk domain (allow localhost for dev)
-                else:
-                    allowed_domains = ["@justice.gov.uk", "@localhost.com"]
-                    valid_domain = allowlist_df["email"].apply(
-                        lambda email: any(email.endswith(domain) for domain in allowed_domains)
-                    )
-                    if not valid_domain.all():
-                        invalid_count = (~valid_domain).sum()
-                        logger.error("Found %d emails not from allowed domains (@justice.gov.uk or @localhost.com)", invalid_count)
-                        return False
-                    else:
-                        logger.info("Allowlist data validation passed. Validated %d rows.", len(allowlist_df))
-                        return True
+                # 6. Log summary of cleaning
+                self._log_cleaning_summary(allowlist_df, original_count)
+                return True, allowlist_df
 
         except Exception:
             logger.exception("Allowlist data validation error")
+            return False, original_df
+
+    def _check_required_columns(self, allowlist_df: pd.DataFrame) -> bool:
+        """Check if required columns exist."""
+        # Only email is truly required
+        if "email" not in allowlist_df.columns:
+            logger.error("Missing required 'email' column. Found columns: %s", list(allowlist_df.columns))
             return False
+
+        # Provider is optional - warn if missing
+        if "provider" not in allowlist_df.columns:
+            logger.warning("Missing optional 'provider' column. Found columns: %s", list(allowlist_df.columns))
+
+        return True
+
+    def _filter_null_values(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Filter out rows with null values in provider or email columns."""
+        # Handle null values in provider column (if it exists)
+        if "provider" in allowlist_df.columns and allowlist_df["provider"].isna().any():
+            null_provider_count = allowlist_df["provider"].isna().sum()
+            logger.warning("Found %d rows with null provider values, filtering them out", null_provider_count)
+            allowlist_df = allowlist_df.dropna(subset=["provider"])
+
+        # Handle null values in email column (required)
+        if allowlist_df["email"].isna().any():
+            null_email_count = allowlist_df["email"].isna().sum()
+            logger.warning("Found %d rows with null email values, filtering them out", null_email_count)
+            allowlist_df = allowlist_df.dropna(subset=["email"])
+
+        return allowlist_df
+
+    def _filter_invalid_emails(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Filter out rows with invalid email formats."""
+        email_pattern = r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+        invalid_emails_mask = ~allowlist_df["email"].str.match(email_pattern)
+        if invalid_emails_mask.any():
+            invalid_count = invalid_emails_mask.sum()
+            invalid_emails = allowlist_df[invalid_emails_mask]["email"].tolist()
+            logger.warning("Found %d emails with invalid format, filtering them out: %s",
+                         invalid_count, ", ".join(invalid_emails[:10]))  # Show first 10
+            allowlist_df = allowlist_df[~invalid_emails_mask]
+        return allowlist_df
+
+    def _filter_invalid_domains(self, allowlist_df: pd.DataFrame) -> pd.DataFrame:
+        """Filter out rows with emails from disallowed domains."""
+        allowed_domains = ["@justice.gov.uk", "@localhost.com"]
+        valid_domain_mask = allowlist_df["email"].apply(
+            lambda email: any(email.endswith(domain) for domain in allowed_domains)
+        )
+        if not valid_domain_mask.all():
+            invalid_domain_count = (~valid_domain_mask).sum()
+            invalid_domain_emails = allowlist_df[~valid_domain_mask]["email"].tolist()
+            logger.warning("Found %d emails not from allowed domains (@justice.gov.uk or @localhost.com), filtering them out: %s",
+                         invalid_domain_count, ", ".join(invalid_domain_emails[:10]))  # Show first 10
+            allowlist_df = allowlist_df[valid_domain_mask]
+        return allowlist_df
+
+    def _log_cleaning_summary(self, allowlist_df: pd.DataFrame, original_count: int) -> None:
+        """Log summary of data cleaning operations."""
+        final_count = len(allowlist_df)
+        if final_count < original_count:
+            logger.info("Allowlist data cleaned: %d rows removed, %d valid rows remaining",
+                       original_count - final_count, final_count)
+        else:
+            logger.info("Allowlist data validation passed. %d rows validated.", final_count)
 
     async def is_user_allowlisted(
         self,
