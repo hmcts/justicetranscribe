@@ -322,7 +322,7 @@ export default function HelpPage() {
               practices.
             </p>
             <Button 
-              className="bg-[#10652F] hover:bg-[#0d4f26] text-white border-[#10652F] hover:border-[#0d4f26]" 
+              variant="outline"
               asChild
             >
               <a
