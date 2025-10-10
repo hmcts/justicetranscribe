@@ -11,10 +11,9 @@
  * - TEST_INTEGRATION=true (to enable integration tests)
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { uploadBlobAsChunks, uploadChunksFromBackup } from "@/lib/azure-upload";
 import { createMockAudioBlob, createMockAudioChunks } from "../fixtures";
-import { apiClient } from "@/lib/api-client";
 
 // Skip integration tests unless explicitly enabled
 const runIntegrationTests = process.env.TEST_INTEGRATION === "true";
