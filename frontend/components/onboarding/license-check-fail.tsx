@@ -9,6 +9,10 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSignUp = () => {
+    window.open(
+      "https://forms.office.com/Pages/ResponsePage.aspx?id=KEeHxuZx_kGp4S6MNndq2EiI1IAZnLFNv6xx2eNp-M5UNFE4STRRN1M5QUdZV05aUkVTOVBIOE9CMy4u",
+      "_blank"
+    );
     setIsSubmitted(true);
   };
 
@@ -35,8 +39,7 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
           </p>
 
           <p className="text-lg leading-relaxed text-gray-700">
-            If you&apos;re wanting early access, click below to join our waiting
-            list.
+            If you want early access, click below to complete our application form.
           </p>
         </div>
       </div>
@@ -47,7 +50,7 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
           disabled={isSubmitted}
           className={`px-8 py-6 text-lg font-semibold transition-all ${
             isSubmitted
-              ? "cursor-default bg-green-600 text-white"
+              ? "cursor-default bg-green-900 text-white hover:bg-green-900"
               : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
         >
@@ -68,3 +71,7 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
     </div>
   );
 }
+
+LicenseCheckFail.defaultProps = {
+  onRetry: undefined,
+};

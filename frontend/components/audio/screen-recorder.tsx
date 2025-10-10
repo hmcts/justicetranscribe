@@ -161,6 +161,7 @@ function ScreenRecorder({
   const mediaChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const visibilityListenerRef = useRef<(() => void) | null>(null);
 
   // Handle wake lock to prevent screen sleeping during recording
   const requestWakeLock = async () => {
@@ -171,7 +172,8 @@ function ScreenRecorder({
           const lock = await navigator.wakeLock.request("screen");
           setWakeLock(lock);
 
-          document.addEventListener("visibilitychange", async () => {
+          // Create and store the listener so we can remove it later
+          const visibilityHandler = async () => {
             if (document.visibilityState === "visible" && !wakeLock) {
               try {
                 const newLock = await navigator.wakeLock.request("screen");
@@ -180,7 +182,10 @@ function ScreenRecorder({
                 // Continue recording even if wake lock fails
               }
             }
-          });
+          };
+          
+          visibilityListenerRef.current = visibilityHandler;
+          document.addEventListener("visibilitychange", visibilityHandler);
         }
       }
     } catch (err) {
@@ -196,6 +201,12 @@ function ScreenRecorder({
       } catch (err) {
         // Continue recording even if wake lock fails
       }
+    }
+    
+    // Remove the visibility change event listener to prevent memory leak
+    if (visibilityListenerRef.current) {
+      document.removeEventListener("visibilitychange", visibilityListenerRef.current);
+      visibilityListenerRef.current = null;
     }
   }, [wakeLock]);
 

@@ -1,26 +1,34 @@
-/* eslint-disable react/button-has-type */
-
 "use client";
 
-/* eslint-disable react/require-default-props */
-/* eslint-disable react/react-in-jsx-scope */
+import React, { useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTranscripts } from "@/providers/transcripts";
 import { Home, HelpCircle } from "lucide-react";
-import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
-export default function Header({ className }: { className?: string }) {
-  const { newTranscription, selectedRecordingMode } = useTranscripts();
+interface HeaderProps {
+  className?: string;
+}
+
+export default function Header({ className = undefined }: HeaderProps) {
+  const { selectedRecordingMode } = useTranscripts();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const handleHomeClick = useCallback(() => {
-    // Always navigate to home/welcome page
-    window.location.href = "/";
-  }, []);
+    const hasQueryParams = (searchParams?.toString().length ?? 0) > 0;
+    
+    if (pathname === "/" && !hasQueryParams) {
+      // Already on clean home page - trigger event to reset view state
+      window.dispatchEvent(new CustomEvent("reset-to-welcome"));
+    } else {
+      // Navigate to clean home (removes query params like ?id=xyz)
+      router.push("/");
+    }
+  }, [router, pathname, searchParams]);
 
   return (
     <header className={cn("z-50 bg-white dark:border-gray-800", className)}>
@@ -37,7 +45,7 @@ export default function Header({ className }: { className?: string }) {
                 className="font-medium text-black"
                 style={{ fontSize: "1.4rem" }}
               >
-                Transcriber
+                Transcribe
               </span>
             </Link>
           </div>
@@ -45,6 +53,7 @@ export default function Header({ className }: { className?: string }) {
             {!selectedRecordingMode && (
               <div className="flex items-center space-x-2">
                 <button
+                  type="button"
                   onClick={handleHomeClick}
                   className="flex h-8 items-center justify-center rounded-full px-3 hover:bg-gray-100"
                   aria-label="Go to home"
