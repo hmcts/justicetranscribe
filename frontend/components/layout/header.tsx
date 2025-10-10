@@ -30,6 +30,10 @@ export default function Header({ className = undefined }: HeaderProps) {
     }
   }, [router, pathname, searchParams]);
 
+  if (pathname === "/coming-soon") {
+    return null; // Hide the header on the 'coming soon' page
+  }
+
   return (
     <header className={cn("z-50 bg-white dark:border-gray-800", className)}>
       <div className="mx-auto max-w-full">
