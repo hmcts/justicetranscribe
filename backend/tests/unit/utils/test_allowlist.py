@@ -575,16 +575,15 @@ class TestUserAllowlistCache:
         expected_columns = ["provider", "email"]
         assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
 
-    def test_clean_and_normalize_dataframe_returns_email_only_without_provider(self, cache: UserAllowlistCache):
-        """Test that DataFrame without provider returns only email column."""
+    def test_clean_and_normalize_dataframe_returns_both_columns_always(self, cache: UserAllowlistCache):
+        """Test that DataFrame always returns both columns (provider added if missing)."""
         df_no_provider = pd.DataFrame({
             "email": ["test@justice.gov.uk"]
         })
 
         result = cache._clean_and_normalize_dataframe(df_no_provider)
 
-        # Should return only email column (provider was added but then filtered out in return)
-        # Actually, based on our implementation, it should return both since we add provider
+        # Should always return both columns since provider is added if missing
         expected_columns = ["provider", "email"]
         assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
 
@@ -782,7 +781,7 @@ class TestUserAllowlistCache:
 
         result = cache._clean_and_normalize_dataframe(df_empty)
 
-        # Should return both columns even for empty DataFrame
+        # Should return both columns even for empty DataFrame (provider added if missing)
         expected_columns = ["provider", "email"]
         assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
         assert len(result) == 0, f"Expected 0 rows, got {len(result)}"

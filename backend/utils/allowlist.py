@@ -337,11 +337,8 @@ class UserAllowlistCache:
                 original_count - final_count
             )
 
-        # Return columns based on what's available
-        if "provider" in allowlist_df.columns:
-            return allowlist_df[["provider", "email"]]
-        else:
-            return allowlist_df[["email"]]
+        # Return both columns (provider is always present after normalization)
+        return allowlist_df[["provider", "email"]]
 
     def _validate_allowlist_data(self, allowlist_df: pd.DataFrame) -> tuple[bool, pd.DataFrame]:
         """Validate allowlist data with resilient error handling.
