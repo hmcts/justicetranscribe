@@ -67,9 +67,22 @@ function BackupUploader({
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { upload_url, user_upload_s3_file_key } = urlResult.data!;
 
-        // Try single file upload first
+        // Try single file upload first (unless force chunked mode is enabled)
         let finalFileKey = user_upload_s3_file_key;
+        
+        // Check if chunked upload is forced (local development only)
+        const isLocalDev = process.env.NODE_ENV === 'development';
+        const forceChunked = isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === 'true';
+        
+        if (forceChunked) {
+          console.log('🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload');
+        }
+        
         try {
+          if (forceChunked) {
+            // Force chunked upload for testing
+            throw new Error('Forced chunked upload (test mode)');
+          }
           // Create XMLHttpRequest to track upload progress
           const xhr = new XMLHttpRequest();
           await new Promise((resolve, reject) => {

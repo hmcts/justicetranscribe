@@ -28,7 +28,7 @@ import { apiClient } from "@/lib/api-client";
 import * as Sentry from "@sentry/nextjs";
 import ErrorReportCard from "@/components/ui/error-report-card";
 import { getDuration } from "@/components/audio/processing-status";
-import { uploadChunksFromBackup } from "@/lib/azure-upload";
+import { uploadChunksFromBackup, uploadBlobAsChunks } from "@/lib/azure-upload";
 import AudioRecorderComponent from "./audio-recorder";
 import ScreenRecorder from "./screen-recorder";
 
@@ -287,28 +287,52 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           setUploadError(null);
         }
 
-        // Try single file upload first
+        // Try single file upload first (unless force chunked mode is enabled)
         let finalFileKey = user_upload_s3_file_key;
+        
+        // Check if chunked upload is forced (local development only)
+        const isLocalDev = process.env.NODE_ENV === 'development';
+        const forceChunked = isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === 'true';
+        
+        if (forceChunked) {
+          console.log('🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload');
+        }
+        
         try {
+          if (forceChunked) {
+            // Force chunked upload for testing
+            throw new Error('Forced chunked upload (test mode)');
+          }
           await uploadFile(blob, upload_url);
         } catch (uploadError) {
           console.warn("Single file upload failed, attempting chunked upload fallback:", uploadError);
           
-          // CHUNKED UPLOAD FALLBACK: If single upload fails, try uploading chunks
-          if (currentBackupId) {
-            try {
-              // uploadChunksAsFallback gets a new upload URL and returns the new file key
+          // CHUNKED UPLOAD FALLBACK: If single upload fails, try chunked upload
+          try {
+            // If we have chunks in IndexedDB, use those; otherwise split the blob
+            if (currentBackupId) {
+              // Try to use existing chunks from recording
               finalFileKey = await uploadChunksAsFallback(currentBackupId, blob.type);
-              currentUserUploadKey = finalFileKey;
-              setUserUploadKey(finalFileKey);
-            } catch (chunkedError) {
-              console.error("❌ Both single and chunked upload failed:", chunkedError);
-              const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
-              const chunkedErrorMessage = chunkedError instanceof Error ? chunkedError.message : String(chunkedError);
-              throw new Error(`Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`);
+            } else {
+              // No IndexedDB chunks - split the blob on-the-fly
+              console.log("No backup ID available, splitting blob for chunked upload");
+              const result = await uploadBlobAsChunks({
+                blob,
+                mimeType: blob.type,
+                onProgress: (progress: number) => {
+                  setProcessingStatus({ state: "uploading", progress });
+                },
+              });
+              finalFileKey = result.fileKey;
             }
-          } else {
-            throw uploadError; // No backup ID available for chunked fallback
+            
+            currentUserUploadKey = finalFileKey;
+            setUserUploadKey(finalFileKey);
+          } catch (chunkedError) {
+            console.error("❌ Both single and chunked upload failed:", chunkedError);
+            const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+            const chunkedErrorMessage = chunkedError instanceof Error ? chunkedError.message : String(chunkedError);
+            throw new Error(`Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`);
           }
         }
 
@@ -395,7 +419,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, uploadFile]
+    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, uploadFile, uploadChunksAsFallback]
   );
 
   const handleRecordingStart = useCallback(() => {
