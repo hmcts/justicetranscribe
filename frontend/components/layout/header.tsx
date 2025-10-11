@@ -41,8 +41,6 @@ export default function Header({ className = undefined }: HeaderProps) {
           <div className={cn("flex items-center", "pl-0 ")}>
             <Link
               href="/"
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex items-center gap-2 text-black"
             >
               <span
