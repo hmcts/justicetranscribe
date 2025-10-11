@@ -1,14 +1,20 @@
 import base64
 import json
+import logging
 import os
-from typing import Annotated, Optional
+from typing import Annotated
 
-from fastapi import Depends, HTTPException, Header
+from fastapi import Depends, Header, HTTPException
 from sqlmodel import Session, select
 
 from app.database.postgres_database import get_session
 from app.database.postgres_models import User
+from utils.allowlist import get_allowlist_cache
 from utils.jwt_verification import jwt_verification_service
+from utils.settings import get_settings
+
+logger = logging.getLogger(__name__)
+
 
 def is_local_development() -> bool:
     """Check if we're running in local development mode"""
@@ -17,34 +23,33 @@ def is_local_development() -> bool:
 def get_mock_user_data() -> dict:
     """Return mock user data for local development"""
     return {
-        "user_id": "local-dev-user-123", 
+        "user_id": "local-dev-user-123",
         "name": "Local Developer",
         "email": "developer@localhost.com"
     }
 
-async def get_current_user(
-    session: Session = Depends(get_session),
-    x_ms_client_principal: Annotated[Optional[str], Header()] = None,
-    authorization: Annotated[Optional[str], Header()] = None
+async def get_current_user(  # noqa: C901, PLR0912, PLR0915
+    session: Session = Depends(get_session),  # noqa: B008
+    x_ms_client_principal: Annotated[str | None, Header()] = None,
+    authorization: Annotated[str | None, Header()] = None
 ) -> User:
     """
     Get or create the current user with defense-in-depth:
     1. Azure Easy Auth headers (primary)
     2. JWT signature verification (secondary)
     """
-    
+
     # Local development mode
     if is_local_development():
-        print("🔧 Local development mode: Using mock authentication")
+        logger.info("Local development mode: Using mock authentication")
         user_data = get_mock_user_data()
         email = user_data["email"]
         azure_user_id = user_data["user_id"]
-        name = user_data["name"]
     else:
         # Production mode - MUST have Easy Auth headers
         if not x_ms_client_principal:
             raise HTTPException(
-                status_code=401, 
+                status_code=401,
                 detail="Authentication required. Please ensure Easy Auth is properly configured."
             )
 
@@ -55,7 +60,6 @@ async def get_current_user(
 
             # Extract user details from Easy Auth
             azure_user_id = user_info.get("userId", "")
-            name = user_info.get("userDetails", "")
 
             # Get email from claims
             email = ""
@@ -67,7 +71,7 @@ async def get_current_user(
 
             if not email:
                 raise HTTPException(
-                    status_code=401, 
+                    status_code=401,
                     detail="Authentication failed: email claim missing from Azure AD token"
                 )
 
@@ -76,7 +80,7 @@ async def get_current_user(
             jwt_user_id = None
             if authorization and authorization.startswith("Bearer "):
                 jwt_token = authorization[7:]  # Remove "Bearer " prefix
-                
+
             if jwt_token:
                 try:
                     decoded_jwt = await jwt_verification_service.verify_jwt_token(jwt_token)
@@ -84,52 +88,52 @@ async def get_current_user(
                         # Cross-validate Easy Auth claims with JWT claims
                         jwt_email = decoded_jwt.get("email") or decoded_jwt.get("preferred_username", "")
                         jwt_user_id = decoded_jwt.get("oid", "")
-                        
+
                         # Verify that Easy Auth and JWT claims match
                         if jwt_email and jwt_email != email:
-                            print(f"⚠️ Email mismatch: Easy Auth={email}, JWT={jwt_email}")
+                            logger.warning("Email mismatch: Easy Auth=%s, JWT=%s", email, jwt_email)
                             if jwt_verification_service.strict_mode:
                                 raise HTTPException(
-                                    status_code=401, 
+                                    status_code=401,
                                     detail="Authentication claims mismatch between Easy Auth and JWT"
                                 )
-                        
-                        print(f"✅ JWT signature verification passed - Additional security layer confirmed")
+
+                        logger.info("JWT signature verification passed - Additional security layer confirmed")
                     else:
-                        print(f"ℹ️ JWT verification skipped or failed non-strictly")
+                        logger.info("JWT verification skipped or failed non-strictly")
                 except Exception as e:
-                    print(f"⚠️ JWT verification error: {e}")
+                    logger.warning("JWT verification error: %s", e)
                     # In non-strict mode, JWT verification failure doesn't block the request
                     if jwt_verification_service.strict_mode:
                         raise
             else:
                 if jwt_verification_service.strict_mode:
                     raise HTTPException(
-                        status_code=401, 
+                        status_code=401,
                         detail="JWT token required for strict verification mode"
                     )
-                print("ℹ️ No JWT token provided for secondary verification")
+                logger.info("No JWT token provided for secondary verification")
 
             # Use JWT user ID as the primary identifier if available (more reliable)
             # Fall back to Easy Auth userId, then email as last resort
             if jwt_user_id:
                 azure_user_id = jwt_user_id
-                print(f"✅ Using JWT object ID as primary user identifier: {azure_user_id}")
+                logger.info("Using JWT object ID as primary user identifier: %s", azure_user_id)
             elif azure_user_id:
-                print(f"✅ Using Easy Auth userId: {azure_user_id}")
+                logger.info("Using Easy Auth userId: %s", azure_user_id)
             else:
                 azure_user_id = email
-                print(f"✅ Falling back to email as user identifier: {azure_user_id}")
+                logger.info("Falling back to email as user identifier: %s", azure_user_id)
 
-            print(f"✅ Authentication validated - ID: {azure_user_id}, Email: {email}")
+            logger.info("Authentication validated - ID: %s, Email: %s", azure_user_id, email)
 
         except (json.JSONDecodeError, base64.binascii.Error) as e:
-            raise HTTPException(status_code=401, detail=f"Invalid authentication information: {str(e)}")
+            raise HTTPException(status_code=401, detail=f"Invalid authentication information: {e!s}") from e
 
     # Get or create user in database
     statement = select(User).where(User.azure_user_id == azure_user_id)
     user = session.exec(statement).first()
-    
+
     if not user:
         # Create new user
         user = User(
@@ -139,8 +143,62 @@ async def get_current_user(
         session.add(user)
         session.commit()
         session.refresh(user)
-        print(f"✅ Created new user: {email}")
+        logger.info("Created new user: %s", email)
     else:
-        print(f"✅ Found existing user: {email}")
-    
+        logger.info("Found existing user: %s", email)
+
     return user
+
+
+async def get_allowlisted_user(
+    current_user: User = Depends(get_current_user)  # noqa: B008
+) -> User:
+    """
+    Get the current user AND verify they are on the allowlist.
+
+    This dependency should be used on all protected endpoints that require
+    allowlist verification (which is most endpoints after onboarding).
+
+    Parameters
+    ----------
+    current_user : User
+        The authenticated user from get_current_user dependency.
+
+    Returns
+    -------
+    User
+        The authenticated and allowlisted user.
+
+    Raises
+    ------
+    HTTPException
+        403 if user is not on the allowlist.
+    """
+    settings = get_settings()
+
+    # Check for local development bypass
+    if (settings.ENVIRONMENT == "local" and
+        settings.BYPASS_ALLOWLIST_DEV and
+        current_user.email == "developer@localhost.com"):
+        logger.info("Allowlist bypassed for local dev user: %s", current_user.email)
+        return current_user
+
+    # Check allowlist
+    allowlist_config = settings.get_allowlist_config()
+    allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
+    is_allowlisted = await allowlist_cache.is_user_allowlisted(
+        current_user.email,
+        settings.AZURE_STORAGE_CONNECTION_STRING,
+        allowlist_config["container"],
+        allowlist_config["blob_name"]
+    )
+
+    if not is_allowlisted:
+        logger.warning("Access denied: User %s is not on the allowlist", current_user.email)
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Your account is not authorized to use this service. Please contact your administrator."
+        )
+
+    logger.info("Allowlist verified for user: %s", current_user.email)
+    return current_user

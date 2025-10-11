@@ -51,7 +51,7 @@ from app.minutes.types import (
     UploadUrlResponse,
 )
 from utils.allowlist import get_allowlist_cache
-from utils.dependencies import get_current_user
+from utils.dependencies import get_allowlisted_user, get_current_user
 from utils.langfuse_models import (
     LangfuseScoreRequest,
     LangfuseTraceRequest,
@@ -134,7 +134,7 @@ async def get_onboarding_status(
 
 @router.post("/user/complete-onboarding")
 async def complete_onboarding(
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Mark user's onboarding as complete"""
 
@@ -155,7 +155,7 @@ async def complete_onboarding(
         }
 @router.post("/user/reset-onboarding")
 async def reset_onboarding(
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Reset user's onboarding status (dev only)"""
 
@@ -208,7 +208,7 @@ async def azure_storage_health_check():
 @router.post("/get-upload-url", response_model=UploadUrlResponse)
 async def get_upload_url(
     request: UploadUrlRequest,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ) -> UploadUrlResponse:
     file_name_uuid = uuid.uuid4()
     file_name = f"{file_name_uuid}.{request.file_extension}"
@@ -239,7 +239,7 @@ async def process_transcription(
 @router.post("/start-transcription-job", response_model=None)
 async def start_transcription_job(
     request: StartTranscriptionJobRequest,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ) -> None:
     try:
         # Pass only primitives to background task, not the User object (SQLAlchemy model)
@@ -257,10 +257,10 @@ async def start_transcription_job(
 @router.post("/generate-or-edit-minutes")
 async def generate_or_edit_minutes(
     request: GenerateMinutesRequest,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     new_minute_version_id = str(uuid.uuid4())
-    
+
     # Extract primitives from SQLAlchemy object before passing to background task
     user_id = current_user.id
     user_email = current_user.email
@@ -324,8 +324,10 @@ async def generate_or_edit_minutes(
 
 
 @router.get("/templates", response_model=TemplateResponse)
-async def get_templates():
-    """Get all template categories and their templates."""
+async def get_templates(
+    current_user: User = Depends(get_current_user),  # noqa: B008, ARG001
+):
+    """Get all template categories (auth only, used during onboarding)."""
     templates = get_all_templates()
     return TemplateResponse(templates=templates)
 
@@ -335,7 +337,7 @@ async def get_transcriptions_metadata(
     current_user: User = Depends(get_current_user),  # noqa: B008
     timezone: str = "Europe/London",  # Optional parameter with UK default
 ):
-    """Get metadata for all transcriptions for the current user."""
+    """Get metadata for all transcriptions (auth only, allowlist checked in frontend)."""
     logger.info("getting transcription metadata for user %s", current_user.id)
 
     # Get timezone (fallback to UK if invalid)
@@ -350,7 +352,7 @@ async def get_transcriptions_metadata(
 @router.get("/transcriptions/{transcription_id}", response_model=Transcription)
 async def get_transcription(
     transcription_id: UUID,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
     timezone: str = "Europe/London",  # Optional parameter with UK default
 ):
     """Get a specific transcription by ID."""
@@ -365,7 +367,7 @@ async def get_transcription(
 @router.post("/transcriptions", response_model=Transcription)
 async def save_transcription_route(
     transcription_data: Transcription,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Save or update a transcription."""
     logger.info("saving transcription for user %s", current_user.id)
@@ -376,7 +378,7 @@ async def save_transcription_route(
 @router.delete("/transcriptions/{transcription_id}", status_code=204)
 async def delete_transcription(
     transcription_id: UUID,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Delete a specific transcription by ID."""
     delete_transcription_by_id(transcription_id, current_user.id)
@@ -389,7 +391,7 @@ async def delete_transcription(
 async def get_minute_version_by_id_route(
     transcription_id: UUID,
     minute_version_id: UUID,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Get a specific minute version by its ID for a given transcription."""
     # Verify user has access to the associated transcription
@@ -410,7 +412,7 @@ async def get_minute_version_by_id_route(
 )
 async def get_minute_versions_route(
     transcription_id: UUID,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Get all minute versions for a specific transcription."""
     # Verify user has access to this transcription
@@ -429,7 +431,7 @@ async def get_minute_versions_route(
 async def save_minute_version_route(
     transcription_id: UUID,
     minute_data: MinuteVersion,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Create or update a minute version for a transcription."""
     transcription = get_transcription_by_id(
@@ -464,7 +466,7 @@ async def save_minute_version_route(
 async def save_transcription_job_route(
     transcription_id: UUID,
     job_data: TranscriptionJob,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ) -> TranscriptionJob:
     """Create a new transcription job for a transcription."""
     # Verify user has access to this transcription
@@ -484,7 +486,7 @@ async def save_transcription_job_route(
 )
 async def get_transcription_jobs_route(
     transcription_id: UUID,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ) -> list[TranscriptionJob]:
     """Get all transcription jobs for a specific transcription."""
     # Verify user has access to this transcription
@@ -501,7 +503,7 @@ async def get_transcription_jobs_route(
 async def get_current_user_route(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
-    """Get the current user's details."""
+    """Get the current user's details (auth only, no allowlist check)."""
     return get_user_by_id(current_user.id)
 
 
@@ -510,7 +512,7 @@ async def get_current_user_route(
 async def get_current_user_me_route(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
-    """Get the current user's details (alias for /user)."""
+    """Get the current user's details (auth only, no allowlist check)."""
     return get_user_by_id(current_user.id)
 
 
@@ -518,7 +520,7 @@ async def get_current_user_me_route(
 async def get_user_profile_route(
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
-    """Get the current user's profile (alias for /user)."""
+    """Get the current user's profile (auth only, no allowlist check)."""
     return get_user_by_id(current_user.id)
 
 
@@ -529,7 +531,7 @@ async def update_current_user_route(
     request: UpdateUserRequest,
     current_user: User = Depends(get_current_user),  # noqa: B008
 ):
-    """Update the current user's details."""
+    """Update the current user's details (auth only, used during onboarding)."""
     update_fields = request.model_dump(exclude_unset=True)
     return update_user(current_user.id, **update_fields)
 
@@ -537,7 +539,7 @@ async def update_current_user_route(
 @router.post("/langfuse/trace")
 async def submit_langfuse_trace(
     request: LangfuseTraceRequest,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Submit a trace to Langfuse via backend proxy for security."""
     try:
@@ -564,7 +566,7 @@ async def submit_langfuse_trace(
 @router.post("/langfuse/score")
 async def submit_langfuse_score(
     request: LangfuseScoreRequest,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Submit a score to Langfuse via backend proxy for security."""
     try:
