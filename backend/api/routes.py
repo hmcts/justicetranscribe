@@ -3,6 +3,7 @@ import uuid
 from uuid import UUID
 
 import pytz
+import sentry_sdk
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse
 
@@ -105,21 +106,39 @@ async def get_onboarding_status(
         settings.ENVIRONMENT in ["local", "dev"]
     )
 
-    # Check allowlist status using environment-specific configuration
+    # Check allowlist status with fail-open approach
     # Check for local development bypass first
     if (settings.ENVIRONMENT == "local" and
         settings.BYPASS_ALLOWLIST_DEV and
         current_user.email == "developer@localhost.com"):
         is_allowlisted = True
     else:
-        allowlist_config = settings.get_allowlist_config()
-        allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
-        is_allowlisted = await allowlist_cache.is_user_allowlisted(
-            current_user.email,
-            settings.AZURE_STORAGE_CONNECTION_STRING,
-            allowlist_config["container"],
-            allowlist_config["blob_name"]
-        )
+        try:
+            allowlist_config = settings.get_allowlist_config()
+            allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
+            is_allowlisted = await allowlist_cache.is_user_allowlisted(
+                current_user.email,
+                settings.AZURE_STORAGE_CONNECTION_STRING,
+                allowlist_config["container"],
+                allowlist_config["blob_name"]
+            )
+        except Exception as e:
+            # FAIL OPEN: Allowlist check failed - log and allow access
+            logger.exception(
+                "⚠️ ALLOWLIST CHECK FAILED IN ONBOARDING STATUS - FAILING OPEN ⚠️ | User: %s",
+                current_user.email
+            )
+            sentry_sdk.capture_exception(
+                e,
+                extras={
+                    "user_email": current_user.email,
+                    "endpoint": "/user/onboarding-status",
+                    "fail_open": True,
+                    "message": "Allowlist check failed in onboarding-status - allowing access (fail-open mode)"
+                }
+            )
+            logger.warning("Allowing access for user %s due to allowlist service failure (fail-open)", current_user.email)
+            is_allowlisted = True  # Fail open: allow access
 
     return OnboardingStatusResponse(
         has_completed_onboarding=current_user.has_completed_onboarding,

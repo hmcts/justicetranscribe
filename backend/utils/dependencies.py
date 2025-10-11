@@ -4,6 +4,7 @@ import logging
 import os
 from typing import Annotated
 
+import sentry_sdk
 from fastapi import Depends, Header, HTTPException
 from sqlmodel import Session, select
 
@@ -183,22 +184,44 @@ async def get_allowlisted_user(
         logger.info("Allowlist bypassed for local dev user: %s", current_user.email)
         return current_user
 
-    # Check allowlist
-    allowlist_config = settings.get_allowlist_config()
-    allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
-    is_allowlisted = await allowlist_cache.is_user_allowlisted(
-        current_user.email,
-        settings.AZURE_STORAGE_CONNECTION_STRING,
-        allowlist_config["container"],
-        allowlist_config["blob_name"]
-    )
-
-    if not is_allowlisted:
-        logger.warning("Access denied: User %s is not on the allowlist", current_user.email)
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied. Your account is not authorized to use this service. Please contact your administrator."
+    # Check allowlist with fail-open approach
+    try:
+        allowlist_config = settings.get_allowlist_config()
+        allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
+        is_allowlisted = await allowlist_cache.is_user_allowlisted(
+            current_user.email,
+            settings.AZURE_STORAGE_CONNECTION_STRING,
+            allowlist_config["container"],
+            allowlist_config["blob_name"]
         )
 
-    logger.info("Allowlist verified for user: %s", current_user.email)
-    return current_user
+        if not is_allowlisted:
+            logger.warning("Access denied: User %s is not on the allowlist", current_user.email)
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied. Your account is not authorized to use this service. Please contact your administrator."
+            )
+
+        logger.info("Allowlist verified for user: %s", current_user.email)
+        return current_user  # noqa: TRY300
+
+    except HTTPException:
+        # Re-raise HTTPException (user not allowlisted) - don't fail open for this
+        raise
+    except Exception as e:
+        # FAIL OPEN: Allowlist check failed (service unavailable, parse error, etc.)
+        # Log extensively and allow access
+        logger.exception(
+            "⚠️ ALLOWLIST CHECK FAILED - FAILING OPEN ⚠️ | User: %s",
+            current_user.email
+        )
+        sentry_sdk.capture_exception(
+            e,
+            extras={
+                "user_email": current_user.email,
+                "fail_open": True,
+                "message": "Allowlist check failed - allowing access (fail-open mode)"
+            }
+        )
+        logger.warning("Allowing access for user %s due to allowlist service failure (fail-open)", current_user.email)
+        return current_user

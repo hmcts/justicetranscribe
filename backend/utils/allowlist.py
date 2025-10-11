@@ -2,12 +2,9 @@
 
 import asyncio
 import logging
-import os
 import time
 from io import StringIO
-from pathlib import Path
 
-import aiofiles
 import pandas as pd
 from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 
@@ -95,8 +92,8 @@ class UserAllowlistCache:
                 if attempt < max_retries - 1:  # Not the last attempt
                     await asyncio.sleep(2 ** attempt)  # Exponential backoff
 
-        # All Azure attempts failed - try local fallback in development
-        return await self._try_local_fallback(blob_name, last_exception)
+        # All Azure attempts failed - raise the exception
+        raise last_exception
 
     async def _download_blob_content(
         self,
@@ -151,58 +148,6 @@ class UserAllowlistCache:
         allowlist_df = cleaned_df
 
         return allowlist_df
-
-    async def _try_local_fallback(self, blob_name: str, last_exception: Exception) -> pd.DataFrame:
-        """Try local file fallback for development environment."""
-        if os.getenv("ENVIRONMENT", "").lower() != "local":
-            raise last_exception
-
-        logger.warning("Azure blob not found. Attempting local file fallback for development...")
-        try:
-            local_file = self._get_local_fallback_path(blob_name)
-            if Path(local_file).exists():
-                # Use aiofiles for async file operations
-                async with aiofiles.open(local_file, mode="rb") as f:
-                    content = await f.read()
-                allowlist_df = self._parse_allowlist_csv_from_bytes(content)
-                # Clean and normalize the data first
-                allowlist_df = self._clean_and_normalize_dataframe(allowlist_df)
-                # Then validate the cleaned data
-                is_valid, cleaned_df = self._validate_allowlist_data(allowlist_df)
-                if is_valid:
-                    logger.info("✅ Using local fallback file: %s", local_file)
-                    return cleaned_df
-            else:
-                logger.error("Local fallback file not found: %s", local_file)
-        except Exception:
-            logger.exception("Local fallback also failed")
-
-        # If we get here, all retries failed
-        raise last_exception
-
-    def _get_local_fallback_path(self, blob_name: str) -> str:
-        """Get local file path for development fallback.
-
-        Parameters
-        ----------
-        blob_name : str
-            The Azure blob name (e.g., 'lookups/allowlist_dev.csv')
-
-        Returns
-        -------
-        str
-            Local file path
-        """
-        # Extract filename from blob path
-        filename = Path(blob_name).name
-
-        # Look in the data directory relative to project root
-        # Assuming backend/utils/allowlist.py -> ../../data/
-        current_dir = Path(__file__).resolve().parent
-        project_root = current_dir.parent.parent
-        data_dir = project_root / "data"
-
-        return str(data_dir / filename)
 
     def _parse_allowlist_csv_from_bytes(self, content: bytes) -> pd.DataFrame:
         """Parse allowlist CSV from bytes with proper encoding fallback.
@@ -512,12 +457,10 @@ class UserAllowlistCache:
                         self._expires_at = time.time() + self._ttl_seconds
                         # Clear user cache when allowlist data refreshes
                         self._user_status.clear()
-                    except Exception as e:
-                        # Log the error but don't raise - fail-safe to deny access
-                        logger.warning("Failed to load allowlist data: %s", e)
-                        # Cache a denial for this user to avoid repeated failed attempts
-                        self._user_status[normalized_email] = False
-                        return False
+                    except Exception:
+                        # Let the exception propagate - fail-open logic will handle it upstream
+                        logger.exception("Failed to load allowlist data from Azure")
+                        raise
 
         # Check against allowlist data
         is_allowlisted = normalized_email in self._allowlist_data["email"].to_numpy()
