@@ -272,7 +272,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
     if (!currentVersion?.star_rating) {
       setTimeout(() => {
         setIsRatingDialogOpen(true);
-      }, 2000); // 3 second delay
+      }, 1000); // 1 second delay
     }
   };
 

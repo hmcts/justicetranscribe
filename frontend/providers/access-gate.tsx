@@ -7,7 +7,9 @@ export default function AccessGate({
 }: {
   children: React.ReactNode;
 }) {
-  const [accessStatus, setAccessStatus] = useState<'checking' | 'allowed' | 'denied' | null>(null);
+  // Start with 'checking' to prevent flash of content
+  const [accessStatus, setAccessStatus] = useState<'checking' | 'allowed'>('checking');
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -27,9 +29,6 @@ export default function AccessGate({
         
         if (isMounted && res.data) {
           const { should_show_coming_soon, should_show_onboarding } = res.data;
-          const newStatus = should_show_coming_soon ? 'denied' : 'allowed';
-          console.log("✅ Setting status:", newStatus);
-          setAccessStatus(newStatus);
           
           // Handle redirects - check if we're in browser environment
           if (typeof window !== 'undefined') {
@@ -42,47 +41,55 @@ export default function AccessGate({
             
             if (should_show_coming_soon && !onComingSoon) {
               console.log("🔄 Redirecting to coming-soon");
+              setIsRedirecting(true);
               window.location.href = "/coming-soon";
+              return;
             } else if (!should_show_coming_soon && should_show_onboarding && !onOnboarding && !isTranscriptPage) {
               console.log("🔄 Redirecting to onboarding");
+              setIsRedirecting(true);
               window.location.href = "/onboarding";
+              return;
             } else if (!should_show_coming_soon && !should_show_onboarding && onComingSoon) {
               console.log("🔄 Redirecting to home");
+              setIsRedirecting(true);
               window.location.href = "/";
-            } else {
-              console.log("✅ No redirect needed");
+              return;
             }
           }
+          
+          // If we got here, no redirect needed - allow page to render
+          console.log("✅ No redirect needed, allowing page render");
+          setAccessStatus('allowed');
         }
       } catch (e) {
         console.warn("❌ Access gate check failed:", e);
         if (isMounted) {
-          setAccessStatus('denied');
-          // Check if we're in browser environment before accessing window
+          // On error, redirect to coming-soon if not already there
           if (typeof window !== 'undefined') {
             const currentPathname = window.location.pathname;
             const onComingSoon = currentPathname?.startsWith("/coming-soon");
             if (!onComingSoon) {
+              console.log("🔄 Error occurred, redirecting to coming-soon");
+              setIsRedirecting(true);
               window.location.href = "/coming-soon";
+              return;
             }
           }
+          // If already on coming-soon, allow it to render
+          setAccessStatus('allowed');
         }
       }
     };
 
-    // Only check if we haven't checked yet
-    if (accessStatus === null) {
-      setAccessStatus('checking');
-      checkAccess();
-    }
+    checkAccess();
 
     return () => {
       isMounted = false;
     };
   }, []); // Empty dependency array - only run once
 
-  // Show loading screen while checking
-  if (accessStatus === 'checking') {
+  // Show loading screen while checking or redirecting
+  if (accessStatus === 'checking' || isRedirecting) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
         <div 
@@ -92,20 +99,20 @@ export default function AccessGate({
           aria-busy="true"
         >
           <h1 className="text-2xl font-semibold text-gray-800 mb-6">
-            Access Verification
+            {isRedirecting ? 'Redirecting' : 'Access Verification'}
           </h1>
           <div 
             className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"
             aria-hidden="true"
           ></div>
           <p className="text-gray-600 font-medium" aria-label="Verifying your access permissions">
-            Verifying access...
+            {isRedirecting ? 'Redirecting...' : 'Verifying access...'}
           </p>
         </div>
       </main>
     );
   }
 
-  // Render the page content
+  // Render page content once check is complete and no redirect needed
   return <>{children}</>;
 }
