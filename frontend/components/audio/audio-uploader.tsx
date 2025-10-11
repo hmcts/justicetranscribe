@@ -10,7 +10,6 @@ import { useTranscripts } from "@/providers/transcripts";
 import ProcessingLoader, {
   AudioProcessingStatus,
 } from "@/components/audio/processing-loader";
-import AudioPlayerComponent from "@/components/audio/audio-player";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import {
@@ -111,7 +110,6 @@ function ContentDisplay({
               Please check your internet connection and try again
             </p>
           </div>
-          <AudioPlayerComponent audioBlob={audioBlob} />
           <div className="flex justify-center gap-4">
             <Button
               variant="default"

@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 
 interface AudioPlayerProps {
   audioBlob: Blob;
+  restrictDownload?: boolean;
 }
 
 const getFileExtension = (blob: Blob): string => {
@@ -45,7 +46,7 @@ const getFileExtension = (blob: Blob): string => {
   }
 };
 
-function AudioPlayerComponent({ audioBlob }: AudioPlayerProps) {
+function AudioPlayerComponent({ audioBlob, restrictDownload = false }: AudioPlayerProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
 
@@ -68,7 +69,12 @@ function AudioPlayerComponent({ audioBlob }: AudioPlayerProps) {
 
   return (
     <div className="mb-4">
-      <audio controls className="w-full rounded-md" preload="none">
+      <audio 
+        controls 
+        className="w-full rounded-md" 
+        preload="none"
+        controlsList={restrictDownload ? "nodownload" : undefined}
+      >
         <source src={audioUrl} type={audioBlob.type} />
         Your browser does not support the audio element.
       </audio>
