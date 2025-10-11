@@ -72,15 +72,6 @@ function AudioPlayerComponent({ audioBlob }: AudioPlayerProps) {
         <source src={audioUrl} type={audioBlob.type} />
         Your browser does not support the audio element.
       </audio>
-      <div className="flex justify-end">
-        <a
-          href={audioUrl}
-          download={fileName}
-          className="mt-2 text-sm text-blue-600 hover:underline"
-        >
-          Download Audio File
-        </a>
-      </div>
     </div>
   );
 }
