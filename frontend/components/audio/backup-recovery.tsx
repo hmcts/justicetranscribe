@@ -28,7 +28,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { audioBackupDB, AudioBackup } from "@/lib/indexeddb-backup";
-import AudioPlayerComponent from "./audio-player";
 
 interface BackupRecoveryProps {
   onRetryUpload: (backup: AudioBackup) => void;
@@ -238,8 +237,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
                       </AlertDialog>
                     </div>
                   </div>
-
-                  <AudioPlayerComponent audioBlob={backup.blob} />
                 </div>
               ))}
             </div>

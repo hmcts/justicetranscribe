@@ -8,7 +8,6 @@ import { RefreshCw } from "lucide-react";
 import ProcessingLoader, {
   AudioProcessingStatus,
 } from "@/components/audio/processing-loader";
-import AudioPlayerComponent from "@/components/audio/audio-player";
 import { AudioBackup, audioBackupDB } from "@/lib/indexeddb-backup";
 import { useTranscripts } from "@/providers/transcripts";
 import { apiClient } from "@/lib/api-client";
@@ -179,8 +178,6 @@ function BackupUploader({
                   <p>Duration: {formatDuration(backup.recordingDuration)}</p>
                 </div>
               </div>
-
-              <AudioPlayerComponent audioBlob={backup.blob} />
 
               <div className="flex justify-center gap-4">
                 <Button
