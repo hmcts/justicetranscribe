@@ -19,11 +19,8 @@ interface AudioChunk {
 class IndexedDBBackup {
   private dbName = "AudioBackupDB";
 
-<<<<<<< HEAD
   private version = 2; // Incremented to add chunks store
-=======
-  private version = 2;
->>>>>>> main
+
 
   private storeName = "audioBackups";
   private chunksStoreName = "audioChunks";
@@ -34,18 +31,13 @@ class IndexedDBBackup {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version);
 
-<<<<<<< HEAD
-      request.onerror = () => {
-        console.error("❌ Failed to open IndexedDB:", request.error);
-        reject(new Error("Failed to open IndexedDB"));
-=======
+
       request.onerror = (event) => {
         const errorMsg = (event.target as IDBOpenDBRequest).error?.message || "Unknown error";
         const error = new Error(`Failed to open IndexedDB: ${errorMsg}`);
         console.error("[IndexedDB] Open error:", error);
         Sentry.captureException(error);
         reject(error);
->>>>>>> main
       };
 
       request.onsuccess = () => {
