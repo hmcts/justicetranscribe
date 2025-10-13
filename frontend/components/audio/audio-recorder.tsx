@@ -134,9 +134,11 @@ function AudioRecorderComponent({
     try {
       await audioBackupDB.appendChunk(
         currentBackupIdRef.current,
-        chunkIndexRef.current++,
+        chunkIndexRef.current,
         chunkData
       );
+      // Only increment index after successful storage to avoid gaps
+      chunkIndexRef.current++;
     } catch (err) {
       console.error("❌ Failed to stream chunk to IndexedDB:", err);
       // Try to initialize IndexedDB if it failed
@@ -144,11 +146,14 @@ function AudioRecorderComponent({
         await audioBackupDB.init();
         await audioBackupDB.appendChunk(
           currentBackupIdRef.current,
-          chunkIndexRef.current - 1, // Use the same index since we incremented it
+          chunkIndexRef.current,
           chunkData
         );
+        // Only increment index after successful retry
+        chunkIndexRef.current++;
       } catch (retryErr) {
         console.error("❌ Failed to store chunk even after retry:", retryErr);
+        // Index not incremented - next chunk will overwrite this slot
       }
     }
   }, []);
