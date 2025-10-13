@@ -30,15 +30,17 @@ export default function Header({ className = undefined }: HeaderProps) {
     }
   }, [router, pathname, searchParams]);
 
+  if (pathname === "/coming-soon") {
+    return null; // Hide the header on the 'coming soon' page
+  }
+
   return (
     <header className={cn("z-50 bg-white dark:border-gray-800", className)}>
       <div className="mx-auto max-w-full">
         <div className="flex h-14 items-center justify-between px-4">
           <div className={cn("flex items-center", "pl-0 ")}>
-            <Link
-              href="/"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={handleHomeClick}
               className="flex items-center gap-2 text-black"
             >
               <span
@@ -47,7 +49,7 @@ export default function Header({ className = undefined }: HeaderProps) {
               >
                 Transcribe
               </span>
-            </Link>
+            </button>
           </div>
           <div className="flex items-center gap-4">
             {!selectedRecordingMode && (

@@ -28,7 +28,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { audioBackupDB, AudioBackup } from "@/lib/indexeddb-backup";
-import AudioPlayerComponent from "./audio-player";
 
 interface BackupRecoveryProps {
   onRetryUpload: (backup: AudioBackup) => void;
@@ -52,7 +51,9 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
       // Auto-collapse if more than 1 recording, otherwise expand
       setIsOpen(allBackups.length <= 1);
     } catch (err) {
-      setError("Failed to load backed up recordings");
+      console.error("[BackupRecovery] Failed to load backups:", err);
+      const errorDetail = err instanceof Error ? err.message : "Unknown error";
+      setError(`Failed to load backed up recordings: ${errorDetail}`);
     } finally {
       setIsLoading(false);
     }
@@ -236,8 +237,6 @@ function BackupRecovery({ onRetryUpload }: BackupRecoveryProps) {
                       </AlertDialog>
                     </div>
                   </div>
-
-                  <AudioPlayerComponent audioBlob={backup.blob} />
                 </div>
               ))}
             </div>

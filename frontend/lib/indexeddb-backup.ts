@@ -19,7 +19,11 @@ interface AudioChunk {
 class IndexedDBBackup {
   private dbName = "AudioBackupDB";
 
+<<<<<<< HEAD
   private version = 2; // Incremented to add chunks store
+=======
+  private version = 2;
+>>>>>>> main
 
   private storeName = "audioBackups";
   private chunksStoreName = "audioChunks";
@@ -30,23 +34,35 @@ class IndexedDBBackup {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version);
 
+<<<<<<< HEAD
       request.onerror = () => {
         console.error("❌ Failed to open IndexedDB:", request.error);
         reject(new Error("Failed to open IndexedDB"));
+=======
+      request.onerror = (event) => {
+        const errorMsg = (event.target as IDBOpenDBRequest).error?.message || "Unknown error";
+        const error = new Error(`Failed to open IndexedDB: ${errorMsg}`);
+        console.error("[IndexedDB] Open error:", error);
+        Sentry.captureException(error);
+        reject(error);
+>>>>>>> main
       };
 
       request.onsuccess = () => {
         this.db = request.result;
+        console.log("[IndexedDB] Successfully opened database");
         resolve();
       };
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+        console.log("[IndexedDB] Upgrading database to version", this.version);
 
         // Create audioBackups store if it doesn't exist
         if (!db.objectStoreNames.contains(this.storeName)) {
           const store = db.createObjectStore(this.storeName, { keyPath: "id" });
           store.createIndex("timestamp", "timestamp", { unique: false });
+          console.log("[IndexedDB] Created object store");
         }
 
         // Create audioChunks store for streaming chunks
@@ -101,6 +117,7 @@ class IndexedDBBackup {
 
   async getAllAudioBackups(): Promise<AudioBackup[]> {
     if (!this.db) {
+      console.log("[IndexedDB] Database not initialized, initializing...");
       await this.init();
     }
 
@@ -109,12 +126,18 @@ class IndexedDBBackup {
       const store = transaction.objectStore(this.storeName);
       const request = store.getAll();
 
-      request.onerror = () => {
-        reject(new Error("Failed to get all audio backups"));
+      request.onerror = (event) => {
+        const errorMsg = (event.target as IDBRequest).error?.message || "Unknown error";
+        const error = new Error(`Failed to get all audio backups: ${errorMsg}`);
+        console.error("[IndexedDB] Get all error:", error);
+        Sentry.captureException(error);
+        reject(error);
       };
 
       request.onsuccess = () => {
-        resolve(request.result || []);
+        const result = request.result || [];
+        console.log(`[IndexedDB] Retrieved ${result.length} audio backup(s)`);
+        resolve(result);
       };
     });
   }

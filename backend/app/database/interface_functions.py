@@ -213,10 +213,10 @@ def save_transcription_job(
             entry.model_dump() if hasattr(entry, "model_dump") else entry
             for entry in job.dialogue_entries
         ]
-        session.add(job)
+        merged = session.merge(job)
         session.commit()
-        session.refresh(job)
-        return job
+        session.refresh(merged)
+        return merged
 
 
 def get_transcription_jobs(

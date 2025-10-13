@@ -252,6 +252,37 @@ export default function HelpPage() {
           </Button>
         </section>
 
+        {/* Justice Transcribe — Approved Use Cases */}
+        <section className="mb-6 rounded-lg border p-6">
+          <h2 className="mb-4 text-xl font-semibold">
+            Justice Transcribe — Approved Use Cases
+          </h2>
+          <p className="mb-3">
+            Per the Data Protection assessment, Justice Transcribe can be used for:
+          </p>
+          <ul className="mb-3 ml-6 list-disc space-y-1">
+            <li>Induction</li>
+            <li>Direct contact with People on Probation</li>
+            <li>Professionals&apos; meetings</li>
+            <li>Preparation for risk assessment</li>
+            <li>Staff supervision</li>
+          </ul>
+          <p className="mb-3">
+            <strong>Coming soon:</strong> PSR use cases.
+          </p>
+          <p>
+            If you have any other use cases, reach out to{" "}
+            <a
+              href="mailto:transcribe@justice.gov.uk"
+              className="font-medium underline"
+              aria-label="Email transcribe@justice.gov.uk"
+            >
+              transcribe@justice.gov.uk
+            </a>{" "}
+            and we&apos;ll get on it.
+          </p>
+        </section>
+
         {/* Individual Sections */}
         <div className="space-y-6">
           {/* Phone/VPN Issue */}
@@ -322,7 +353,7 @@ export default function HelpPage() {
               practices.
             </p>
             <Button 
-              className="bg-[#10652F] hover:bg-[#0d4f26] text-white border-[#10652F] hover:border-[#0d4f26]" 
+              variant="outline"
               asChild
             >
               <a

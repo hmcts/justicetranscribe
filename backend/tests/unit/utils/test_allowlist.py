@@ -128,8 +128,8 @@ class TestUserAllowlistCache:
             cache._parse_allowlist_csv(csv_data)
         assert "email" in str(exc_info.value).lower(), f"Expected error about missing email column, got: {exc_info.value}"
 
-    def test_parse_allowlist_csv_requires_provider_column(self, cache: UserAllowlistCache):
-        """Test that CSV must contain provider column (case-insensitive)."""
+    def test_parse_allowlist_csv_handles_missing_provider_column(self, cache: UserAllowlistCache, mock_logger):
+        """Test that CSV without provider column gets warning and default values."""
         # Use properly formatted CSV without provider column
         csv_data = (
             "Email,Name\n"
@@ -137,9 +137,21 @@ class TestUserAllowlistCache:
             "test2@justice.gov.uk,John\n"
         )
 
-        with pytest.raises(ValueError, match="CSV must contain 'provider' or 'Provider' column") as exc_info:
-            cache._parse_allowlist_csv(csv_data)
-        assert "provider" in str(exc_info.value).lower(), f"Expected error about missing provider column, got: {exc_info.value}"
+        result = cache._parse_allowlist_csv(csv_data)
+
+        # Should succeed with warning
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        assert len(result) == 2, f"Expected 2 rows, got {len(result)}"
+        assert "provider" in result.columns, f"Expected 'provider' column to be added, got: {list(result.columns)}"
+        assert "email" in result.columns, f"Expected 'email' column, got: {list(result.columns)}"
+
+        # Provider should have default "unknown" values
+        assert all(result["provider"] == "unknown"), f"Expected all provider values to be 'unknown', got: {result['provider'].tolist()}"
+
+        # Should have logged warning about missing provider
+        mock_logger.warning.assert_called()
+        warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+        assert any("CSV missing 'provider' or 'Provider' column" in call for call in warning_calls), f"Expected warning about missing provider column, got: {warning_calls}"
 
     def test_parse_allowlist_csv_integration(self, cache: UserAllowlistCache, sample_csv_data: str):
         """Test CSV parsing with realistic data - this tests the core parsing logic."""
@@ -445,6 +457,357 @@ class TestUserAllowlistCache:
         mock_logger.exception.assert_called_once()
         call_args = mock_logger.exception.call_args
         assert call_args[0][0] == "Allowlist data validation error"
+
+    def test_check_required_columns_email_required(self, cache: UserAllowlistCache, mock_logger):
+        """Test that email column is required and returns False if missing."""
+        # DataFrame without email column
+        df_no_email = pd.DataFrame({
+            "provider": ["Test"],
+            "name": ["test@example.com"]
+        })
+
+        result = cache._check_required_columns(df_no_email)
+        assert result is False, f"Expected False for missing email column, got {result}"
+
+        # Should log error about missing email
+        mock_logger.error.assert_called_once()
+        error_call = mock_logger.error.call_args[0]
+        assert "Missing required 'email' column" in error_call[0]
+        assert "name" in error_call[1]  # Should show found columns
+
+    def test_check_required_columns_provider_optional(self, cache: UserAllowlistCache, mock_logger):
+        """Test that provider column is optional and logs warning if missing."""
+        # DataFrame without provider column
+        df_no_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk"]
+        })
+
+        result = cache._check_required_columns(df_no_provider)
+        assert result is True, f"Expected True for missing provider column (optional), got {result}"
+
+        # Should log warning about missing provider
+        mock_logger.warning.assert_called_once()
+        warning_call = mock_logger.warning.call_args[0]
+        assert "Missing optional 'provider' column" in warning_call[0]
+        assert "email" in warning_call[1]  # Should show found columns
+
+    def test_check_required_columns_both_present(self, cache: UserAllowlistCache, mock_logger):
+        """Test that both columns present returns True with no warnings."""
+        # DataFrame with both columns
+        df_complete = pd.DataFrame({
+            "email": ["test@justice.gov.uk"],
+            "provider": ["Test Provider"]
+        })
+
+        result = cache._check_required_columns(df_complete)
+        assert result is True, f"Expected True for complete data, got {result}"
+
+        # Should not log any warnings or errors
+        mock_logger.error.assert_not_called()
+        mock_logger.warning.assert_not_called()
+
+    def test_clean_and_normalize_dataframe_handles_email_column_variations(self, cache: UserAllowlistCache):
+        """Test that Email vs email column names are handled gracefully."""
+        # DataFrame with capitalized Email column
+        df_capitalized = pd.DataFrame({
+            "Email": ["test@justice.gov.uk", "test2@justice.gov.uk"],
+            "Provider": ["Test1", "Test2"]
+        })
+
+        result = cache._clean_and_normalize_dataframe(df_capitalized)
+
+        # Should succeed and normalize column names
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        assert "email" in result.columns, f"Expected 'email' column (lowercase), got: {list(result.columns)}"
+        assert "provider" in result.columns, f"Expected 'provider' column (lowercase), got: {list(result.columns)}"
+        assert len(result) == 2, f"Expected 2 rows, got {len(result)}"
+
+        # Emails should be normalized
+        assert "test@justice.gov.uk" in result["email"].tolist()
+        assert "test2@justice.gov.uk" in result["email"].tolist()
+
+    def test_clean_and_normalize_dataframe_handles_missing_provider(self, cache: UserAllowlistCache, mock_logger):
+        """Test that missing provider column gets default values."""
+        # DataFrame without provider column
+        df_no_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk", "test2@justice.gov.uk"]
+        })
+
+        result = cache._clean_and_normalize_dataframe(df_no_provider)
+
+        # Should succeed with provider column added
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        assert "provider" in result.columns, f"Expected 'provider' column to be added, got: {list(result.columns)}"
+        assert "email" in result.columns, f"Expected 'email' column, got: {list(result.columns)}"
+        assert len(result) == 2, f"Expected 2 rows, got {len(result)}"
+
+        # Provider should have default "unknown" values
+        assert all(result["provider"] == "unknown"), f"Expected all provider values to be 'unknown', got: {result['provider'].tolist()}"
+
+        # Should log warning about missing provider
+        mock_logger.warning.assert_called_once()
+        warning_call = mock_logger.warning.call_args[0]
+        assert "CSV missing 'provider' or 'Provider' column" in warning_call[0]
+
+    def test_clean_and_normalize_dataframe_handles_missing_email(self, cache: UserAllowlistCache):
+        """Test that missing email column raises ValueError."""
+        # DataFrame without email column
+        df_no_email = pd.DataFrame({
+            "provider": ["Test Provider"]
+        })
+
+        with pytest.raises(ValueError, match="CSV must contain 'email' or 'Email' column") as exc_info:
+            cache._clean_and_normalize_dataframe(df_no_email)
+
+        assert "email" in str(exc_info.value).lower()
+        assert "provider" in str(exc_info.value)  # Should show found columns
+
+    def test_clean_and_normalize_dataframe_returns_correct_columns_with_provider(self, cache: UserAllowlistCache):
+        """Test that DataFrame with provider returns both columns."""
+        df_with_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk"],
+            "provider": ["Test Provider"]
+        })
+
+        result = cache._clean_and_normalize_dataframe(df_with_provider)
+
+        # Should return both columns
+        expected_columns = ["provider", "email"]
+        assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
+
+    def test_clean_and_normalize_dataframe_returns_both_columns_always(self, cache: UserAllowlistCache):
+        """Test that DataFrame always returns both columns (provider added if missing)."""
+        df_no_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk"]
+        })
+
+        result = cache._clean_and_normalize_dataframe(df_no_provider)
+
+        # Should always return both columns since provider is added if missing
+        expected_columns = ["provider", "email"]
+        assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
+
+    def test_filter_null_values_handles_missing_provider_column(self, cache: UserAllowlistCache):
+        """Test that null value filtering works when provider column is missing."""
+        # DataFrame without provider column
+        df_no_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk", None, "test2@justice.gov.uk"]
+        })
+
+        result = cache._filter_null_values(df_no_provider)
+
+        # Should filter out null email values
+        assert len(result) == 2, f"Expected 2 rows after filtering null emails, got {len(result)}"
+        assert "test@justice.gov.uk" in result["email"].tolist()
+        assert "test2@justice.gov.uk" in result["email"].tolist()
+        assert result["email"].isna().sum() == 0, "Should have no null email values"
+
+    def test_filter_null_values_handles_provider_column_when_present(self, cache: UserAllowlistCache, mock_logger):
+        """Test that null value filtering works when provider column is present."""
+        # DataFrame with provider column and null values
+        df_with_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk", "test2@justice.gov.uk"],
+            "provider": ["Test Provider", None]
+        })
+
+        result = cache._filter_null_values(df_with_provider)
+
+        # Should filter out null provider values
+        assert len(result) == 1, f"Expected 1 row after filtering null providers, got {len(result)}"
+        assert "test@justice.gov.uk" in result["email"].tolist()
+        assert result["provider"].isna().sum() == 0, "Should have no null provider values"
+
+        # Should log warning about null provider values
+        mock_logger.warning.assert_called_once()
+        warning_call = mock_logger.warning.call_args[0]
+        assert "Found %d rows with null provider values" in warning_call[0]
+        assert warning_call[1] == 1  # null_provider_count
+
+    def test_validate_allowlist_data_handles_missing_provider_gracefully(self, cache: UserAllowlistCache, mock_logger):
+        """Test that validation handles missing provider column gracefully."""
+        # DataFrame without provider column
+        df_no_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk", "test2@justice.gov.uk"]
+        })
+
+        is_valid, cleaned_df = cache._validate_allowlist_data(df_no_provider)
+
+        # Should pass validation
+        assert is_valid is True, f"Expected validation to pass for data without provider, got {is_valid}"
+        assert len(cleaned_df) == 2, f"Expected 2 rows, got {len(cleaned_df)}"
+
+        # Should have logged warning about missing provider
+        warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+        assert any("Missing optional 'provider' column" in call for call in warning_calls), f"Expected warning about missing provider, got: {warning_calls}"
+
+    def test_validate_allowlist_data_fails_without_email(self, cache: UserAllowlistCache, mock_logger):
+        """Test that validation fails when email column is missing."""
+        # DataFrame without email column
+        df_no_email = pd.DataFrame({
+            "provider": ["Test Provider"]
+        })
+
+        is_valid, cleaned_df = cache._validate_allowlist_data(df_no_email)
+
+        # Should fail validation
+        assert is_valid is False, f"Expected validation to fail for data without email, got {is_valid}"
+
+        # Should have logged error about missing email
+        mock_logger.error.assert_called_once()
+        error_call = mock_logger.error.call_args[0]
+        assert "Missing required 'email' column" in error_call[0]
+
+    def test_parse_allowlist_csv_from_bytes_utf8_success(self, cache: UserAllowlistCache):
+        """Test successful UTF-8 decoding and parsing."""
+        csv_content = b"Email,Provider\ntest@justice.gov.uk,Test Provider\n"
+
+        result = cache._parse_allowlist_csv_from_bytes(csv_content)
+
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        assert "email" in result.columns, f"Expected 'email' column, got: {list(result.columns)}"
+        assert "provider" in result.columns, f"Expected 'provider' column, got: {list(result.columns)}"
+        assert len(result) == 1, f"Expected 1 row, got {len(result)}"
+        assert "test@justice.gov.uk" in result["email"].tolist()
+
+    def test_parse_allowlist_csv_from_bytes_utf8_fallback_cp1252(self, cache: UserAllowlistCache, mock_logger):
+        """Test fallback to cp1252 encoding when UTF-8 fails."""
+        # Create content that will fail UTF-8 but succeed with cp1252
+        # Use a character that's valid in cp1252 but not in UTF-8
+        csv_content = "Email,Provider\ntest@justice.gov.uk,Test Provider\n".encode("cp1252")
+
+        # Create content that will fail UTF-8 decoding by adding invalid UTF-8 bytes
+        invalid_utf8_content = csv_content + b"\xff\xfe"  # Invalid UTF-8 sequence
+
+        result = cache._parse_allowlist_csv_from_bytes(invalid_utf8_content)
+
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        assert "email" in result.columns, f"Expected 'email' column, got: {list(result.columns)}"
+        assert "provider" in result.columns, f"Expected 'provider' column, got: {list(result.columns)}"
+
+        # Should have logged warning about UTF-8 failure
+        mock_logger.warning.assert_called_once()
+        warning_call = mock_logger.warning.call_args[0]
+        assert "UTF-8 decoding failed, trying cp1252 encoding" in warning_call[0]
+
+    def test_parse_allowlist_csv_from_bytes_cp1252_fallback_explicit_columns(self, cache: UserAllowlistCache, mock_logger):
+        """Test fallback to explicit column names when both encodings fail."""
+        # Create content that will fail both UTF-8 and cp1252
+        # Use bytes that are invalid in both encodings
+        csv_content = b"invalid\xff\xfecontent\x80\x81"
+
+        result = cache._parse_allowlist_csv_from_bytes(csv_content)
+
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        # Should have explicit column names
+        assert "email" in result.columns, f"Expected 'email' column, got: {list(result.columns)}"
+        assert "provider" in result.columns, f"Expected 'provider' column, got: {list(result.columns)}"
+
+        # Should have logged warnings about both failures
+        warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+        assert any("UTF-8 decoding failed, trying cp1252 encoding" in call for call in warning_calls)
+        assert any("cp1252 also failed, trying with explicit column names" in call for call in warning_calls)
+
+    def test_parse_and_validate_content_success(self, cache: UserAllowlistCache):
+        """Test successful parsing and validation of content."""
+        csv_content = b"Email,Provider\ntest@justice.gov.uk,Test Provider\n"
+
+        result = cache._parse_and_validate_content(csv_content, "test_blob.csv")
+
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        assert "email" in result.columns, f"Expected 'email' column, got: {list(result.columns)}"
+        assert "provider" in result.columns, f"Expected 'provider' column, got: {list(result.columns)}"
+        assert len(result) == 1, f"Expected 1 row, got {len(result)}"
+        assert "test@justice.gov.uk" in result["email"].tolist()
+
+    def test_parse_and_validate_content_validation_failure(self, cache: UserAllowlistCache):
+        """Test that validation failure raises ValueError."""
+        # Create content that will pass parsing but fail validation (invalid domain)
+        csv_content = b"Email,Provider\ntest@example.com,Test Provider\n"
+
+        with pytest.raises(ValueError, match="Allowlist data failed validation checks") as exc_info:
+            cache._parse_and_validate_content(csv_content, "test_blob.csv")
+
+        assert "Allowlist data failed validation checks" in str(exc_info.value)
+
+    def test_parse_and_validate_content_uses_cleaned_data(self, cache: UserAllowlistCache):
+        """Test that the method uses the cleaned data from validation."""
+        # Create content with duplicates that will be cleaned
+        csv_content = b"Email,Provider\ntest@justice.gov.uk,Test Provider\ntest@justice.gov.uk,Test Provider\n"
+
+        result = cache._parse_and_validate_content(csv_content, "test_blob.csv")
+
+        # Should have deduplicated data
+        assert len(result) == 1, f"Expected 1 row after deduplication, got {len(result)}"
+        assert "test@justice.gov.uk" in result["email"].tolist()
+
+    def test_clean_and_normalize_dataframe_return_columns_with_provider(self, cache: UserAllowlistCache):
+        """Test that DataFrame with provider returns both columns in correct order."""
+        df_with_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk", "test2@justice.gov.uk"],
+            "provider": ["Test Provider", "Test Provider 2"]
+        })
+
+        result = cache._clean_and_normalize_dataframe(df_with_provider)
+
+        # Should return both columns in the correct order
+        expected_columns = ["provider", "email"]
+        assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
+        assert len(result) == 2, f"Expected 2 rows, got {len(result)}"
+
+    def test_clean_and_normalize_dataframe_return_columns_without_provider(self, cache: UserAllowlistCache, mock_logger):
+        """Test that DataFrame without provider returns both columns (provider added as unknown)."""
+        df_no_provider = pd.DataFrame({
+            "email": ["test@justice.gov.uk", "test2@justice.gov.uk"]
+        })
+
+        result = cache._clean_and_normalize_dataframe(df_no_provider)
+
+        # Should return both columns (provider added as "unknown")
+        expected_columns = ["provider", "email"]
+        assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
+        assert len(result) == 2, f"Expected 2 rows, got {len(result)}"
+
+        # Provider should be "unknown"
+        assert all(result["provider"] == "unknown"), f"Expected all provider values to be 'unknown', got: {result['provider'].tolist()}"
+
+        # Should have logged warning about missing provider
+        mock_logger.warning.assert_called_once()
+        warning_call = mock_logger.warning.call_args[0]
+        assert "CSV missing 'provider' or 'Provider' column" in warning_call[0]
+
+    def test_clean_and_normalize_dataframe_return_columns_edge_case_empty_dataframe(self, cache: UserAllowlistCache, mock_logger):
+        """Test return columns with empty DataFrame."""
+        df_empty = pd.DataFrame(columns=["email"])
+
+        result = cache._clean_and_normalize_dataframe(df_empty)
+
+        # Should return both columns even for empty DataFrame (provider added if missing)
+        expected_columns = ["provider", "email"]
+        assert list(result.columns) == expected_columns, f"Expected {expected_columns}, got {list(result.columns)}"
+        assert len(result) == 0, f"Expected 0 rows, got {len(result)}"
+
+        # Should have logged warning about missing provider
+        mock_logger.warning.assert_called_once()
+
+    def test_parse_and_validate_content_handles_encoding_errors_gracefully(self, cache: UserAllowlistCache, mock_logger):
+        """Test that encoding errors are handled gracefully with fallbacks."""
+        # Create content that will trigger all fallback paths but still have valid data
+        # Use bytes that are invalid in both UTF-8 and cp1252, but include valid CSV structure
+        csv_content = b"email,provider\ntest@justice.gov.uk,Test Provider\n"
+        # Add invalid bytes that will trigger encoding fallbacks
+        csv_content += b"\xff\xfe\x80\x81"
+
+        result = cache._parse_and_validate_content(csv_content, "test_blob.csv")
+
+        # Should still return a DataFrame with valid data
+        assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+        assert "email" in result.columns, f"Expected 'email' column, got: {list(result.columns)}"
+        assert "provider" in result.columns, f"Expected 'provider' column, got: {list(result.columns)}"
+
+        # Should have logged warnings about encoding failures
+        warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
+        assert any("UTF-8 decoding failed, trying cp1252 encoding" in call for call in warning_calls)
+        assert any("cp1252 also failed, trying with explicit column names" in call for call in warning_calls)
 
 
 class TestCreateAllowlistCache:
