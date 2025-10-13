@@ -27,6 +27,7 @@ import { apiClient } from "@/lib/api-client";
 import * as Sentry from "@sentry/nextjs";
 import ErrorReportCard from "@/components/ui/error-report-card";
 import { getDuration } from "@/components/audio/processing-status";
+import { uploadChunksFromBackup, uploadBlobAsChunks } from "@/lib/azure-upload";
 import AudioRecorderComponent from "./audio-recorder";
 import ScreenRecorder from "./screen-recorder";
 
@@ -217,6 +218,26 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     []
   );
 
+  // CHUNKED UPLOAD FALLBACK: Azure Block Blob API compliant chunked upload
+  const uploadChunksAsFallback = useCallback(
+    async (backupId: string, mimeType: string): Promise<string> => {
+      try {
+        const result = await uploadChunksFromBackup(
+          backupId,
+          mimeType,
+          (progress) => {
+            setProcessingStatus({ state: "uploading", progress });
+          }
+        );
+        return result.fileKey;
+      } catch (error) {
+        console.error("❌ Chunked upload fallback failed:", error);
+        throw error;
+      }
+    },
+    []
+  );
+
   const startTranscription = useCallback(
     async (blob: Blob) => {
       const maxRetries = 2;
@@ -243,7 +264,6 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
         // Show retry attempt to user
         if (attempt > 1) {
-          console.log(`Upload attempt ${attempt} of ${maxRetries}`);
           setUploadError(`Retrying upload (attempt ${attempt} of ${maxRetries})...`);
         }
 
@@ -265,11 +285,57 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           setUploadError(null);
         }
 
-        // Upload the file with the new URL
-        await uploadFile(blob, upload_url);
+        // Try single file upload first (unless force chunked mode is enabled)
+        let finalFileKey = user_upload_s3_file_key;
+        
+        // Check if chunked upload is forced (local development only)
+        const isLocalDev = process.env.NODE_ENV === 'development';
+        const forceChunked = isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === 'true';
+        
+        if (forceChunked) {
+          console.log('🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload');
+        }
+        
+        try {
+          if (forceChunked) {
+            // Force chunked upload for testing
+            throw new Error('Forced chunked upload (test mode)');
+          }
+          await uploadFile(blob, upload_url);
+        } catch (uploadError) {
+          console.warn("Single file upload failed, attempting chunked upload fallback:", uploadError);
+          
+          // CHUNKED UPLOAD FALLBACK: If single upload fails, try chunked upload
+          try {
+            // If we have chunks in IndexedDB, use those; otherwise split the blob
+            if (currentBackupId) {
+              // Try to use existing chunks from recording
+              finalFileKey = await uploadChunksAsFallback(currentBackupId, blob.type);
+            } else {
+              // No IndexedDB chunks - split the blob on-the-fly
+              console.log("No backup ID available, splitting blob for chunked upload");
+              const result = await uploadBlobAsChunks({
+                blob,
+                mimeType: blob.type,
+                onProgress: (progress: number) => {
+                  setProcessingStatus({ state: "uploading", progress });
+                },
+              });
+              finalFileKey = result.fileKey;
+            }
+            
+            currentUserUploadKey = finalFileKey;
+            setUserUploadKey(finalFileKey);
+          } catch (chunkedError) {
+            console.error("❌ Both single and chunked upload failed:", chunkedError);
+            const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+            const chunkedErrorMessage = chunkedError instanceof Error ? chunkedError.message : String(chunkedError);
+            throw new Error(`Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`);
+          }
+        }
 
         const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          user_upload_s3_file_key
+          finalFileKey
         );
 
         if (transcriptionJobResult.error) {
@@ -286,13 +352,13 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           retry_attempt: attempt,
         });
 
-        // Clean up backup after successful upload
+        // STREAMING: Clean up streamed chunks after successful upload
         if (currentBackupId) {
           try {
-            await audioBackupDB.deleteAudioBackup(currentBackupId);
+            await audioBackupDB.deleteChunks(currentBackupId);
             setCurrentBackupId(null);
           } catch (error) {
-            alert(`error deleting backup: ${error}`);
+            alert(`error deleting backup chunks: ${error}`);
           }
         }
       };
@@ -351,7 +417,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, uploadFile]
+    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, uploadFile, uploadChunksAsFallback]
   );
 
   const handleRecordingStart = useCallback(() => {

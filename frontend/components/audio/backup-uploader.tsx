@@ -11,6 +11,7 @@ import ProcessingLoader, {
 import { AudioBackup, audioBackupDB } from "@/lib/indexeddb-backup";
 import { useTranscripts } from "@/providers/transcripts";
 import { apiClient } from "@/lib/api-client";
+import { uploadBlobAsChunks } from "@/lib/azure-upload";
 import posthog from "posthog-js";
 
 interface BackupUploaderProps {
@@ -29,6 +30,26 @@ function BackupUploader({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const { setIsProcessingTranscription } = useTranscripts();
 
+  // CHUNKED UPLOAD FALLBACK: Azure Block Blob API compliant chunked upload
+  const uploadBlobInChunks = useCallback(
+    async (blob: Blob, mimeType: string): Promise<string> => {
+      try {
+        const result = await uploadBlobAsChunks({
+          blob,
+          mimeType,
+          onProgress: (progress) => {
+            setProcessingStatus({ state: "uploading", progress });
+          },
+        });
+        return result.fileKey;
+      } catch (error) {
+        console.error("❌ Chunked upload fallback failed:", error);
+        throw error;
+      }
+    },
+    []
+  );
+
   const startTranscription = useCallback(
     async (blob: Blob) => {
       try {
@@ -45,40 +66,70 @@ function BackupUploader({
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { upload_url, user_upload_s3_file_key } = urlResult.data!;
 
-        // Create XMLHttpRequest to track upload progress
-        const xhr = new XMLHttpRequest();
-        await new Promise((resolve, reject) => {
-          xhr.upload.addEventListener("progress", (event) => {
-            if (event.lengthComputable) {
-              const progress = Math.round((event.loaded / event.total) * 100);
-              setProcessingStatus({ state: "uploading", progress });
-            }
-          });
+        // Try single file upload first (unless force chunked mode is enabled)
+        let finalFileKey = user_upload_s3_file_key;
+        
+        // Check if chunked upload is forced (local development only)
+        const isLocalDev = process.env.NODE_ENV === 'development';
+        const forceChunked = isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === 'true';
+        
+        if (forceChunked) {
+          console.log('🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload');
+        }
+        
+        try {
+          if (forceChunked) {
+            // Force chunked upload for testing
+            throw new Error('Forced chunked upload (test mode)');
+          }
+          // Create XMLHttpRequest to track upload progress
+          const xhr = new XMLHttpRequest();
+          await new Promise((resolve, reject) => {
+            xhr.upload.addEventListener("progress", (event) => {
+              if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                setProcessingStatus({ state: "uploading", progress });
+              }
+            });
 
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-            } else {
-              reject(new Error("Failed to upload file to Azure Storage"));
-            }
-          });
+            xhr.addEventListener("load", () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error("Failed to upload file to Azure Storage"));
+              }
+            });
 
-          xhr.addEventListener("error", () => {
-            reject(new Error("Network error during upload"));
-          });
+            xhr.addEventListener("error", () => {
+              reject(new Error("Network error during upload"));
+            });
 
-          xhr.addEventListener("timeout", () => {
-            reject(new Error("Upload timed out"));
-          });
+            xhr.addEventListener("timeout", () => {
+              reject(new Error("Upload timed out"));
+            });
 
-          xhr.open("PUT", upload_url);
-          // Add required headers for Azure Blob Storage
-          xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
-          xhr.send(blob);
-        });
+            xhr.open("PUT", upload_url);
+            // Add required headers for Azure Blob Storage
+            xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
+            xhr.send(blob);
+          });
+        } catch (uploadError) {
+          console.warn("Single file upload failed, attempting chunked upload fallback:", uploadError);
+          
+          // CHUNKED UPLOAD FALLBACK: If single upload fails, split and upload as chunks
+          try {
+            // uploadBlobInChunks gets a new upload URL and returns the new file key
+            finalFileKey = await uploadBlobInChunks(blob, blob.type);
+          } catch (chunkedError) {
+            console.error("❌ Both single and chunked upload failed:", chunkedError);
+            const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+            const chunkedErrorMessage = chunkedError instanceof Error ? chunkedError.message : String(chunkedError);
+            throw new Error(`Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`);
+          }
+        }
 
         const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          user_upload_s3_file_key
+          finalFileKey
         );
 
         if (transcriptionJobResult.error) {
