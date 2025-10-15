@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Info, Mic } from "lucide-react";
+import { Info, Mic, AlertTriangle, RefreshCw, Clock } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
 
@@ -29,6 +29,7 @@ import {
 
 // Local storage key for the dialog preference
 const DIALOG_PREFERENCE_KEY = "tab-recorder-show-instructions-dialog";
+const LONG_RECORDING_WARNING_KEY = "screen-recorder-long-recording-warning-seen";
 
 interface ScreenRecorderProps {
   onRecordingStop: (blob: Blob | null) => void;
@@ -147,6 +148,7 @@ function ScreenRecorder({
   const [showShareGuidance, setShowShareGuidance] = useState(false);
   const [showTimeWarning, setShowTimeWarning] = useState(false);
   const [remainingMinutes, setRemainingMinutes] = useState<string>("");
+  const [showLongRecordingWarning, setShowLongRecordingWarning] = useState(false);
 
   // Load dialog preference from local storage on component mount
   useEffect(() => {
@@ -160,6 +162,20 @@ function ScreenRecorder({
         }
       } catch (error) {
         // If there's an error accessing localStorage, default to showing the dialog
+        console.error("Error accessing localStorage:", error);
+      }
+    }
+  }, []);
+
+  // Check if long recording warning has been shown before
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const warningSeen = localStorage.getItem(LONG_RECORDING_WARNING_KEY);
+        if (!warningSeen) {
+          setShowLongRecordingWarning(true);
+        }
+      } catch (error) {
         console.error("Error accessing localStorage:", error);
       }
     }
@@ -550,6 +566,85 @@ function ScreenRecorder({
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Long Recording Warning Dialog */}
+      <Dialog
+        open={showLongRecordingWarning}
+        onOpenChange={(open) => {
+          setShowLongRecordingWarning(open);
+          if (!open) {
+            try {
+              localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
+            } catch (error) {
+              console.error("Error saving warning preference:", error);
+            }
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <div className="flex items-start gap-4">
+            {/* Warning Icon */}
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
+              <AlertTriangle className="size-6 text-amber-600" />
+            </div>
+            
+            {/* Content */}
+            <div className="flex-1 pt-1">
+              <DialogHeader className="space-y-3 pb-0">
+                <DialogTitle className="text-left text-xl font-semibold">
+                  Please refresh before recording
+                </DialogTitle>
+                <DialogDescription className="text-left text-base text-gray-600 dark:text-gray-400">
+                  There&apos;s a temporary issue affecting long sessions. To avoid disruption, please refresh before you begin. If a session exceeds 60 minutes, it will stop and upload automatically.
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Bullet Points */}
+              <div className="mt-6 space-y-4 border-t pt-6">
+                <div className="flex items-start gap-3">
+                  <RefreshCw className="mt-0.5 size-5 shrink-0 text-gray-600 dark:text-gray-400" />
+                  <div>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">Refresh before recording</span>
+                    <span className="text-gray-600 dark:text-gray-400"> to ensure a clean start.</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-3">
+                  <Clock className="mt-0.5 size-5 shrink-0 text-gray-600 dark:text-gray-400" />
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-400">If your meeting goes past </span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">60:00</span>
+                    <span className="text-gray-600 dark:text-gray-400">, recording will auto-stop and upload.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Don't show this again checkbox */}
+              <div className="mt-6 border-t pt-4">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="size-4 cursor-pointer rounded border-gray-300"
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setShowLongRecordingWarning(false);
+                        try {
+                          localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
+                        } catch (error) {
+                          console.error("Error saving warning preference:", error);
+                        }
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Don&apos;t show this again
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Instructions Dialog */}
       {showInstructionsInDialog && (
