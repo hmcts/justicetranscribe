@@ -35,7 +35,7 @@ interface ContentDisplayProps {
   setProcessingStatus: (status: AudioProcessingStatus) => void;
   uploadError: string | null;
   audioBlob: Blob | null;
-  startTranscription: (blob: Blob) => void;
+  startTranscription: (blob: Blob, backupIdToDelete?: string | null) => void;
   initialRecordingMode: "mic" | "screen";
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
   onRecordingStart: () => void;
@@ -114,7 +114,7 @@ function ContentDisplay({
             <Button
               variant="default"
               onClick={() => {
-                startTranscription(audioBlob);
+                startTranscription(audioBlob, null);
               }}
               disabled={!audioBlob}
             >
@@ -180,6 +180,8 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   const [lastSentryEventId, setLastSentryEventId] = useState<string | null>(null);
   const [userUploadKey, setUserUploadKey] = useState<string | null>(null);
   const [lastDuration, setLastDuration] = useState<number | null>(null);
+  const [showContinueDialog, setShowContinueDialog] = useState(false);
+  const [uploadSuccessful, setUploadSuccessful] = useState(false);
   const { setIsProcessingTranscription } = useTranscripts();
   const uploadFile = useCallback(
     async (blob: Blob, uploadUrl: string): Promise<void> => {
@@ -218,7 +220,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   );
 
   const startTranscription = useCallback(
-    async (blob: Blob) => {
+    async (blob: Blob, backupIdToDelete?: string | null) => {
       const maxRetries = 2;
       let lastError: Error | null = null;
       let currentRequestId: string | null = null;
@@ -279,6 +281,8 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         }
 
         setProcessingStatus("transcribing");
+        setUploadSuccessful(true);
+        setShowContinueDialog(true);
 
         posthog.capture("transcription_started", {
           file_type: blob.type,
@@ -287,12 +291,14 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         });
 
         // Clean up backup after successful upload
-        if (currentBackupId) {
+        const idToDelete = backupIdToDelete || currentBackupId;
+        if (idToDelete) {
           try {
-            await audioBackupDB.deleteAudioBackup(currentBackupId);
+            await audioBackupDB.deleteAudioBackup(idToDelete);
             setCurrentBackupId(null);
           } catch (error) {
-            alert(`error deleting backup: ${error}`);
+            console.error("Error deleting backup:", error);
+            // Don't alert user about backup deletion failure
           }
         }
       };
@@ -361,16 +367,38 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   const handleRecordingStop = useCallback(
     (blob: Blob | null, backupId?: string | null) => {
       if (blob) {
-        startTranscription(blob);
         setAudioBlob(blob);
         if (backupId) {
           setCurrentBackupId(backupId);
         }
+        // Pass backupId directly to ensure it gets deleted after successful upload
+        startTranscription(blob, backupId);
       }
       setProcessingStatus({ state: "uploading", progress: 0 });
     },
     [startTranscription]
   );
+
+  const handleStartNewRecording = useCallback(() => {
+    // Reset all states to allow a new recording
+    setAudioBlob(null);
+    setProcessingStatus("idle");
+    setUploadError(null);
+    setShowContinueDialog(false);
+    setUploadSuccessful(false);
+    setLastRequestId(null);
+    setLastStatusCode(null);
+    setLastSentryEventId(null);
+    setUserUploadKey(null);
+    setLastDuration(null);
+    
+    posthog.capture("new_recording_started_after_auto_stop");
+  }, []);
+
+  const handleFinishRecording = useCallback(() => {
+    setShowContinueDialog(false);
+    onClose();
+  }, [onClose]);
 
   return (
     <div className="mx-auto mt-8 w-full max-w-3xl">
@@ -430,6 +458,32 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           />
         </>
       )}
+
+      <AlertDialog open={showContinueDialog} onOpenChange={setShowContinueDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Recording Uploaded Successfully! 🎉</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your recording has been uploaded and transcription has started. 
+              Would you like to start another recording session?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel 
+              onClick={handleFinishRecording}
+              className="h-12 w-full sm:h-10 sm:w-auto"
+            >
+              No, I&apos;m Done
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleStartNewRecording}
+              className="h-12 w-full sm:h-10 sm:w-auto"
+            >
+              Start New Recording
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

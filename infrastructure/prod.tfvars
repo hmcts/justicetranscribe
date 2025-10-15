@@ -15,4 +15,7 @@ backend_service_plan_sku = "S3"   # 4 vCPU, 7GB RAM for backend
 # postgres_admin_password = "CHANGE_ME_SECURE_PASSWORD_123!" # REMOVED - now auto-generated
 
 # Optional: Allow specific IP addresses to connect directly to the database
-# postgres_allowed_ips = ["203.0.113.1", "198.51.100.0"] 
+# postgres_allowed_ips = ["203.0.113.1", "198.51.100.0"]
+
+# Recording configuration
+# max_recording_minutes = 55  # Default: 55 minutes. Uncomment to override. 

@@ -1,5 +1,7 @@
 data/*
 .pre-commit-config-local.yaml
+frontend/lib/__tests__/
+frontend/tsconfig.tsbuildinfo
 
 # Terraform
 **/.terraform/*
