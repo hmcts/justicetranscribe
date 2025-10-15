@@ -5,6 +5,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Pause, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,8 @@ interface RecordingControlProps {
   };
   onPauseStateChange?: (isPaused: boolean) => void;
   elapsedTime?: number;
+  showTimeWarning?: boolean;
+  remainingTime?: string;
 }
 
 export default function RecordingControl({
@@ -36,12 +39,14 @@ export default function RecordingControl({
   recorderControls,
   onPauseStateChange,
   elapsedTime,
+  showTimeWarning = false,
+  remainingTime = "",
 }: RecordingControlProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>();
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
+  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -118,7 +123,8 @@ export default function RecordingControl({
       analyserRef.current.smoothingTimeConstant = 0.7;
 
       const bufferLength = analyserRef.current.frequencyBinCount;
-      dataArrayRef.current = new Uint8Array(bufferLength);
+      const buffer = new ArrayBuffer(bufferLength);
+      dataArrayRef.current = new Uint8Array(buffer);
 
       // Create a media stream source and connect it to the analyzer
       const source = audioContextRef.current.createMediaStreamSource(stream);
@@ -356,6 +362,34 @@ export default function RecordingControl({
           </span>
         </div>
       )}
+      
+      {showTimeWarning && (
+        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+          <AlertDescription className="text-amber-900 dark:text-amber-100">
+            <div className="flex items-center gap-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-5 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>
+                <strong>Recording will end in {remainingTime}</strong>
+                <br />
+                Your recording will be automatically saved and uploaded when the time limit is reached.
+              </span>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div
         ref={containerRef}
         className="relative h-20 w-full overflow-hidden rounded-md border-2 border-blue-200 bg-transparent dark:border-blue-800"
@@ -437,4 +471,6 @@ RecordingControl.defaultProps = {
   recorderControls: undefined,
   onPauseStateChange: undefined,
   elapsedTime: undefined,
+  showTimeWarning: false,
+  remainingTime: "",
 };

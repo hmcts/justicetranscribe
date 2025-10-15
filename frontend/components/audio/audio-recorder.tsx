@@ -26,6 +26,12 @@ import {
   IndexedDBBackup,
 } from "@/lib/indexeddb-backup";
 import { AudioDevice, MicrophonePermission } from "./microphone-permission";
+import { 
+  hasReachedMaxDuration, 
+  shouldShowWarning, 
+  getRemainingTime,
+  formatRemainingTime
+} from "@/lib/recording-config";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
@@ -45,6 +51,8 @@ function AudioRecorderComponent({
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [showProcessingRecording, setShowProcessingRecording] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [showTimeWarning, setShowTimeWarning] = useState(false);
+  const [remainingMinutes, setRemainingMinutes] = useState<string>("");
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -306,6 +314,29 @@ function AudioRecorderComponent({
     }
   };
 
+  // Monitor recording time and trigger auto-stop when limit is reached
+  useEffect(() => {
+    if (!isRecording || isPaused) {
+      return;
+    }
+
+    // Check if we should show the warning
+    if (shouldShowWarning(recordingTime)) {
+      const remaining = getRemainingTime(recordingTime);
+      setRemainingMinutes(formatRemainingTime(remaining));
+      setShowTimeWarning(true);
+    } else {
+      setShowTimeWarning(false);
+      setRemainingMinutes("");
+    }
+
+    // Check if we've reached the maximum duration
+    if (hasReachedMaxDuration(recordingTime)) {
+      console.log("Maximum recording duration reached. Auto-stopping recording.");
+      stopRecording();
+    }
+  }, [recordingTime, isRecording, isPaused]);
+
   useEffect(() => {
     if (recordedAudio || isRecording) {
       setIsRecording(true);
@@ -390,6 +421,8 @@ function AudioRecorderComponent({
                   recordingTime,
                 }}
                 elapsedTime={recordingTime}
+                showTimeWarning={showTimeWarning}
+                remainingTime={remainingMinutes}
               />
             </div>
           ) : (

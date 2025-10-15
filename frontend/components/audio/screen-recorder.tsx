@@ -20,6 +20,12 @@ import {
 
 import { useTranscripts } from "@/providers/transcripts";
 import RecordingControl from "@/components/audio/recording-control";
+import { 
+  hasReachedMaxDuration, 
+  shouldShowWarning, 
+  getRemainingTime,
+  formatRemainingTime
+} from "@/lib/recording-config";
 
 // Local storage key for the dialog preference
 const DIALOG_PREFERENCE_KEY = "tab-recorder-show-instructions-dialog";
@@ -139,6 +145,8 @@ function ScreenRecorder({
     useState(false);
   const [isMacOS, setIsMacOS] = useState(false);
   const [showShareGuidance, setShowShareGuidance] = useState(false);
+  const [showTimeWarning, setShowTimeWarning] = useState(false);
+  const [remainingMinutes, setRemainingMinutes] = useState<string>("");
 
   // Load dialog preference from local storage on component mount
   useEffect(() => {
@@ -249,6 +257,29 @@ function ScreenRecorder({
       releaseWakeLock();
     }
   }, [isRecording, releaseWakeLock]);
+
+  // Monitor recording time and trigger auto-stop when limit is reached
+  useEffect(() => {
+    if (!isRecording) {
+      return;
+    }
+
+    // Check if we should show the warning
+    if (shouldShowWarning(recordingTime)) {
+      const remaining = getRemainingTime(recordingTime);
+      setRemainingMinutes(formatRemainingTime(remaining));
+      setShowTimeWarning(true);
+    } else {
+      setShowTimeWarning(false);
+      setRemainingMinutes("");
+    }
+
+    // Check if we've reached the maximum duration
+    if (hasReachedMaxDuration(recordingTime)) {
+      console.log("Maximum recording duration reached. Auto-stopping recording.");
+      stopRecording();
+    }
+  }, [recordingTime, isRecording, stopRecording]);
 
   useEffect(() => {
     if (isRecording) {
@@ -643,6 +674,8 @@ function ScreenRecorder({
               onStopRecording={stopRecording}
               onPauseStateChange={handlePauseStateChange}
               elapsedTime={recordingTime}
+              showTimeWarning={showTimeWarning}
+              remainingTime={remainingMinutes}
             />
           </div>
         )}
