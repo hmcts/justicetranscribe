@@ -30,15 +30,15 @@ export default function ProcessingLoader({
     return (
       <div className="mx-auto flex max-w-md flex-col items-center justify-center space-y-6 py-12">
         <div className="relative">
-          <div className="absolute inset-0 animate-ping rounded-full bg-gradient-to-r from-blue-400 to-blue-500 opacity-20" />
+          <div className="absolute inset-0 motion-safe:animate-ping rounded-full bg-gradient-to-r from-blue-400 to-blue-500 opacity-20" />
           <div className="absolute inset-1 rounded-full bg-blue-100 dark:bg-blue-900/30" />
-          <Loader2 className="relative z-10 size-14 animate-spin text-blue-500" aria-label="Loading" />
+          <Loader2 className="relative z-10 size-14 motion-safe:animate-spin text-blue-500" aria-label="Loading" />
         </div>
         <div className="text-center">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             Uploading your meeting...
           </h3>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300" aria-live="polite" aria-atomic="true">
             Progress: {status.progress}%
           </p>
           <div className="mt-3 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
@@ -105,13 +105,13 @@ export default function ProcessingLoader({
         <Button
           onClick={handleReturnHome}
           variant="outline"
-          className="w-auto px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
+          className="w-auto min-h-[44px] px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 motion-safe:hover:scale-105 hover:shadow-md motion-safe:active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
         >
           Return to Home
         </Button>
         <StartNewMeetingButton
           onClick={handleNewTranscription}
-          className="w-auto px-6 py-2 md:text-lg shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
+          className="w-auto min-h-[44px] px-6 py-2 md:text-lg shadow-md transition-all duration-200 motion-safe:hover:scale-105 hover:shadow-lg motion-safe:active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
           fullWidth={false}
           showIcon={false}
         />

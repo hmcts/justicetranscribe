@@ -73,7 +73,7 @@ function ContentDisplay({
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30"
+          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
           style={{ color: "#B21010" }}
         >
           Close
@@ -88,6 +88,7 @@ function ContentDisplay({
             strokeLinecap="round"
             strokeLinejoin="round"
             className="size-4"
+            aria-hidden="true"
           >
             <path d="M18 6 6 18" />
             <path d="m6 6 12 12" />
@@ -117,8 +118,9 @@ function ContentDisplay({
                 startTranscription(audioBlob, null);
               }}
               disabled={!audioBlob}
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
-              <RefreshCw className="mr-2 size-4" />
+              <RefreshCw className="mr-2 size-4" aria-hidden="true" />
               Retry transcription
             </Button>
           </div>

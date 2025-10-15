@@ -155,6 +155,8 @@ function BackupUploader({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   className="md:scale-125"
+                  role="img"
+                  aria-label="Retry upload"
                 >
                   <polyline points="23 4 23 10 17 10" />
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
@@ -175,9 +177,15 @@ function BackupUploader({
 
               {/* File Details */}
               <div className="space-y-1 text-sm md:text-base text-gray-600 dark:text-gray-400">
-                <p>📄 {backup.fileName}</p>
-                <p>🕐 Recorded: {formatTimestamp(backup.timestamp)}</p>
-                <p>⏱️ Duration: {formatDuration(backup.recordingDuration)}</p>
+                <p>
+                  <span role="img" aria-label="File">📄</span> {backup.fileName}
+                </p>
+                <p>
+                  <span role="img" aria-label="Clock">🕐</span> Recorded: {formatTimestamp(backup.timestamp)}
+                </p>
+                <p>
+                  <span role="img" aria-label="Timer">⏱️</span> Duration: {formatDuration(backup.recordingDuration)}
+                </p>
               </div>
             </div>
 
@@ -186,13 +194,13 @@ function BackupUploader({
               <Button
                 onClick={handleReturnHome}
                 variant="outline"
-                className="w-auto px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
+                className="w-auto min-h-[44px] px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 motion-safe:hover:scale-105 hover:shadow-md motion-safe:active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
               >
                 Return to Home
               </Button>
               <Button
                 onClick={handleRetryUpload}
-                className="w-auto bg-blue-700 px-6 py-2 md:text-lg text-[#E8E8E8] shadow-md transition-all duration-200 hover:scale-105 hover:bg-blue-800 hover:shadow-lg active:scale-95"
+                className="w-auto min-h-[44px] bg-blue-700 px-6 py-2 md:text-lg text-[#E8E8E8] shadow-md transition-all duration-200 motion-safe:hover:scale-105 hover:bg-blue-800 hover:shadow-lg motion-safe:active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
               >
                 Retry Upload
               </Button>
@@ -204,6 +212,7 @@ function BackupUploader({
           <Alert
             variant="destructive"
             className="border border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+            role="alert"
           >
             <AlertDescription className="flex items-center gap-2">
               <svg
@@ -211,6 +220,8 @@ function BackupUploader({
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                role="img"
+                aria-label="Error"
               >
                 <path
                   strokeLinecap="round"
