@@ -46,7 +46,7 @@ export default function RecordingControl({
   const containerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>();
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -123,8 +123,7 @@ export default function RecordingControl({
       analyserRef.current.smoothingTimeConstant = 0.7;
 
       const bufferLength = analyserRef.current.frequencyBinCount;
-      const buffer = new ArrayBuffer(bufferLength);
-      dataArrayRef.current = new Uint8Array(buffer);
+      dataArrayRef.current = new Uint8Array(bufferLength);
 
       // Create a media stream source and connect it to the analyzer
       const source = audioContextRef.current.createMediaStreamSource(stream);
