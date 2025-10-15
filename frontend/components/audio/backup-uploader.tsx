@@ -130,9 +130,13 @@ function BackupUploader({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handleReturnHome = () => {
+    onClose();
+  };
+
   return (
     <div className="mx-auto mt-8 w-full max-w-3xl">
-      <Card>
+      <Card className="border-transparent">
         <CardContent className="space-y-6">
           <div className="-mr-4 flex justify-end">
             <Button
@@ -179,10 +183,17 @@ function BackupUploader({
                 </div>
               </div>
 
-              <div className="flex justify-center gap-4">
+              <div className="flex flex-row items-center justify-center gap-3">
+                <Button
+                  onClick={handleReturnHome}
+                  variant="outline"
+                  className="w-auto px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
+                >
+                  Return to Home
+                </Button>
                 <Button
                   onClick={handleRetryUpload}
-                  className="flex items-center gap-2"
+                  className="flex w-auto items-center gap-2 px-6 py-2 md:text-lg shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
                 >
                   <RefreshCw className="size-4" />
                   Retry Upload
