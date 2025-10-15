@@ -190,9 +190,6 @@ resource "azurerm_linux_web_app" "frontend" {
     
     # Onboarding Configuration
     "FORCE_ONBOARDING_DEV"                      = "false"
-    
-    # Recording Configuration
-    "NEXT_PUBLIC_MAX_RECORDING_MINUTES"         = tostring(var.max_recording_minutes)
   }
 
   # VNet integration allows secure database access

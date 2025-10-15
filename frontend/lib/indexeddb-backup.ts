@@ -12,7 +12,7 @@ interface AudioBackup {
 class IndexedDBBackup {
   private dbName = "AudioBackupDB";
 
-  private version = 2;
+  private version = 3;
 
   private storeName = "audioBackups";
 
