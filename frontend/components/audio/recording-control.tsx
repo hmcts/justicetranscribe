@@ -355,14 +355,13 @@ export default function RecordingControl({
 
   return (
     <div className="space-y-4">
-      <div className="md:scale-125 md:origin-top">
-        {isRecording && elapsedTime && (
-          <div className="mb-2 flex justify-center">
-            <span className="font-mono text-lg tabular-nums text-blue-600 dark:text-blue-300">
-              {formatTime(elapsedTime ?? 0)}
-            </span>
-          </div>
-        )}
+      {isRecording && elapsedTime && (
+        <div className="mb-2 flex justify-center">
+          <span className="font-mono text-lg tabular-nums text-blue-600 dark:text-blue-300">
+            {formatTime(elapsedTime ?? 0)}
+          </span>
+        </div>
+      )}
         
         {showTimeWarning && (
           <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
@@ -441,7 +440,6 @@ export default function RecordingControl({
             </Button>
           </div>
         )}
-      </div>
 
       <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>
         <AlertDialogContent>

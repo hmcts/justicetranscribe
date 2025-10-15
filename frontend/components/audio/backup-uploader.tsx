@@ -2,9 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
 import ProcessingLoader, {
   AudioProcessingStatus,
 } from "@/components/audio/processing-loader";
@@ -136,97 +134,96 @@ function BackupUploader({
 
   return (
     <div className="mx-auto mt-8 w-full max-w-3xl">
-      <Card className="border-transparent">
-        <CardContent className="space-y-6">
-          <div className="-mr-4 flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30"
-              style={{ color: "#B21010" }}
-            >
-              Close
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="size-4"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </Button>
-          </div>
-
-          {processingStatus !== "idle" ? (
-            <ProcessingLoader
-              status={processingStatus}
-              onStopPolling={() => setProcessingStatus("idle")}
-            />
-          ) : (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h1 className="mb-2 text-2xl font-semibold">
-                  Retry Upload - Backed Up Recording
-                </h1>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <p>File: {backup.fileName}</p>
-                  <p>Recorded: {formatTimestamp(backup.timestamp)}</p>
-                  <p>Duration: {formatDuration(backup.recordingDuration)}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-row items-center justify-center gap-3">
-                <Button
-                  onClick={handleReturnHome}
-                  variant="outline"
-                  className="w-auto px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
+      <div className="space-y-6 py-8">
+        {processingStatus !== "idle" ? (
+          <ProcessingLoader
+            status={processingStatus}
+            onStopPolling={() => setProcessingStatus("idle")}
+          />
+        ) : (
+          <div className="space-y-6">
+            {/* Orange Retry Icon */}
+            <div className="flex justify-center">
+              <div className="flex size-16 md:size-20 items-center justify-center rounded-full bg-[#FF9500]">
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="md:scale-125"
                 >
-                  Return to Home
-                </Button>
-                <Button
-                  onClick={handleRetryUpload}
-                  className="flex w-auto items-center gap-2 px-6 py-2 md:text-lg shadow-md transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
-                >
-                  <RefreshCw className="size-4" />
-                  Retry Upload
-                </Button>
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
               </div>
             </div>
-          )}
 
-          {uploadError && (
-            <Alert
-              variant="destructive"
-              className="border border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
-            >
-              <AlertDescription className="flex items-center gap-2">
-                <svg
-                  className="size-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                {uploadError}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+            <div className="text-center">
+              {/* Title */}
+              <h1 className="mb-2 text-2xl md:text-3xl font-semibold text-black dark:text-white">
+                Retry the upload
+              </h1>
+              
+              {/* Subtitle */}
+              <p className="mb-4 text-base md:text-xl text-gray-600 dark:text-gray-400">
+                We saved your recording. Re-upload to complete.
+              </p>
+
+              {/* File Details */}
+              <div className="space-y-1 text-sm md:text-base text-gray-600 dark:text-gray-400">
+                <p>📄 {backup.fileName}</p>
+                <p>🕐 Recorded: {formatTimestamp(backup.timestamp)}</p>
+                <p>⏱️ Duration: {formatDuration(backup.recordingDuration)}</p>
+              </div>
+            </div>
+
+            {/* Buttons - Responsive Layout */}
+            <div className="flex flex-row items-center justify-center gap-3">
+              <Button
+                onClick={handleReturnHome}
+                variant="outline"
+                className="w-auto px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md active:scale-95"
+              >
+                Return to Home
+              </Button>
+              <Button
+                onClick={handleRetryUpload}
+                className="w-auto bg-blue-700 px-6 py-2 md:text-lg text-[#E8E8E8] shadow-md transition-all duration-200 hover:scale-105 hover:bg-blue-800 hover:shadow-lg active:scale-95"
+              >
+                Retry Upload
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {uploadError && (
+          <Alert
+            variant="destructive"
+            className="border border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+          >
+            <AlertDescription className="flex items-center gap-2">
+              <svg
+                className="size-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {uploadError}
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
     </div>
   );
 }
