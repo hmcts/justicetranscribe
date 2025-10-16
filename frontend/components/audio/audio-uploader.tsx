@@ -67,7 +67,7 @@ function ContentDisplay({
   };
 
   return (
-    <div className="md:scale-125 md:origin-top">
+    <div className={initialRecordingMode === "mic" ? "md:scale-125 md:origin-top" : ""}>
       <div className="-mr-4 flex justify-end">
         <Button
           variant="ghost"

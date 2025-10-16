@@ -558,13 +558,25 @@ function ScreenRecorder({
       </div>
 
       {!isRecording && !showInstructionsInDialog && (
-        <Alert variant="default" className="mb-2">
-          <Info className="size-4" />
-          <AlertDescription className="ml-2 text-sm">
-            You will be asked to share your screen to record a virtual meeting
-            on Teams.
-          </AlertDescription>
-        </Alert>
+        <>
+          <Alert variant="default" className="mb-2">
+            <Info className="size-4" />
+            <AlertDescription className="ml-2 text-sm">
+              You will be asked to share your screen to record a virtual meeting
+              on Teams.
+            </AlertDescription>
+          </Alert>
+
+          {/* Refresh Notification */}
+          <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
+            <div className="flex items-center justify-center gap-2">
+              <RefreshCw className="size-3.5 text-amber-600 dark:text-amber-400" />
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                💡 Refresh Justice Transcribe before recording a new meeting
+              </p>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Long Recording Warning Dialog */}
@@ -581,37 +593,37 @@ function ScreenRecorder({
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
-          <div className="flex items-start gap-4">
+        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-2rem)]">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
             {/* Warning Icon */}
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
-              <AlertTriangle className="size-6 text-amber-600" />
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30">
+              <AlertTriangle className="size-6 text-amber-600 dark:text-amber-400" />
             </div>
             
             {/* Content */}
-            <div className="flex-1 pt-1">
+            <div className="flex-1 pt-0 sm:pt-1">
               <DialogHeader className="space-y-3 pb-0">
-                <DialogTitle className="text-left text-xl font-semibold">
+                <DialogTitle className="text-left text-lg sm:text-xl font-semibold">
                   Please refresh before recording
                 </DialogTitle>
-                <DialogDescription className="text-left text-base text-gray-600 dark:text-gray-400">
+                <DialogDescription className="text-left text-sm sm:text-base text-gray-600 dark:text-gray-400">
                   There&apos;s a temporary issue affecting long sessions. To avoid disruption, please refresh before you begin. If a session exceeds 60 minutes, it will stop and upload automatically.
                 </DialogDescription>
               </DialogHeader>
 
               {/* Bullet Points */}
-              <div className="mt-6 space-y-4 border-t pt-6">
+              <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 border-t pt-4 sm:pt-6">
                 <div className="flex items-start gap-3">
-                  <RefreshCw className="mt-0.5 size-5 shrink-0 text-gray-600 dark:text-gray-400" />
-                  <div>
+                  <RefreshCw className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
+                  <div className="text-sm sm:text-base">
                     <span className="font-semibold text-gray-900 dark:text-gray-100">Refresh before recording</span>
                     <span className="text-gray-600 dark:text-gray-400"> to ensure a clean start.</span>
                   </div>
                 </div>
                 
                 <div className="flex items-start gap-3">
-                  <Clock className="mt-0.5 size-5 shrink-0 text-gray-600 dark:text-gray-400" />
-                  <div>
+                  <Clock className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
+                  <div className="text-sm sm:text-base">
                     <span className="text-gray-600 dark:text-gray-400">If your meeting goes past </span>
                     <span className="font-semibold text-gray-900 dark:text-gray-100">60:00</span>
                     <span className="text-gray-600 dark:text-gray-400">, recording will auto-stop and upload.</span>
@@ -619,28 +631,22 @@ function ScreenRecorder({
                 </div>
               </div>
 
-              {/* Don't show this again checkbox */}
-              <div className="mt-6 border-t pt-4">
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="size-4 cursor-pointer rounded border-gray-300"
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setShowLongRecordingWarning(false);
-                        try {
-                          localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
-                        } catch (error) {
-                          console.error("Error saving warning preference:", error);
-                        }
-                      }
-                    }}
-                  />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Don&apos;t show this again
-                  </span>
-                </label>
-              </div>
+              {/* Continue Button */}
+              <DialogFooter className="mt-6 border-t pt-4">
+                <Button
+                  onClick={() => {
+                    setShowLongRecordingWarning(false);
+                    try {
+                      localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
+                    } catch (error) {
+                      console.error("Error saving warning preference:", error);
+                    }
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  Continue
+                </Button>
+              </DialogFooter>
             </div>
           </div>
         </DialogContent>
