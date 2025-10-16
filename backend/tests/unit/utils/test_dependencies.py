@@ -10,6 +10,22 @@ from fastapi import HTTPException
 from app.database.postgres_models import User
 
 
+@pytest.fixture(scope="module", autouse=True)
+def mock_settings():
+    """Mock settings at module level to prevent import-time side effects."""
+    from unittest.mock import MagicMock, patch
+
+    mock_settings_obj = MagicMock()
+    mock_settings_obj.DATABASE_CONNECTION_STRING = "postgresql://test:test@localhost/test"
+    mock_settings_obj.ENVIRONMENT = "test"
+
+    with (
+        patch("utils.settings.get_settings", return_value=mock_settings_obj),
+        patch("app.database.postgres_database.get_settings", return_value=mock_settings_obj),
+    ):
+        yield mock_settings_obj
+
+
 @pytest.fixture
 def mock_db_session(mocker):
     """Mock database session using pytest-mock."""
