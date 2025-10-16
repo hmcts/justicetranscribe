@@ -175,9 +175,7 @@ class TestGetCurrentUserOIDValidation:
             )
 
         assert exc_info.value.status_code == 401, "Should return 401 status code"
-        assert "oid claim mismatch" in exc_info.value.detail, f"Error message should mention oid claim mismatch, got: {exc_info.value.detail}"
-        assert easy_auth_oid in exc_info.value.detail, f"Error should include Easy Auth OID, got: {exc_info.value.detail}"
-        assert jwt_oid in exc_info.value.detail, f"Error should include JWT OID, got: {exc_info.value.detail}"
+        assert "Authentication claims mismatch" in exc_info.value.detail, f"Error message should mention authentication mismatch, got: {exc_info.value.detail}"
 
     @pytest.mark.asyncio
     async def test_oid_mismatch_logs_warning_in_non_strict_mode(self, mocker, mock_db_session, mock_jwt_service, mock_logger, mock_is_local_dev):  # noqa: ARG002

@@ -101,7 +101,7 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
                             if jwt_verification_service.strict_mode:
                                 raise HTTPException(
                                     status_code=401,
-                                    detail=f"oid claim mismatch between Easy Auth and JWT: {azure_user_id} != {jwt_user_id}"
+                                    detail="Authentication claims mismatch between Easy Auth and JWT"
                                 )
 
                         # Log email differences for observability (expected when emails change)
