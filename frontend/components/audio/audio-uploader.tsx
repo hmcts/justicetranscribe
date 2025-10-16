@@ -35,7 +35,7 @@ interface ContentDisplayProps {
   setProcessingStatus: (status: AudioProcessingStatus) => void;
   uploadError: string | null;
   audioBlob: Blob | null;
-  startTranscription: (blob: Blob) => void;
+  startTranscription: (blob: Blob, backupIdToDelete?: string | null) => void;
   initialRecordingMode: "mic" | "screen";
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
   onRecordingStart: () => void;
@@ -67,13 +67,13 @@ function ContentDisplay({
   };
 
   return (
-    <div className="">
+    <div className={initialRecordingMode === "mic" ? "md:scale-125 md:origin-top" : ""}>
       <div className="-mr-4 flex justify-end">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30"
+          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
           style={{ color: "#B21010" }}
         >
           Close
@@ -88,6 +88,7 @@ function ContentDisplay({
             strokeLinecap="round"
             strokeLinejoin="round"
             className="size-4"
+            aria-hidden="true"
           >
             <path d="M18 6 6 18" />
             <path d="m6 6 12 12" />
@@ -114,11 +115,12 @@ function ContentDisplay({
             <Button
               variant="default"
               onClick={() => {
-                startTranscription(audioBlob);
+                startTranscription(audioBlob, null);
               }}
               disabled={!audioBlob}
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
-              <RefreshCw className="mr-2 size-4" />
+              <RefreshCw className="mr-2 size-4" aria-hidden="true" />
               Retry transcription
             </Button>
           </div>
@@ -218,7 +220,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   );
 
   const startTranscription = useCallback(
-    async (blob: Blob) => {
+    async (blob: Blob, backupIdToDelete?: string | null) => {
       const maxRetries = 2;
       let lastError: Error | null = null;
       let currentRequestId: string | null = null;
@@ -287,12 +289,14 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         });
 
         // Clean up backup after successful upload
-        if (currentBackupId) {
+        const idToDelete = backupIdToDelete || currentBackupId;
+        if (idToDelete) {
           try {
-            await audioBackupDB.deleteAudioBackup(currentBackupId);
+            await audioBackupDB.deleteAudioBackup(idToDelete);
             setCurrentBackupId(null);
           } catch (error) {
-            alert(`error deleting backup: ${error}`);
+            console.error("Error deleting backup:", error);
+            // Don't alert user about backup deletion failure
           }
         }
       };
@@ -361,11 +365,12 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   const handleRecordingStop = useCallback(
     (blob: Blob | null, backupId?: string | null) => {
       if (blob) {
-        startTranscription(blob);
         setAudioBlob(blob);
         if (backupId) {
           setCurrentBackupId(backupId);
         }
+        // Pass backupId directly to ensure it gets deleted after successful upload
+        startTranscription(blob, backupId);
       }
       setProcessingStatus({ state: "uploading", progress: 0 });
     },
@@ -374,7 +379,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
   return (
     <div className="mx-auto mt-8 w-full max-w-3xl">
-      <Card>
+      <Card className="border-transparent">
         <CardContent className="space-y-6">
           <ContentDisplay
             processingStatus={processingStatus}

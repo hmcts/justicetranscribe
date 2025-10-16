@@ -5,6 +5,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Pause, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,8 @@ interface RecordingControlProps {
   };
   onPauseStateChange?: (isPaused: boolean) => void;
   elapsedTime?: number;
+  showTimeWarning?: boolean;
+  remainingTime?: string;
 }
 
 export default function RecordingControl({
@@ -36,6 +39,8 @@ export default function RecordingControl({
   recorderControls,
   onPauseStateChange,
   elapsedTime,
+  showTimeWarning = false,
+  remainingTime = "",
 }: RecordingControlProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -176,7 +181,8 @@ export default function RecordingControl({
         ctx.clearRect(0, 0, width, height);
 
         // Get frequency data
-        analyser.getByteFrequencyData(dataArray);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        analyser.getByteFrequencyData(dataArray as any);
 
         // Calculate average frequency
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
@@ -356,73 +362,101 @@ export default function RecordingControl({
           </span>
         </div>
       )}
-      <div
-        ref={containerRef}
-        className="relative h-20 w-full overflow-hidden rounded-md border-2 border-blue-200 bg-transparent dark:border-blue-800"
-      >
-        <canvas ref={canvasRef} className="size-full" />
-        {!isRecording && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
-            Audio visualisation will appear here when recording
-          </div>
+        
+        {showTimeWarning && (
+          <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+            <AlertDescription className="text-amber-900 dark:text-amber-100">
+              <div className="flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="size-5 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>
+                  <strong>Recording will end in {remainingTime}</strong>
+                  <br />
+                  Your recording will be automatically saved and uploaded when the time limit is reached.
+                </span>
+              </div>
+            </AlertDescription>
+          </Alert>
         )}
-        {isRecording && !stream && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 text-sm text-gray-500 dark:bg-gray-800/80 dark:text-gray-400">
-            Connecting to audio stream...
-          </div>
-        )}
-      </div>
-
-      {isRecording && (
-        <div className="flex justify-between gap-2">
-          <Button
-            onClick={togglePause}
-            variant="outline"
-            className="min-w-0 flex-1"
-          >
-            {isPaused ? (
-              <>
-                <Play className="mr-2 size-4 sm:mr-2" />
-                <span className="hidden sm:inline">Resume Recording</span>
-                <span className="sm:hidden">Resume</span>
-              </>
-            ) : (
-              <>
-                <Pause className="mr-2 size-4 sm:mr-2" />
-                <span className="hidden sm:inline">Pause Recording</span>
-                <span className="sm:hidden">Pause</span>
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={handleStopRecording}
-            variant="destructive"
-            className="min-w-0 flex-1"
-            style={{ backgroundColor: "#B21010", color: "white" }}
-          >
-            <Square className="mr-2 size-4 sm:mr-2" />
-            <span className="hidden sm:inline">Stop Recording</span>
-            <span className="sm:hidden">Stop</span>
-          </Button>
+        
+        <div
+          ref={containerRef}
+          className="relative h-20 w-full overflow-hidden rounded-md border-2 border-blue-200 bg-transparent dark:border-blue-800"
+        >
+          <canvas ref={canvasRef} className="size-full" />
+          {!isRecording && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+              Audio visualisation will appear here when recording
+            </div>
+          )}
+          {isRecording && !stream && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 text-sm text-gray-500 dark:bg-gray-800/80 dark:text-gray-400">
+              Connecting to audio stream...
+            </div>
+          )}
         </div>
-      )}
+
+        {isRecording && (
+          <div className="mt-6 flex justify-between gap-2">
+            <Button
+              onClick={togglePause}
+              variant="outline"
+              className="min-w-0 flex-1"
+            >
+              {isPaused ? (
+                <>
+                  <Play className="mr-2 size-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Resume Recording</span>
+                  <span className="sm:hidden">Resume</span>
+                </>
+              ) : (
+                <>
+                  <Pause className="mr-2 size-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Pause Recording</span>
+                  <span className="sm:hidden">Pause</span>
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleStopRecording}
+              variant="destructive"
+              className="min-w-0 flex-1"
+              style={{ backgroundColor: "#B21010", color: "white" }}
+            >
+              <Square className="mr-2 size-4 sm:mr-2" />
+              <span className="hidden sm:inline">Stop Recording</span>
+              <span className="sm:hidden">Stop</span>
+            </Button>
+          </div>
+        )}
 
       <AlertDialog open={showStopDialog} onOpenChange={setShowStopDialog}>
         <AlertDialogContent>
-          <AlertDialogHeader>
+          <AlertDialogHeader className="text-center">
             <AlertDialogTitle>Stop Recording?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to stop recording? You won&apos;t be able to
               resume recording after stopping.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-4 sm:flex-row">
+          <AlertDialogFooter className="flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
             <AlertDialogCancel className="h-12 w-full sm:h-10 sm:w-auto">
               Continue recording
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmStop}
-              className="h-12 w-full sm:h-10 sm:w-auto"
+              className="h-12 w-full bg-blue-600 text-white hover:bg-blue-700 sm:h-10 sm:w-auto"
             >
               Stop Recording
             </AlertDialogAction>
@@ -437,4 +471,6 @@ RecordingControl.defaultProps = {
   recorderControls: undefined,
   onPauseStateChange: undefined,
   elapsedTime: undefined,
+  showTimeWarning: false,
+  remainingTime: "",
 };

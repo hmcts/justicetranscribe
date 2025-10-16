@@ -17,3 +17,6 @@ backend_service_plan_sku = "S2"   # 2 vCPU, 3.5GB RAM for backend dev
 # Optional: Allow specific IP addresses to connect directly to the database
 # Uncomment and add your IPs if you need direct database access
 # postgres_allowed_ips = ["203.0.113.1", "198.51.100.0"]
+
+# Recording configuration
+# max_recording_minutes = 55  # Default: 55 minutes. Uncomment to override.

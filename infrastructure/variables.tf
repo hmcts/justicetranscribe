@@ -189,3 +189,15 @@ variable "backend_service_plan_sku" {
     error_message = "backend_service_plan_sku must be a valid App Service Plan SKU."
   }
 }
+
+# Recording configuration
+variable "max_recording_minutes" {
+  description = "Maximum recording duration in minutes"
+  type        = number
+  default     = 55
+  
+  validation {
+    condition     = var.max_recording_minutes > 0 && var.max_recording_minutes <= 180
+    error_message = "max_recording_minutes must be between 1 and 180 minutes."
+  }
+}
