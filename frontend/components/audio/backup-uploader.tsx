@@ -93,9 +93,7 @@ function BackupUploader({
         // Clean up backup after successful upload
         try {
           await audioBackupDB.deleteAudioBackup(backup.id);
-          if (onUploadSuccess) {
-            onUploadSuccess();
-          }
+          // Don't call onUploadSuccess here - let ProcessingLoader show the completion screen
         } catch (error) {
           // Sentry.captureException(error);
           alert(`error deleting backup: ${error}`);
@@ -110,7 +108,7 @@ function BackupUploader({
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, backup.id, onUploadSuccess]
+    [setIsProcessingTranscription, backup.id]
   );
 
   const handleRetryUpload = () => {
