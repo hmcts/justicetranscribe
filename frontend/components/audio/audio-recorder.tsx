@@ -395,16 +395,16 @@ function AudioRecorderComponent({
 
               {/* Do Not Disturb Reminder - Only show on mobile */}
               {isMobile && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+                <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3" style={{ borderColor: '#D8C8FF', backgroundColor: '#F4F1FF' }}>
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5 rounded-full bg-slate-200 p-2 dark:bg-slate-700">
-                      <Moon className="size-5 text-slate-600 dark:text-slate-300" />
+                    <div className="mt-0.5 rounded-full p-2" style={{ backgroundColor: '#CABDFF' }}>
+                      <Moon className="size-5" style={{ color: '#1F1247' }} />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        Silence notifications?
+                      <h3 className="text-sm font-semibold" style={{ color: '#1F1247' }}>
+                        Silence notifications
                       </h3>
-                      <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                      <p className="mt-0.5 text-sm" style={{ color: '#4A3F6B' }}>
                         Turn on Do Not Disturb while recording.
                       </p>
                     </div>
