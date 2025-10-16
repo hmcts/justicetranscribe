@@ -172,7 +172,10 @@ function BackupUploader({
               
               {/* Subtitle */}
               <p className="mb-4 text-base md:text-xl text-gray-600 dark:text-gray-400">
-                We saved your recording. Re-upload to complete.
+                We saved your recording.
+              </p>
+              <p className="mb-4 text-base md:text-xl text-gray-600 dark:text-gray-400">
+                Re-upload to complete.
               </p>
 
               {/* File Details */}
