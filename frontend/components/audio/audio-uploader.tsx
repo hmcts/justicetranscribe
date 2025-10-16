@@ -67,13 +67,13 @@ function ContentDisplay({
   };
 
   return (
-    <div className="">
+    <div className={initialRecordingMode === "mic" ? "md:scale-125 md:origin-top" : ""}>
       <div className="-mr-4 flex justify-end">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30"
+          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
           style={{ color: "#B21010" }}
         >
           Close
@@ -88,6 +88,7 @@ function ContentDisplay({
             strokeLinecap="round"
             strokeLinejoin="round"
             className="size-4"
+            aria-hidden="true"
           >
             <path d="M18 6 6 18" />
             <path d="m6 6 12 12" />
@@ -117,8 +118,9 @@ function ContentDisplay({
                 startTranscription(audioBlob, null);
               }}
               disabled={!audioBlob}
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
-              <RefreshCw className="mr-2 size-4" />
+              <RefreshCw className="mr-2 size-4" aria-hidden="true" />
               Retry transcription
             </Button>
           </div>
@@ -180,8 +182,6 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   const [lastSentryEventId, setLastSentryEventId] = useState<string | null>(null);
   const [userUploadKey, setUserUploadKey] = useState<string | null>(null);
   const [lastDuration, setLastDuration] = useState<number | null>(null);
-  const [showContinueDialog, setShowContinueDialog] = useState(false);
-  const [uploadSuccessful, setUploadSuccessful] = useState(false);
   const { setIsProcessingTranscription } = useTranscripts();
   const uploadFile = useCallback(
     async (blob: Blob, uploadUrl: string): Promise<void> => {
@@ -281,8 +281,6 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         }
 
         setProcessingStatus("transcribing");
-        setUploadSuccessful(true);
-        setShowContinueDialog(true);
 
         posthog.capture("transcription_started", {
           file_type: blob.type,
@@ -379,30 +377,9 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     [startTranscription]
   );
 
-  const handleStartNewRecording = useCallback(() => {
-    // Reset all states to allow a new recording
-    setAudioBlob(null);
-    setProcessingStatus("idle");
-    setUploadError(null);
-    setShowContinueDialog(false);
-    setUploadSuccessful(false);
-    setLastRequestId(null);
-    setLastStatusCode(null);
-    setLastSentryEventId(null);
-    setUserUploadKey(null);
-    setLastDuration(null);
-    
-    posthog.capture("new_recording_started_after_auto_stop");
-  }, []);
-
-  const handleFinishRecording = useCallback(() => {
-    setShowContinueDialog(false);
-    onClose();
-  }, [onClose]);
-
   return (
     <div className="mx-auto mt-8 w-full max-w-3xl">
-      <Card>
+      <Card className="border-transparent">
         <CardContent className="space-y-6">
           <ContentDisplay
             processingStatus={processingStatus}
@@ -458,32 +435,6 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           />
         </>
       )}
-
-      <AlertDialog open={showContinueDialog} onOpenChange={setShowContinueDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Recording Uploaded Successfully! 🎉</AlertDialogTitle>
-            <AlertDialogDescription>
-              Your recording has been uploaded and transcription has started. 
-              Would you like to start another recording session?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-            <AlertDialogCancel 
-              onClick={handleFinishRecording}
-              className="h-12 w-full sm:h-10 sm:w-auto"
-            >
-              No, I&apos;m Done
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleStartNewRecording}
-              className="h-12 w-full sm:h-10 sm:w-auto"
-            >
-              Start New Recording
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
