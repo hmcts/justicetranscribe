@@ -383,3 +383,115 @@ class TestGetCurrentUserOIDValidation:
             info_calls = [str(call) for call in mock_logger.info.call_args_list]
             assert not any("Email differs" in call for call in info_calls), "Should not log email difference when emails match"
 
+    @pytest.mark.asyncio
+    async def test_no_jwt_token_in_strict_mode_fails(self, mocker, mock_db_session, mock_logger, mock_is_local_dev):  # noqa: ARG002
+        """Test that missing JWT token in strict mode blocks authentication."""
+        # Lazy import to avoid side effects
+        from utils.dependencies import get_current_user
+
+        # Arrange
+        oid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        email = "user@example.com"
+
+        easy_auth_header = self.create_easy_auth_header(oid, email)
+
+        # Configure JWT service mock to be in strict mode
+        mock_jwt_service = mocker.MagicMock()
+        mock_jwt_service.strict_mode = True
+        mocker.patch("utils.dependencies.jwt_verification_service", mock_jwt_service)
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(
+                session=mock_db_session,
+                x_ms_client_principal=easy_auth_header,
+                authorization=None  # No JWT token
+            )
+
+        assert exc_info.value.status_code == 401, "Should return 401 status code"
+        assert "JWT token required" in exc_info.value.detail, f"Error should mention JWT token required, got: {exc_info.value.detail}"
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_email_as_user_identifier(self, mocker, mock_db_session, mock_logger, mock_is_local_dev):  # noqa: ARG002
+        """Test that system falls back to email when no user IDs are available."""
+        # Lazy import to avoid side effects
+        from utils.dependencies import get_current_user
+
+        # Arrange
+        email = "user@example.com"
+
+        # Create Easy Auth header without userId
+        user_info = {
+            "claims": [{"typ": "email", "val": email}]
+            # No userId field
+        }
+        json_str = json.dumps(user_info)
+        easy_auth_header = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
+
+        # JWT payload without oid
+        jwt_payload = {"email": email}  # No oid claim
+
+        # User will be looked up by email since no OID
+        mock_user = User(id="test-id", email=email, azure_user_id=email)
+        mock_db_session.exec.return_value.first.return_value = mock_user
+
+        # Configure JWT service mock
+        mock_jwt_service = mocker.MagicMock()
+        mock_jwt_service.verify_jwt_token = mocker.AsyncMock(return_value=jwt_payload)
+        mock_jwt_service.strict_mode = False
+        mocker.patch("utils.dependencies.jwt_verification_service", mock_jwt_service)
+
+        # Act
+        result = await get_current_user(
+            session=mock_db_session,
+            x_ms_client_principal=easy_auth_header,
+            authorization="Bearer test-token"
+        )
+
+        # Assert
+        assert result == mock_user, "Should return user when falling back to email"
+        # Check that fallback logging occurred
+        info_calls = [str(call) for call in mock_logger.info.call_args_list]
+        assert any("Falling back to email" in call for call in info_calls), "Should log fallback to email as identifier"
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_in_easy_auth_header_fails(self, mocker, mock_db_session, mock_logger, mock_is_local_dev):  # noqa: ARG002
+        """Test that invalid JSON in Easy Auth header raises appropriate error."""
+        # Lazy import to avoid side effects
+        from utils.dependencies import get_current_user
+
+        # Arrange - Create invalid JSON in Easy Auth header
+        invalid_json = "not valid json"
+        easy_auth_header = base64.b64encode(invalid_json.encode("utf-8")).decode("utf-8")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(
+                session=mock_db_session,
+                x_ms_client_principal=easy_auth_header,
+                authorization="Bearer test-token"
+            )
+
+        assert exc_info.value.status_code == 401, "Should return 401 status code"
+        assert "Invalid authentication information" in exc_info.value.detail, f"Error should mention invalid authentication, got: {exc_info.value.detail}"
+
+    @pytest.mark.asyncio
+    async def test_invalid_base64_in_easy_auth_header_fails(self, mocker, mock_db_session, mock_logger, mock_is_local_dev):  # noqa: ARG002
+        """Test that invalid base64 in Easy Auth header raises appropriate error."""
+        # Lazy import to avoid side effects
+        from utils.dependencies import get_current_user
+
+        # Arrange - Invalid base64 string
+        easy_auth_header = "not-valid-base64!!!"
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(
+                session=mock_db_session,
+                x_ms_client_principal=easy_auth_header,
+                authorization="Bearer test-token"
+            )
+
+        assert exc_info.value.status_code == 401, "Should return 401 status code"
+        assert "Invalid authentication information" in exc_info.value.detail, f"Error should mention invalid authentication, got: {exc_info.value.detail}"
+
