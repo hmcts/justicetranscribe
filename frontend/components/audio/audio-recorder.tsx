@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Mic, Loader2, BellOff, AlertTriangle, RefreshCw, Clock } from "lucide-react";
+import { Mic, Loader2, BellOff, AlertTriangle, RefreshCw, Clock, Moon } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
@@ -40,6 +40,7 @@ import {
   getRemainingTime,
   formatRemainingTime
 } from "@/lib/recording-config";
+import useIsMobile from "@/hooks/use-mobile";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
@@ -74,6 +75,7 @@ function AudioRecorderComponent({
   const currentBackupIdRef = useRef<string | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const visibilityListenerRef = useRef<(() => void) | null>(null);
+  const isMobile = useIsMobile();
 
   const handlePermissionGranted = (devices: AudioDevice[]) => {
     setAudioDevices(devices);
@@ -391,15 +393,24 @@ function AudioRecorderComponent({
                 </h1>
               </div>
 
-              {/* Refresh Notification - One line below header */}
-              <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
-                <div className="flex items-center justify-center gap-2">
-                  <RefreshCw className="size-3.5 text-amber-600 dark:text-amber-400" />
-                  <p className="text-sm text-amber-800 dark:text-amber-300">
-                    💡 Refresh Justice Transcribe before recording a new meeting
-                  </p>
+              {/* Do Not Disturb Reminder - Only show on mobile */}
+              {isMobile && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-full bg-slate-200 p-2 dark:bg-slate-700">
+                      <Moon className="size-5 text-slate-600 dark:text-slate-300" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        Silence notifications?
+                      </h3>
+                      <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                        Turn on Do Not Disturb while recording.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
 
