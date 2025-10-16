@@ -19,7 +19,7 @@ interface AudioChunk {
 class IndexedDBBackup {
   private dbName = "AudioBackupDB";
 
-  private version = 3; // Incremented to ensure audioChunks store is created for all users
+  private version = 3;
 
   private storeName = "audioBackups";
   private chunksStoreName = "audioChunks";
