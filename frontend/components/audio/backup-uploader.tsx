@@ -129,7 +129,8 @@ function BackupUploader({
   };
 
   const handleReturnHome = () => {
-    onClose();
+    onClose(); // Close the modal or whatever context is needed
+    window.location.href = '/welcome-back'; // Navigate to the 'welcome back' page
   };
 
   return (
