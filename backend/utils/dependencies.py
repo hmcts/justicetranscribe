@@ -91,14 +91,26 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
                         jwt_email = decoded_jwt.get("email") or decoded_jwt.get("preferred_username", "")
                         jwt_user_id = decoded_jwt.get("oid", "")
 
-                        # Verify that Easy Auth and JWT claims match (case-insensitive)
-                        if jwt_email and not emails_match(email, jwt_email):
-                            logger.warning("Email mismatch: Easy Auth=%s, JWT=%s", email, jwt_email)
+                        # Verify that Easy Auth and JWT user identities match via oid (case-insensitive)
+                        if jwt_user_id and azure_user_id and jwt_user_id.lower() != azure_user_id.lower():
+                            logger.error(
+                                "User ID mismatch - potential spoofing attempt: Easy Auth oid=%s, JWT oid=%s",
+                                azure_user_id,
+                                jwt_user_id
+                            )
                             if jwt_verification_service.strict_mode:
                                 raise HTTPException(
                                     status_code=401,
                                     detail="Authentication claims mismatch between Easy Auth and JWT"
                                 )
+
+                        # Log email differences for observability (expected when emails change)
+                        if jwt_email and not emails_match(email, jwt_email):
+                            logger.info(
+                                "Email differs between Easy Auth and JWT (user identity verified): Easy Auth=%s, JWT=%s",
+                                email,
+                                jwt_email
+                            )
 
                         logger.info("JWT signature verification passed - Additional security layer confirmed")
                     else:
