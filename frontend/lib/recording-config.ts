@@ -5,10 +5,10 @@
  * 
  * Configuration:
  * - NEXT_PUBLIC_MAX_RECORDING_MINUTES: Set the max recording duration
- * - Default: 55 minutes for all environments
+ * - Default: 115 minutes for all environments
  */
 
-const DEFAULT_MAX_RECORDING_MINUTES = 55;
+const DEFAULT_MAX_RECORDING_MINUTES = 115;
 
 /**
  * Get the maximum recording duration in seconds
