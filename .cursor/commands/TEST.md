@@ -12,7 +12,7 @@ debugging.
 * Never ever duplicate src code in test files. Ensure test modules import
 business logic.
 * Ensure that test module dependencies import without causing side effects.
-* Ensure test modules are located in the apporpriate location of the existing
+* Ensure test modules are located in the appropriate location of the existing
 directory structure. The test directory is organised to reflect that of the
 system under test.
 * When running pytest, use `uv run pytest ...` from the backend dir. 
