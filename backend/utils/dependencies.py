@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 from app.database.postgres_database import get_session
 from app.database.postgres_models import User
 from utils.allowlist import get_allowlist_cache
+from utils.email_utils import emails_match
 from utils.jwt_verification import jwt_verification_service
 from utils.settings import get_settings
 
@@ -90,8 +91,8 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
                         jwt_email = decoded_jwt.get("email") or decoded_jwt.get("preferred_username", "")
                         jwt_user_id = decoded_jwt.get("oid", "")
 
-                        # Verify that Easy Auth and JWT claims match
-                        if jwt_email and jwt_email != email:
+                        # Verify that Easy Auth and JWT claims match (case-insensitive)
+                        if jwt_email and not emails_match(email, jwt_email):
                             logger.warning("Email mismatch: Easy Auth=%s, JWT=%s", email, jwt_email)
                             if jwt_verification_service.strict_mode:
                                 raise HTTPException(
