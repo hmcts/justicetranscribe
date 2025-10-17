@@ -1,4 +1,5 @@
 import asyncio
+from uuid import UUID
 
 import sentry_sdk
 
@@ -15,7 +16,6 @@ from app.database.interface_functions import (
 from app.database.postgres_models import (
     Transcription,
     TranscriptionJob,
-    User,
 )
 from app.logger import logger
 from app.minutes.llm_calls import (
@@ -27,7 +27,6 @@ from app.minutes.templates.templates_metadata import (
     general_template,
 )
 from utils.gov_notify import send_email
-from uuid import UUID
 
 
 async def generate_and_save_meeting_title(

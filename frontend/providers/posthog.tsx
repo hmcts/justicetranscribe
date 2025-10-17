@@ -12,13 +12,21 @@ if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_API_KEY) {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://eu.i.posthog.com",
     capture_pageview: true,
     session_recording: {
-      maskAllInputs: true,
-      maskTextSelector: "*",
+      enabled: true,
+      maskAllInputs: false,
+      maskTextSelector: ".ph-mask", // Only mask elements with ph-mask class
     },
     before_send: (event: any) => {
+      // Redact comment in rating events
       if (event.event === "minutes_rating_submitted" && event.properties?.comment) {
         event.properties.comment = "[REDACTED]";
       }
+      
+      // Redact meeting title from all events
+      if (event.properties?.title) {
+        event.properties.title = "[REDACTED]";
+      }
+      
       return event;
     },
   } as any);

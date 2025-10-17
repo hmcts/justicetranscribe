@@ -32,6 +32,7 @@ import {
   audioBackupDB,
   AudioBackup,
   IndexedDBBackup,
+  AudioChunk,
 } from "@/lib/indexeddb-backup";
 import { AudioDevice, MicrophonePermission } from "./microphone-permission";
 import { 
@@ -58,7 +59,6 @@ function AudioRecorderComponent({
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
-
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [showProcessingRecording, setShowProcessingRecording] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
@@ -71,10 +71,9 @@ function AudioRecorderComponent({
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const chunkIndexRef = useRef<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const backupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentBackupIdRef = useRef<string | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const visibilityListenerRef = useRef<(() => void) | null>(null);
@@ -118,7 +117,7 @@ function AudioRecorderComponent({
         document.addEventListener("visibilitychange", visibilityHandler);
       }
     } catch (err) {
-      console.log("Wake Lock error:", err);
+      // Wake Lock error handled silently
     }
   };
 
@@ -128,7 +127,7 @@ function AudioRecorderComponent({
         await wakeLock.release();
         setWakeLock(null);
       } catch (err) {
-        console.log("Wake Lock release error:", err);
+        // Wake Lock release error handled silently
       }
     }
     
@@ -159,49 +158,37 @@ function AudioRecorderComponent({
     onRecordingStop(null, null);
   };
 
-  const createPeriodicBackup = useCallback(async () => {
-    if (!mediaRecorderRef.current || mediaChunksRef.current.length === 0) {
-      return;
+
+  // STREAMING: Stream chunks directly to IndexedDB instead of periodic backups
+  const streamChunkToIndexedDB = useCallback(async (chunkData: Blob) => {
+    if (!currentBackupIdRef.current) {
+      currentBackupIdRef.current = IndexedDBBackup.generateBackupId();
     }
 
     try {
-      const selectedMimeType = mediaRecorderRef.current.mimeType;
-      const currentChunks = [...mediaChunksRef.current];
-      const audioBlob = new Blob(currentChunks, { type: selectedMimeType });
-
-      if (!currentBackupIdRef.current) {
-        currentBackupIdRef.current = IndexedDBBackup.generateBackupId();
-      }
-
-      const backup: AudioBackup = {
-        id: currentBackupIdRef.current,
-        blob: audioBlob,
-        fileName: `recording_${new Date().toISOString()}.${selectedMimeType.includes("mp4") ? "mp4" : "webm"}`,
-        timestamp: Date.now(),
-        mimeType: selectedMimeType,
-        recordingDuration: recordingTime,
-      };
-
-      await audioBackupDB.saveAudioBackup(backup);
+      await audioBackupDB.appendChunk(
+        currentBackupIdRef.current,
+        chunkIndexRef.current,
+        chunkData
+      );
+      // Only increment index after successful storage to avoid gaps
+      chunkIndexRef.current++;
     } catch (err) {
-      console.error("Failed to create periodic backup:", err);
-    }
-  }, [recordingTime]);
-
-  const startPeriodicBackup = useCallback(() => {
-    if (backupIntervalRef.current) {
-      clearInterval(backupIntervalRef.current);
-    }
-
-    backupIntervalRef.current = setInterval(() => {
-      createPeriodicBackup();
-    }, 15000); // Backup every 15 seconds
-  }, [createPeriodicBackup]);
-
-  const stopPeriodicBackup = useCallback(() => {
-    if (backupIntervalRef.current) {
-      clearInterval(backupIntervalRef.current);
-      backupIntervalRef.current = null;
+      console.error("❌ Failed to stream chunk to IndexedDB:", err);
+      // Try to initialize IndexedDB if it failed
+      try {
+        await audioBackupDB.init();
+        await audioBackupDB.appendChunk(
+          currentBackupIdRef.current,
+          chunkIndexRef.current,
+          chunkData
+        );
+        // Only increment index after successful retry
+        chunkIndexRef.current++;
+      } catch (retryErr) {
+        console.error("❌ Failed to store chunk even after retry:", retryErr);
+        // Index not incremented - next chunk will overwrite this slot
+      }
     }
   }, []);
 
@@ -245,29 +232,38 @@ function AudioRecorderComponent({
       const options = { mimeType: selectedMimeType };
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
-      mediaChunksRef.current = [];
+      chunkIndexRef.current = 0; // Reset chunk index for new recording
 
-      mediaRecorder.ondataavailable = (event) => {
+      // STREAMING: Stream each chunk directly to IndexedDB as it arrives
+      mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
-          mediaChunksRef.current.push(event.data);
+          await streamChunkToIndexedDB(event.data);
         }
       };
 
-      mediaRecorder.onstop = () => {
-        if (mediaChunksRef.current.length > 0) {
-          const audioBlob = new Blob(mediaChunksRef.current, {
-            type: selectedMimeType, // Use the selected MIME type
-          });
-          onRecordingStop(audioBlob, currentBackupIdRef.current);
+      mediaRecorder.onstop = async () => {
+        // STREAMING: Reconstruct final blob from streamed chunks
+        if (currentBackupIdRef.current && chunkIndexRef.current > 0) {
+          try {
+            let audioBlob = await audioBackupDB.reconstructBlob(
+              currentBackupIdRef.current,
+              selectedMimeType
+            );
+            onRecordingStop(audioBlob, currentBackupIdRef.current);
 
-          posthog.capture("in_person_recording_completed", {
-            duration_seconds: recordingTime,
-            file_size_bytes: audioBlob.size,
-          });
+            posthog.capture("in_person_recording_completed", {
+              duration_seconds: recordingTime,
+              file_size_bytes: audioBlob.size,
+            });
+          } catch (err) {
+            console.error("Failed to reconstruct final blob:", err);
+            onRecordingStop(null, currentBackupIdRef.current);
+          }
+        } else {
+          onRecordingStop(null, currentBackupIdRef.current);
         }
 
-        // Clean up
-        stopPeriodicBackup();
+        // Clean up media resources and reset refs
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
@@ -284,22 +280,25 @@ function AudioRecorderComponent({
         }
         
         currentBackupIdRef.current = null;
+        chunkIndexRef.current = 0; // Reset chunk index
         releaseWakeLock();
       };
 
       await requestWakeLock();
+      
+      // DEBUG: Check IndexedDB status before starting recording
+      // await audioBackupDB.debugIndexedDB();
+      
       mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
       onRecordingStart();
 
-      // Start backup after initial recording data is available
-      setTimeout(() => {
-        startPeriodicBackup();
-      }, 5000); // Wait 5 seconds before starting backups
+      // STREAMING: No need for delayed backup start - chunks stream immediately
 
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
+
     } catch (err) {
       setError(
         err instanceof Error
@@ -311,7 +310,6 @@ function AudioRecorderComponent({
 
   const stopRecording = () => {
     setShowProcessingRecording(true);
-    stopPeriodicBackup();
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
@@ -326,17 +324,17 @@ function AudioRecorderComponent({
     if (mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
-      stopPeriodicBackup();
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     } else if (mediaRecorderRef.current.state === "paused") {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
-      startPeriodicBackup();
+      // STREAMING: Resume timer but streaming continues automatically
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
+
     }
   };
 

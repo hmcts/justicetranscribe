@@ -161,7 +161,7 @@ Examples:
         
         if stats['duplicates_removed'] > 0:
             print()
-            print(f"   Duplicate emails found (kept first occurrence):")
+            print("   Duplicate emails found (kept first occurrence):")
             for email in stats['duplicate_emails']:
                 print(f"      - {email}")
         else:

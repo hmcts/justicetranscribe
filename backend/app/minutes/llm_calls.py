@@ -7,6 +7,16 @@ from fastapi import HTTPException
 from langfuse.decorators import langfuse_context, observe
 from uwotm8 import convert_american_to_british_spelling
 
+from app.database.interface_functions import (
+    get_minute_version_by_id,
+    save_minute_version,
+)
+from app.database.postgres_models import (
+    DialogueEntry,
+    MinuteVersion,
+    TemplateMetadata,
+    TemplateName,
+)
 from app.llm.llm_client import (
     LLMModel,
     langfuse_client,
@@ -21,16 +31,6 @@ from app.minutes.types import (
     SpeakerPredictionOutput,
 )
 from utils.markdown import html_to_markdown, markdown_to_html
-from app.database.interface_functions import (
-    get_minute_version_by_id,
-    save_minute_version,
-)
-from app.database.postgres_models import (
-    DialogueEntry,
-    MinuteVersion,
-    TemplateMetadata,
-    TemplateName,
-)
 
 
 @observe(name="edit_minutes_with_ai", as_type="generation")

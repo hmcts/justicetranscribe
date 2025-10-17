@@ -1,6 +1,5 @@
 """Test CORS utilities for parsing and normalizing origins."""
 
-import pytest
 from utils.cors_utils import parse_origins
 
 
@@ -49,7 +48,7 @@ class TestCORSOriginParsing:
         result = parse_origins(origins)
         expected = [
             "https://example.com",
-            "http://localhost:3000", 
+            "http://localhost:3000",
             "https://subdomain.example.com"
         ]
         assert result == expected

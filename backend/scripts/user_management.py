@@ -12,14 +12,13 @@ Usage:
 """
 import os
 import sys
-from uuid import UUID
 
 # Add backend to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database.interface_functions import get_user_by_id, update_user
-from app.database.postgres_database import engine
 from sqlmodel import Session, select
+
+from app.database.postgres_database import engine
 from app.database.postgres_models import User
 
 
@@ -29,21 +28,21 @@ def reset_user_onboarding(email: str) -> bool:
         # Find user by email
         statement = select(User).where(User.email == email)
         user = session.exec(statement).first()
-        
+
         if not user:
             print(f"❌ User with email '{email}' not found")
             return False
-            
+
         print(f"📧 Found user: {user.email}")
         print(f"🆔 User ID: {user.id}")
         print(f"📊 Current onboarding status: {user.has_completed_onboarding}")
-        
+
         # Reset onboarding status
         user.has_completed_onboarding = False
         session.add(user)
         session.commit()
         session.refresh(user)
-        
+
         print(f"✅ Reset onboarding status to: {user.has_completed_onboarding}")
         return True
 
@@ -54,21 +53,21 @@ def set_user_onboarding(email: str, completed: bool) -> bool:
         # Find user by email
         statement = select(User).where(User.email == email)
         user = session.exec(statement).first()
-        
+
         if not user:
             print(f"❌ User with email '{email}' not found")
             return False
-            
+
         print(f"📧 Found user: {user.email}")
         print(f"🆔 User ID: {user.id}")
         print(f"📊 Current onboarding status: {user.has_completed_onboarding}")
-        
+
         # Set onboarding status
         user.has_completed_onboarding = completed
         session.add(user)
         session.commit()
         session.refresh(user)
-        
+
         print(f"✅ Set onboarding status to: {user.has_completed_onboarding}")
         return True
 
@@ -78,12 +77,12 @@ def list_all_users():
     with Session(engine) as session:
         statement = select(User)
         users = session.exec(statement).all()
-        
+
         print("👥 All users in database:")
         if not users:
             print("  (No users found)")
             return
-            
+
         for user in users:
             status = "✅ Completed" if user.has_completed_onboarding else "⏳ Pending"
             print(f"  - {user.email} (ID: {user.id}, Onboarding: {status})")
@@ -113,9 +112,9 @@ def main():
     if len(sys.argv) < 2:
         show_help()
         sys.exit(1)
-    
+
     command = sys.argv[1]
-    
+
     if command == "list":
         list_all_users()
     elif command == "reset":
