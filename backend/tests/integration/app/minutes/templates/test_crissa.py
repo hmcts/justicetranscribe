@@ -1,10 +1,11 @@
 # ruff: noqa: T201
 
 import asyncio
+
 import pytest
 
-from app.minutes.templates.crissa import generate_full_crissa
 from app.database.postgres_models import DialogueEntry
+from app.minutes.templates.crissa import generate_full_crissa
 
 
 @pytest.mark.integration

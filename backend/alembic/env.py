@@ -1,10 +1,11 @@
 import os
 from logging.config import fileConfig
-from sqlmodel import SQLModel
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
+
 from dotenv import load_dotenv
+from sqlalchemy import engine_from_config, pool
+from sqlmodel import SQLModel
+
+from alembic import context
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,7 +20,6 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import your models here for autogenerate to work
-from app.database.postgres_models import User, Transcription, TranscriptionJob, MinuteVersion
 
 # add your model's MetaData object here
 # for 'autogenerate' support
