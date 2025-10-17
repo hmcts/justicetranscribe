@@ -144,7 +144,7 @@ function MeetingsList({
               type="text"
               value={renameTitle}
               onChange={(e) => setRenameTitle(e.target.value)}
-              className="mb-6 w-full rounded-md border border-gray-300 p-2"
+              className="mb-6 w-full rounded-md border border-gray-300 p-2 ph-mask"
               placeholder="Enter new title"
             />
             <div className="flex justify-end gap-3">
@@ -189,7 +189,7 @@ function MeetingsList({
                     className="flex-1 cursor-pointer"
                     onClick={() => handleMeetingClick(meeting.id)}
                   >
-                    <div className="mb-1 font-medium">
+                    <div className="mb-1 font-medium ph-mask">
                       {meeting.title || DEFAULT_MEETING_TITLE}
                     </div>
                     <div className="flex items-center text-sm text-gray-500">
