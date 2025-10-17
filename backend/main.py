@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 import sentry_sdk
@@ -21,6 +22,8 @@ log = logging.getLogger("uvicorn")
 
 # Global dictionary to track active per-user polling tasks
 active_polling_tasks: dict[str, asyncio.Task] = {}
+# Lock to prevent race conditions when starting polling tasks
+_polling_tasks_lock = threading.Lock()
 
 
 def ensure_user_polling_started(user_email: str) -> None:
@@ -29,6 +32,9 @@ def ensure_user_polling_started(user_email: str) -> None:
 
     If a polling service doesn't exist for this user, creates one and starts it.
     If one already exists, does nothing (idempotent).
+
+    Thread-safe: Uses a lock to prevent race conditions when multiple concurrent
+    requests attempt to start polling for the same user.
 
     Parameters
     ----------
@@ -41,23 +47,24 @@ def ensure_user_polling_started(user_email: str) -> None:
     if not settings.ENABLE_TRANSCRIPTION_POLLING:
         return
 
-    # Check if polling already exists for this user
-    if user_email in active_polling_tasks:
-        # Check if the task is still running
-        task = active_polling_tasks[user_email]
-        if not task.done():
-            # Task is still running, nothing to do
-            return
-        else:
+    # Use lock to prevent race conditions on concurrent requests
+    with _polling_tasks_lock:
+        # Check if polling already exists for this user
+        if user_email in active_polling_tasks:
+            # Check if the task is still running
+            task = active_polling_tasks[user_email]
+            if not task.done():
+                # Task is still running, nothing to do
+                return
             # Task has completed/failed, remove it and create a new one
             logger.warning(f"Polling task for user {user_email} was done, restarting...")
             del active_polling_tasks[user_email]
 
-    # Create and start new polling service for this user
-    logger.info(f"Starting new polling service for user: {user_email}")
-    polling_service = TranscriptionPollingService(user_email=user_email)
-    task = asyncio.create_task(polling_service.run_polling_loop())
-    active_polling_tasks[user_email] = task
+        # Create and start new polling service for this user
+        logger.info(f"Starting new polling service for user: {user_email}")
+        polling_service = TranscriptionPollingService(user_email=user_email)
+        task = asyncio.create_task(polling_service.run_polling_loop())
+        active_polling_tasks[user_email] = task
 
 
 @asynccontextmanager
