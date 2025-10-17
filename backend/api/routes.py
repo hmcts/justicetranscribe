@@ -255,11 +255,30 @@ async def process_transcription(
     )
 
 
-@router.post("/start-transcription-job", response_model=None)
+@router.post("/start-transcription-job", response_model=None, deprecated=True)
 async def start_transcription_job(
     request: StartTranscriptionJobRequest,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ) -> None:
+    """
+    Start a transcription job for an uploaded audio file.
+
+    DEPRECATION NOTICE:
+    This endpoint is being deprecated in favor of automatic transcription polling.
+    When ENABLE_TRANSCRIPTION_POLLING is enabled, audio files uploaded to blob storage
+    are automatically discovered and processed by a background polling service.
+
+    This endpoint is maintained for backward compatibility during the transition period
+    and serves as a fallback when polling is disabled. Frontend clients should:
+    1. Upload audio files directly to blob storage using SAS tokens
+    2. Remove calls to this endpoint
+    3. Poll /get-transcriptions to detect when transcription is complete
+
+    Migration Path (Expand-Contract Pattern):
+    - Phase 1 (Current): Both methods work (API endpoint + polling service)
+    - Phase 2 (Future): Polling service becomes primary, endpoint is fallback
+    - Phase 3 (Future): Endpoint may be removed after full migration
+    """
     try:
         # Pass only primitives to background task, not the User object (SQLAlchemy model)
         # to avoid keeping database sessions open
