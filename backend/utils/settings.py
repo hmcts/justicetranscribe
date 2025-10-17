@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     SENTRY_DSN: str
     # CORS configuration from infrastructure
     CORS_ALLOWED_ORIGINS: str | None = None
+    # Transcription polling service configuration
+    ENABLE_TRANSCRIPTION_POLLING: bool = False
 
 
     @field_validator("LANGFUSE_HOST")
