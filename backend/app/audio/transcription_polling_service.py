@@ -1,0 +1,419 @@
+"""
+Transcription Polling Service for automatic audio file discovery and processing.
+
+This service polls Azure Blob Storage for new audio files and automatically triggers
+transcription processing without requiring frontend API calls. This avoids JWT timeout
+issues on long audio recordings.
+"""
+
+import asyncio
+from datetime import UTC, datetime
+from pathlib import Path
+
+from sqlmodel import Session, select
+
+from app.audio.azure_utils import AsyncAzureBlobManager
+from app.audio.process_audio_fully import transcribe_and_generate_llm_output
+from app.database.postgres_database import engine
+from app.database.postgres_models import User
+from app.logger import logger
+from utils.settings import get_settings
+
+
+class TranscriptionPollingService:
+    """
+    Service for polling Azure Blob Storage and automatically processing audio files for a specific user.
+
+    This service:
+    - Polls the user-specific prefix (user-uploads/{email}/) every 30 seconds
+    - Identifies unprocessed audio files for that user only
+    - Triggers transcription processing
+    - Marks files as processed using blob metadata
+    - Includes defensive checks to prevent cross-user data access
+    """
+
+    def __init__(self, user_email: str):
+        """Initialize the transcription polling service for a specific user.
+
+        Parameters
+        ----------
+        user_email : str
+            Email address of the user whose files should be processed.
+            Used to construct the blob prefix: user-uploads/{user_email}/
+        """
+        self.settings = get_settings()
+        self.azure_blob_manager = AsyncAzureBlobManager()
+        self.polling_interval_seconds = 30
+        self.user_email = user_email
+        self.user_uploads_prefix = f"user-uploads/{user_email}/"
+        self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
+        # Record startup time - only process files uploaded after this
+        self.startup_time = datetime.now(UTC)
+        self._is_first_poll = True
+        logger.info(
+            f"Polling service initialized for user {user_email} - "
+            f"will only process files uploaded after {self.startup_time.isoformat()}"
+        )
+
+    async def poll_for_new_audio_files(self) -> list[dict]:
+        """
+        Poll blob storage for new, unprocessed audio files for this user only.
+
+        Only returns files uploaded after the service started to avoid
+        reprocessing old backlogged files. Includes defensive check to ensure
+        all blobs belong to the user's prefix.
+
+        Returns
+        -------
+        list[dict]
+            List of unprocessed blob dictionaries with keys:
+            - name: str (blob path)
+            - metadata: dict
+            - last_modified: datetime
+            - size: int
+        """
+        try:
+            # List all blobs with user-specific prefix
+            all_blobs = await self.azure_blob_manager.list_blobs_in_prefix(
+                prefix=self.user_uploads_prefix,
+                include_metadata=True
+            )
+
+            # Filter for unprocessed audio files
+            unprocessed = []
+            for blob in all_blobs:
+                blob_name = blob["name"]
+
+                # DEFENSIVE CHECK: Ensure blob belongs to this user
+                if not blob_name.startswith(self.user_uploads_prefix):
+                    logger.warning(
+                        f"Security check failed: Blob '{blob_name}' does not match "
+                        f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
+                    )
+                    continue
+
+                # Check file extension
+                blob_path = Path(blob_name)
+                if blob_path.suffix.lower() not in self.supported_extensions:
+                    continue
+
+                # Skip files uploaded before service started
+                last_modified = blob.get("last_modified")
+                if last_modified and last_modified < self.startup_time:
+                    continue
+
+                # Check if already processed
+                metadata = blob.get("metadata", {})
+                if metadata.get("processed") == "true":
+                    continue
+
+                unprocessed.append(blob)
+
+            if unprocessed:
+                logger.info(f"User {self.user_email}: Found {len(unprocessed)} unprocessed audio files")
+
+        except Exception as e:
+            logger.error(f"User {self.user_email}: Error polling for new audio files: {e}")
+            return []
+        else:
+            return unprocessed
+
+    def extract_user_email_from_blob_path(self, blob_path: str) -> str | None:
+        """
+        Extract user email from blob path and verify it matches this service's user.
+
+        Expected format: user-uploads/{email}/{filename}
+
+        Parameters
+        ----------
+        blob_path : str
+            The full blob path.
+
+        Returns
+        -------
+        str | None
+            The user email if it matches this service's user, None otherwise.
+        """
+        min_parts = 3  # Minimum parts for valid path: user-uploads/{email}/{filename}
+        try:
+            parts = blob_path.split("/")
+            if len(parts) >= min_parts and parts[0] == "user-uploads":
+                extracted_email = parts[1]
+
+                # DEFENSIVE CHECK: Verify extracted email matches this service's user
+                if extracted_email != self.user_email:
+                    logger.error(
+                        f"Security check failed: Extracted email '{extracted_email}' from blob path "
+                        f"does not match service user '{self.user_email}'"
+                    )
+                    return None
+
+                return extracted_email
+
+        except Exception as e:
+            logger.error(f"User {self.user_email}: Error extracting email from blob path '{blob_path}': {e}")
+
+        return None
+
+    def get_or_create_user_by_email(self, email: str) -> User | None:
+        """
+        Look up user by email in the database.
+
+        Note: This only looks up existing users. New users must be created
+        through the authentication flow.
+
+        Parameters
+        ----------
+        email : str
+            The user's email address.
+
+        Returns
+        -------
+        User | None
+            The User object if found, None otherwise.
+        """
+        try:
+            with Session(engine) as session:
+                statement = select(User).where(User.email == email)
+                user = session.exec(statement).first()
+
+                if user:
+                    logger.info(f"Found user for email: {email}")
+                else:
+                    logger.warning(f"No user found for email: {email}")
+
+                return user
+
+        except Exception as e:
+            logger.error(f"Error looking up user by email '{email}': {e}")
+            return None
+
+    async def process_discovered_audio(self, blob_info: dict) -> bool:
+        """
+        Process a discovered audio file for this user only.
+
+        This method:
+        1. Verifies blob path belongs to this user (defensive check)
+        2. Extracts user email from blob path and validates it
+        3. Looks up user in database
+        4. Triggers transcription processing
+        5. Marks blob as processed
+
+        Parameters
+        ----------
+        blob_info : dict
+            Dictionary containing blob information from poll_for_new_audio_files.
+
+        Returns
+        -------
+        bool
+            True if processing was successful, False otherwise.
+        """
+        blob_path = blob_info["name"]
+        logger.info(f"User {self.user_email}: Processing discovered audio file: {blob_path}")
+
+        try:
+            # DEFENSIVE CHECK: Verify blob path starts with user's prefix
+            if not blob_path.startswith(self.user_uploads_prefix):
+                error_msg = (
+                    f"Security violation: Blob path '{blob_path}' does not start with "
+                    f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
+                )
+                logger.error(error_msg)
+                return False
+
+            # Extract user email from path (includes additional validation)
+            user_email = self.extract_user_email_from_blob_path(blob_path)
+            if not user_email:
+                error_msg = f"Could not extract/validate user email from blob path: {blob_path}"
+                logger.error(f"User {self.user_email}: {error_msg}")
+                await self._mark_blob_with_error(blob_path, error_msg)
+                return False
+
+            # Look up user in database
+            user = self.get_or_create_user_by_email(user_email)
+            if not user:
+                error_msg = f"User not found for email: {user_email}"
+                logger.error(f"User {self.user_email}: {error_msg}")
+                await self._mark_blob_with_error(blob_path, error_msg)
+                return False
+
+            # Trigger transcription processing
+            # Note: transcription_id will be auto-generated by the function
+            logger.info(f"User {self.user_email}: Starting transcription for blob: {blob_path}")
+
+            await transcribe_and_generate_llm_output(
+                user_upload_blob_storage_file_key=blob_path,
+                user_id=user.id,
+                user_email=user.email,
+                transcription_id=None  # Will be auto-generated
+            )
+
+            # Mark blob as processed
+            await self._mark_blob_as_processed(blob_path)
+
+            logger.info(f"User {self.user_email}: Successfully processed audio file: {blob_path}")
+
+        except Exception as e:
+            error_msg = f"Error processing audio file {blob_path}: {e}"
+            logger.error(f"User {self.user_email}: {error_msg}")
+            await self._mark_blob_with_error(blob_path, str(e))
+            return False
+        else:
+            return True
+
+    async def _mark_blob_as_processed(self, blob_path: str) -> None:
+        """
+        Mark a blob as processed by setting metadata.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        """
+        try:
+            metadata = {
+                "processed": "true",
+                "processed_at": datetime.now(UTC).isoformat(),
+            }
+            success = await self.azure_blob_manager.set_blob_metadata(
+                blob_name=blob_path,
+                metadata=metadata
+            )
+            if success:
+                logger.info(f"Marked blob as processed: {blob_path}")
+            else:
+                logger.warning(f"Failed to mark blob as processed: {blob_path}")
+        except Exception as e:
+            logger.error(f"Error marking blob as processed {blob_path}: {e}")
+
+    async def _mark_blob_with_error(self, blob_path: str, error_message: str) -> None:
+        """
+        Mark a blob with error information in metadata.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        error_message : str
+            The error message to store.
+        """
+        try:
+            metadata = {
+                "processed": "false",
+                "error": error_message[:1000],  # Limit error message length
+                "error_at": datetime.now(UTC).isoformat(),
+            }
+            await self.azure_blob_manager.set_blob_metadata(
+                blob_name=blob_path,
+                metadata=metadata
+            )
+            logger.info(f"Marked blob with error: {blob_path}")
+        except Exception as e:
+            logger.error(f"Error marking blob with error {blob_path}: {e}")
+
+    async def _cleanup_old_blobs_on_startup(self) -> None:
+        """
+        Clean up this user's blobs older than the service startup time.
+
+        This runs once on the first poll to:
+        1. Remove old recordings for this user that should have been cleaned up
+        2. Ensure we only work with new uploads from this session
+
+        Includes defensive checks to ensure only this user's blobs are deleted.
+        """
+        try:
+            logger.info(f"User {self.user_email}: Starting cleanup of old blobs from before service startup...")
+
+            # List all blobs with user-specific prefix
+            all_blobs = await self.azure_blob_manager.list_blobs_in_prefix(
+                prefix=self.user_uploads_prefix,
+                include_metadata=True
+            )
+
+            # Find blobs older than startup time
+            old_blobs = []
+            for blob in all_blobs:
+                blob_name = blob["name"]
+
+                # DEFENSIVE CHECK: Ensure blob belongs to this user
+                if not blob_name.startswith(self.user_uploads_prefix):
+                    logger.error(
+                        f"Security check failed during cleanup: Blob '{blob_name}' does not match "
+                        f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
+                    )
+                    continue
+
+                blob_path = Path(blob_name)
+                # Only consider audio files
+                if blob_path.suffix.lower() not in self.supported_extensions:
+                    continue
+
+                last_modified = blob.get("last_modified")
+                if last_modified and last_modified < self.startup_time:
+                    old_blobs.append(blob)
+
+            if old_blobs:
+                logger.info(f"User {self.user_email}: Found {len(old_blobs)} old blob(s) to clean up")
+
+                # Delete each old blob
+                for blob in old_blobs:
+                    blob_name = blob["name"]
+                    try:
+                        success = await self.azure_blob_manager.delete_blob(blob_name)
+                        if success:
+                            logger.info(f"User {self.user_email}: Deleted old blob: {blob_name}")
+                        else:
+                            logger.warning(f"User {self.user_email}: Failed to delete old blob: {blob_name}")
+                    except Exception as e:
+                        logger.error(f"User {self.user_email}: Error deleting old blob {blob_name}: {e}")
+
+                logger.info(f"User {self.user_email}: Cleanup complete - processed {len(old_blobs)} old blob(s)")
+            else:
+                logger.info(f"User {self.user_email}: No old blobs found to clean up")
+
+        except Exception as e:
+            logger.error(f"User {self.user_email}: Error during startup cleanup: {e}")
+
+    async def run_polling_loop(self) -> None:
+        """
+        Run the continuous polling loop for this user.
+
+        This method runs indefinitely, polling for new audio files every
+        30 seconds and processing them for this user only.
+
+        On the first poll, it cleans up any of this user's blobs older than
+        the service startup time.
+        """
+        logger.info(
+            f"User {self.user_email}: Starting transcription polling service "
+            f"(interval: {self.polling_interval_seconds}s)"
+        )
+
+        while True:
+            try:
+                # On first poll, clean up old blobs for this user
+                if self._is_first_poll:
+                    await self._cleanup_old_blobs_on_startup()
+                    self._is_first_poll = False
+
+                # Poll for new files
+                unprocessed_files = await self.poll_for_new_audio_files()
+
+                # Process each file
+                for blob_info in unprocessed_files:
+                    try:
+                        await self.process_discovered_audio(blob_info)
+                    except Exception as e:
+                        logger.error(
+                            f"User {self.user_email}: Error processing blob "
+                            f"{blob_info.get('name', 'unknown')}: {e}"
+                        )
+                        # Continue processing other files even if one fails
+
+            except Exception as e:
+                logger.error(f"User {self.user_email}: Error in polling loop: {e}")
+
+            # Wait before next poll
+            await asyncio.sleep(self.polling_interval_seconds)
+
