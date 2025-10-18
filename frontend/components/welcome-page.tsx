@@ -5,7 +5,7 @@
 "use client";
 
 import React from "react";
-import { Plus, ChevronLeft, Mic, MonitorPlay } from "lucide-react";
+import { ChevronLeft, Mic, MonitorPlay } from "lucide-react";
 import { useTranscripts } from "@/providers/transcripts";
 import { useUserSettings } from "@/providers/user-settings";
 import { Button } from "@/components/ui/button";

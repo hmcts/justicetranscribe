@@ -190,7 +190,10 @@ class ApiClient {
           const errorMessage = isLocalDevelopment()
             ? "Authentication failed. Check if backend is running."
             : "Authentication failed. Your session may have expired. Please refresh the page to log in again.";
-          const e = new Error(errorMessage) as Error & { requestId?: string; status?: number };
+          const e = new Error(errorMessage) as Error & {
+            requestId?: string;
+            status?: number;
+          };
           e.requestId = requestId;
           e.status = response.status;
           throw e;
@@ -217,7 +220,10 @@ class ApiClient {
           console.error("Error parsing response body:", parseError);
           // If we can't parse the response body, fall back to generic error (errorMessage already set above)
         }
-        const e = new Error(errorMessage) as Error & { requestId?: string; status?: number };
+        const e = new Error(errorMessage) as Error & {
+          requestId?: string;
+          status?: number;
+        };
         e.requestId = bodyRequestId || requestId;
         e.status = response.status;
         throw e;

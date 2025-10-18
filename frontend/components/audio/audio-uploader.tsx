@@ -68,13 +68,17 @@ function ContentDisplay({
   };
 
   return (
-    <div className={initialRecordingMode === "mic" ? "md:scale-125 md:origin-top" : ""}>
+    <div
+      className={
+        initialRecordingMode === "mic" ? "md:origin-top md:scale-125" : ""
+      }
+    >
       <div className="-mr-4 flex justify-end">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="mt-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+          className="mt-1 bg-red-50 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 dark:bg-red-900/10 dark:hover:bg-red-900/30"
           style={{ color: "#B21010" }}
         >
           Close
@@ -180,7 +184,9 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
   const [currentBackupId, setCurrentBackupId] = useState<string | null>(null);
   const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [lastStatusCode, setLastStatusCode] = useState<number | null>(null);
-  const [lastSentryEventId, setLastSentryEventId] = useState<string | null>(null);
+  const [lastSentryEventId, setLastSentryEventId] = useState<string | null>(
+    null
+  );
   const [userUploadKey, setUserUploadKey] = useState<string | null>(null);
   const [lastDuration, setLastDuration] = useState<number | null>(null);
   const { setIsProcessingTranscription } = useTranscripts();
@@ -188,7 +194,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     async (blob: Blob, uploadUrl: string): Promise<void> => {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        
+
         xhr.upload.addEventListener("progress", (event) => {
           if (event.lengthComputable) {
             const progress = Math.round((event.loaded / event.total) * 100);
@@ -200,7 +206,11 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
-            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+            reject(
+              new Error(
+                `Upload failed with status ${xhr.status}: ${xhr.statusText}`
+              )
+            );
           }
         });
 
@@ -266,7 +276,9 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
         // Show retry attempt to user
         if (attempt > 1) {
-          setUploadError(`Retrying upload (attempt ${attempt} of ${maxRetries})...`);
+          setUploadError(
+            `Retrying upload (attempt ${attempt} of ${maxRetries})...`
+          );
         }
 
         const urlResult = await apiClient.getUploadUrl(fileExtension);
@@ -289,33 +301,44 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
         // Try single file upload first (unless force chunked mode is enabled)
         let finalFileKey = user_upload_s3_file_key;
-        
+
         // Check if chunked upload is forced (local development only)
-        const isLocalDev = process.env.NODE_ENV === 'development';
-        const forceChunked = isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === 'true';
-        
+        const isLocalDev = process.env.NODE_ENV === "development";
+        const forceChunked =
+          isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === "true";
+
         if (forceChunked) {
-          console.log('🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload');
+          console.log(
+            "🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload"
+          );
         }
-        
+
         try {
           if (forceChunked) {
             // Force chunked upload for testing
-            throw new Error('Forced chunked upload (test mode)');
+            throw new Error("Forced chunked upload (test mode)");
           }
           await uploadFile(blob, upload_url);
-        } catch (uploadError) {
-          console.warn("Single file upload failed, attempting chunked upload fallback:", uploadError);
-          
+        } catch (uploadErrorResult) {
+          console.warn(
+            "Single file upload failed, attempting chunked upload fallback:",
+            uploadErrorResult
+          );
+
           // CHUNKED UPLOAD FALLBACK: If single upload fails, try chunked upload
           try {
             // If we have chunks in IndexedDB, use those; otherwise split the blob
             if (currentBackupId) {
               // Try to use existing chunks from recording
-              finalFileKey = await uploadChunksAsFallback(currentBackupId, blob.type);
+              finalFileKey = await uploadChunksAsFallback(
+                currentBackupId,
+                blob.type
+              );
             } else {
               // No IndexedDB chunks - split the blob on-the-fly
-              console.log("No backup ID available, splitting blob for chunked upload");
+              console.log(
+                "No backup ID available, splitting blob for chunked upload"
+              );
               const result = await uploadBlobAsChunks({
                 blob,
                 mimeType: blob.type,
@@ -325,20 +348,30 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
               });
               finalFileKey = result.fileKey;
             }
-            
+
             currentUserUploadKey = finalFileKey;
             setUserUploadKey(finalFileKey);
           } catch (chunkedError) {
-            console.error("❌ Both single and chunked upload failed:", chunkedError);
-            const uploadErrorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
-            const chunkedErrorMessage = chunkedError instanceof Error ? chunkedError.message : String(chunkedError);
-            throw new Error(`Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`);
+            console.error(
+              "❌ Both single and chunked upload failed:",
+              chunkedError
+            );
+            const uploadErrorMessage =
+              uploadErrorResult instanceof Error
+                ? uploadErrorResult.message
+                : String(uploadErrorResult);
+            const chunkedErrorMessage =
+              chunkedError instanceof Error
+                ? chunkedError.message
+                : String(chunkedError);
+            throw new Error(
+              `Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`
+            );
           }
         }
 
-        const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          finalFileKey
-        );
+        const transcriptionJobResult =
+          await apiClient.startTranscriptionJob(finalFileKey);
 
         if (transcriptionJobResult.error) {
           const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
@@ -373,21 +406,29 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
 
       while (attempt <= maxRetries && !success) {
         try {
+          // eslint-disable-next-line no-await-in-loop
           await performSingleAttempt(attempt);
           success = true;
         } catch (error) {
-          lastError = error instanceof Error ? error : new Error("Unknown error occurred");
+          lastError =
+            error instanceof Error
+              ? error
+              : new Error("Unknown error occurred");
           console.error(`Upload attempt ${attempt} failed:`, lastError.message);
 
           // Extract request ID and status code from error if available
-          const err = lastError as Error & { requestId?: string; status?: number };
+          const err = lastError as Error & {
+            requestId?: string;
+            status?: number;
+          };
           currentRequestId = err?.requestId || null;
           currentStatusCode = err?.status ?? null;
 
           if (attempt < maxRetries) {
+            // eslint-disable-next-line no-await-in-loop
             await delay(1000);
           }
-          attempt = attempt + 1;
+          attempt += 1;
         }
       }
 
@@ -398,7 +439,10 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
         );
         // Capture rich context for failed upload/transcription
         try {
-          const err = lastError as Error & { requestId?: string; status?: number };
+          const err = lastError as Error & {
+            requestId?: string;
+            status?: number;
+          };
           const eventId = Sentry.captureException(err, {
             tags: {
               area: "audio-upload",
@@ -416,12 +460,20 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
           setLastSentryEventId(eventId || null);
           setLastRequestId(currentRequestId);
           setLastStatusCode(currentStatusCode);
-        } catch {}
+        } catch (error) {
+          console.error("Error capturing sentry event:", error);
+        }
         setIsProcessingTranscription(false);
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, currentBackupId, initialRecordingMode, uploadFile, uploadChunksAsFallback]
+    [
+      setIsProcessingTranscription,
+      currentBackupId,
+      initialRecordingMode,
+      uploadFile,
+      uploadChunksAsFallback,
+    ]
   );
 
   const handleRecordingStart = useCallback(() => {
