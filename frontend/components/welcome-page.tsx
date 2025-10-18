@@ -81,7 +81,7 @@ function WelcomePage() {
       return transcriptsMetadata;
     }
     return transcriptsMetadata.filter((meeting) =>
-      meeting.speakers.includes(speakerFilter)
+      meeting.speakers?.includes(speakerFilter)
     );
   }, [transcriptsMetadata, speakerFilter]);
 
