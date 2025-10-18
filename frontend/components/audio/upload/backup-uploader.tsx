@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import ProcessingLoader, {
   AudioProcessingStatus,
-} from "@/components/audio/processing-loader";
+} from "@/components/audio/processing/processing-loader";
 import { AudioBackup, audioBackupDB } from "@/lib/indexeddb-backup";
 import { useTranscripts } from "@/providers/transcripts";
 import { apiClient } from "@/lib/api-client";

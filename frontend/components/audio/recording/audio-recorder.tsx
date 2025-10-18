@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import RecordingControl from "@/components/audio/recording-control";
+import RecordingControl from "@/components/audio/recording/recording-control";
 import { audioBackupDB, IndexedDBBackup } from "@/lib/indexeddb-backup";
 import {
   hasReachedMaxDuration,

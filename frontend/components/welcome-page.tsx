@@ -25,10 +25,10 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { getFirstName } from "@/lib/utils";
 import { AudioBackup } from "@/lib/indexeddb-backup";
 import StartNewMeetingButton from "@/components/ui/start-new-meeting-button";
-import AudioUploader from "./audio/audio-uploader";
+import AudioUploader from "./audio/upload/audio-uploader";
 import MeetingsList from "./meetings-list";
-import BackupRecovery from "./audio/backup-recovery";
-import BackupUploader from "./audio/backup-uploader";
+import BackupRecovery from "./audio/upload/backup-recovery";
+import BackupUploader from "./audio/upload/backup-uploader";
 
 function WelcomePage() {
   const {

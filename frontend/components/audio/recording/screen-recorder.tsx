@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { useTranscripts } from "@/providers/transcripts";
-import RecordingControl from "@/components/audio/recording-control";
+import RecordingControl from "@/components/audio/recording/recording-control";
 import {
   hasReachedMaxDuration,
   shouldShowWarning,

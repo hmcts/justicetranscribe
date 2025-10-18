@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useTranscripts } from "@/providers/transcripts";
 import ProcessingLoader, {
   AudioProcessingStatus,
-} from "@/components/audio/processing-loader";
+} from "@/components/audio/processing/processing-loader";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import {
@@ -26,10 +26,10 @@ import { audioBackupDB } from "@/lib/indexeddb-backup";
 import { apiClient } from "@/lib/api-client";
 import * as Sentry from "@sentry/nextjs";
 import ErrorReportCard from "@/components/ui/error-report-card";
-import { getDuration } from "@/components/audio/processing-status";
+import { getDuration } from "@/components/audio/processing/processing-status";
 import { uploadChunksFromBackup, uploadBlobAsChunks } from "@/lib/azure-upload";
-import AudioRecorderComponent from "./audio-recorder";
-import ScreenRecorder from "./screen-recorder";
+import AudioRecorderComponent from "../recording/audio-recorder";
+import ScreenRecorder from "../recording/screen-recorder";
 
 interface ContentDisplayProps {
   processingStatus: AudioProcessingStatus;
