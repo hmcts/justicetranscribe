@@ -1,499 +1,31 @@
-/* eslint-disable no-nested-ternary */
-
 "use client";
 
-import posthog from "posthog-js";
-import React, { useState, useCallback } from "react";
+import React from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTranscripts } from "@/providers/transcripts";
-import ProcessingLoader, {
-  AudioProcessingStatus,
-} from "@/components/audio/processing/processing-loader";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
-import { audioBackupDB } from "@/lib/indexeddb-backup";
-import { apiClient } from "@/lib/api-client";
-import * as Sentry from "@sentry/nextjs";
 import ErrorReportCard from "@/components/ui/error-report-card";
-import { getDuration } from "@/components/audio/processing/processing-status";
-import { uploadChunksFromBackup, uploadBlobAsChunks } from "@/lib/azure-upload";
-import AudioRecorderComponent from "../recording/audio-recorder";
-import ScreenRecorder from "../recording/screen-recorder";
+import ContentDisplay from "./content-display";
+import useAudioUpload from "./use-audio-upload";
+import { AudioUploaderProps } from "./types";
 
-interface ContentDisplayProps {
-  processingStatus: AudioProcessingStatus;
-  setProcessingStatus: (status: AudioProcessingStatus) => void;
-  uploadError: string | null;
-  audioBlob: Blob | null;
-  startTranscription: (blob: Blob, backupIdToDelete?: string | null) => void;
-  initialRecordingMode: "mic" | "screen";
-  onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
-  onRecordingStart: () => void;
-  onClose: () => void;
-  // isRecording: boolean;
-}
-
-function ContentDisplay({
-  processingStatus,
-  setProcessingStatus,
-  uploadError,
-  audioBlob,
-  startTranscription,
-  initialRecordingMode,
-  onRecordingStop,
-  onRecordingStart,
-  onClose,
-}: ContentDisplayProps) {
-  const [showCloseDialog, setShowCloseDialog] = useState(false);
-
-  const handleClose = () => {
-    if (!audioBlob && processingStatus === "idle") {
-      onClose();
-    } else if (processingStatus !== "transcribing") {
-      setShowCloseDialog(true);
-    } else {
-      onClose();
-    }
-  };
-
-  return (
-    <div
-      className={
-        initialRecordingMode === "mic" ? "md:origin-top md:scale-125" : ""
-      }
-    >
-      <div className="-mr-4 flex justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleClose}
-          className="mt-1 bg-red-50 hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 dark:bg-red-900/10 dark:hover:bg-red-900/30"
-          style={{ color: "#B21010" }}
-        >
-          Close
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-4"
-            aria-hidden="true"
-          >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </Button>
-      </div>
-
-      {processingStatus !== "idle" && processingStatus !== "recording" ? (
-        <ProcessingLoader
-          status={processingStatus}
-          onStopPolling={() => setProcessingStatus("idle")}
-        />
-      ) : uploadError && audioBlob ? (
-        <div className="mt-8">
-          <div className="mb-4 text-center">
-            <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">
-              Error Processing Audio
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Please check your internet connection and try again
-            </p>
-          </div>
-          <div className="flex justify-center gap-4">
-            <Button
-              variant="default"
-              onClick={() => {
-                startTranscription(audioBlob, null);
-              }}
-              disabled={!audioBlob}
-              className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-            >
-              <RefreshCw className="mr-2 size-4" aria-hidden="true" />
-              Retry transcription
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="">
-          {initialRecordingMode === "mic" ? (
-            <AudioRecorderComponent
-              onRecordingStart={onRecordingStart}
-              onRecordingStop={onRecordingStop}
-            />
-          ) : (
-            <ScreenRecorder
-              onRecordingStop={onRecordingStop}
-              onRecordingStart={onRecordingStart}
-            />
-          )}
-        </div>
-      )}
-
-      <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Close Recorder?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to close? YOU WILL NOT BE ABLE TO RESUME
-              RECORDING.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-            <AlertDialogCancel className="h-12 w-full sm:h-10 sm:w-auto">
-              Go back
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={onClose}
-              className="h-12 w-full bg-red-600 text-white hover:bg-red-700 dark:bg-red-900 dark:hover:bg-red-800 sm:h-10 sm:w-auto"
-            >
-              Close and STOP recording
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
-interface AudioUploaderProps {
-  initialRecordingMode: "mic" | "screen";
-  onClose: () => void;
-}
 function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [processingStatus, setProcessingStatus] =
-    useState<AudioProcessingStatus>("idle");
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [currentBackupId, setCurrentBackupId] = useState<string | null>(null);
-  const [lastRequestId, setLastRequestId] = useState<string | null>(null);
-  const [lastStatusCode, setLastStatusCode] = useState<number | null>(null);
-  const [lastSentryEventId, setLastSentryEventId] = useState<string | null>(
-    null
-  );
-  const [userUploadKey, setUserUploadKey] = useState<string | null>(null);
-  const [lastDuration, setLastDuration] = useState<number | null>(null);
   const { setIsProcessingTranscription } = useTranscripts();
-  const uploadFile = useCallback(
-    async (blob: Blob, uploadUrl: string): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
 
-        xhr.upload.addEventListener("progress", (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            setProcessingStatus({ state: "uploading", progress });
-          }
-        });
-
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(
-              new Error(
-                `Upload failed with status ${xhr.status}: ${xhr.statusText}`
-              )
-            );
-          }
-        });
-
-        xhr.addEventListener("error", () => {
-          reject(new Error("Network error during upload"));
-        });
-
-        xhr.addEventListener("timeout", () => {
-          reject(new Error("Upload timed out"));
-        });
-
-        xhr.open("PUT", uploadUrl);
-        xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
-        xhr.send(blob);
-      });
-    },
-    []
-  );
-
-  // CHUNKED UPLOAD FALLBACK: Azure Block Blob API compliant chunked upload
-  const uploadChunksAsFallback = useCallback(
-    async (backupId: string, mimeType: string): Promise<string> => {
-      try {
-        const result = await uploadChunksFromBackup(
-          backupId,
-          mimeType,
-          (progress) => {
-            setProcessingStatus({ state: "uploading", progress });
-          }
-        );
-        return result.fileKey;
-      } catch (error) {
-        console.error("❌ Chunked upload fallback failed:", error);
-        throw error;
-      }
-    },
-    []
-  );
-
-  const startTranscription = useCallback(
-    async (blob: Blob, backupIdToDelete?: string | null) => {
-      const maxRetries = 2;
-      let lastError: Error | null = null;
-      let currentRequestId: string | null = null;
-      let currentStatusCode: number | null = null;
-      let currentUserUploadKey: string | null = null;
-
-      // Calculate duration non-blocking for report (telemetry)
-      getDuration(blob).then((d) => setLastDuration(d ?? null));
-
-      const delay = (ms: number): Promise<void> => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve();
-          }, ms);
-        });
-      };
-
-      const performSingleAttempt = async (attempt: number): Promise<void> => {
-        const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
-        setProcessingStatus({ state: "uploading", progress: 0 });
-        setUploadError(null);
-
-        // Show retry attempt to user
-        if (attempt > 1) {
-          setUploadError(
-            `Retrying upload (attempt ${attempt} of ${maxRetries})...`
-          );
-        }
-
-        const urlResult = await apiClient.getUploadUrl(fileExtension);
-
-        if (urlResult.error) {
-          const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
-          console.error(errorMsg);
-          throw new Error(errorMsg);
-        }
-
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
-        currentUserUploadKey = user_upload_s3_file_key;
-        setUserUploadKey(user_upload_s3_file_key);
-
-        // Clear retry message on successful URL fetch
-        if (attempt > 1) {
-          setUploadError(null);
-        }
-
-        // Try single file upload first (unless force chunked mode is enabled)
-        let finalFileKey = user_upload_s3_file_key;
-
-        // Check if chunked upload is forced (local development only)
-        const isLocalDev = process.env.NODE_ENV === "development";
-        const forceChunked =
-          isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === "true";
-
-        if (forceChunked) {
-          console.log(
-            "🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload"
-          );
-        }
-
-        try {
-          if (forceChunked) {
-            // Force chunked upload for testing
-            throw new Error("Forced chunked upload (test mode)");
-          }
-          await uploadFile(blob, upload_url);
-        } catch (uploadErrorResult) {
-          console.warn(
-            "Single file upload failed, attempting chunked upload fallback:",
-            uploadErrorResult
-          );
-
-          // CHUNKED UPLOAD FALLBACK: If single upload fails, try chunked upload
-          try {
-            // If we have chunks in IndexedDB, use those; otherwise split the blob
-            if (currentBackupId) {
-              // Try to use existing chunks from recording
-              finalFileKey = await uploadChunksAsFallback(
-                currentBackupId,
-                blob.type
-              );
-            } else {
-              // No IndexedDB chunks - split the blob on-the-fly
-              console.log(
-                "No backup ID available, splitting blob for chunked upload"
-              );
-              const result = await uploadBlobAsChunks({
-                blob,
-                mimeType: blob.type,
-                onProgress: (progress: number) => {
-                  setProcessingStatus({ state: "uploading", progress });
-                },
-              });
-              finalFileKey = result.fileKey;
-            }
-
-            currentUserUploadKey = finalFileKey;
-            setUserUploadKey(finalFileKey);
-          } catch (chunkedError) {
-            console.error(
-              "❌ Both single and chunked upload failed:",
-              chunkedError
-            );
-            const uploadErrorMessage =
-              uploadErrorResult instanceof Error
-                ? uploadErrorResult.message
-                : String(uploadErrorResult);
-            const chunkedErrorMessage =
-              chunkedError instanceof Error
-                ? chunkedError.message
-                : String(chunkedError);
-            throw new Error(
-              `Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`
-            );
-          }
-        }
-
-        const transcriptionJobResult =
-          await apiClient.startTranscriptionJob(finalFileKey);
-
-        if (transcriptionJobResult.error) {
-          const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
-          console.error(errorMsg);
-          throw new Error(errorMsg);
-        }
-
-        setProcessingStatus("transcribing");
-
-        posthog.capture("transcription_started", {
-          file_type: blob.type,
-          source: blob instanceof File ? "upload" : "recording",
-          retry_attempt: attempt,
-        });
-
-        // Clean up backup after successful upload
-        const idToDelete = backupIdToDelete || currentBackupId;
-        if (idToDelete) {
-          try {
-            await audioBackupDB.deleteAudioBackup(idToDelete);
-            setCurrentBackupId(null);
-          } catch (error) {
-            console.error("Error deleting backup:", error);
-            // Don't alert user about backup deletion failure
-          }
-        }
-      };
-
-      // Sequential retry logic without loops or recursion
-      let attempt = 1;
-      let success = false;
-
-      while (attempt <= maxRetries && !success) {
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          await performSingleAttempt(attempt);
-          success = true;
-        } catch (error) {
-          lastError =
-            error instanceof Error
-              ? error
-              : new Error("Unknown error occurred");
-          console.error(`Upload attempt ${attempt} failed:`, lastError.message);
-
-          // Extract request ID and status code from error if available
-          const err = lastError as Error & {
-            requestId?: string;
-            status?: number;
-          };
-          currentRequestId = err?.requestId || null;
-          currentStatusCode = err?.status ?? null;
-
-          if (attempt < maxRetries) {
-            // eslint-disable-next-line no-await-in-loop
-            await delay(1000);
-          }
-          attempt += 1;
-        }
-      }
-
-      if (!success) {
-        // All retries failed
-        setUploadError(
-          lastError?.message || "Error occurred while transcribing"
-        );
-        // Capture rich context for failed upload/transcription
-        try {
-          const err = lastError as Error & {
-            requestId?: string;
-            status?: number;
-          };
-          const eventId = Sentry.captureException(err, {
-            tags: {
-              area: "audio-upload",
-              recording_mode: initialRecordingMode,
-            },
-            extra: {
-              request_id: currentRequestId,
-              status_code: currentStatusCode,
-              user_upload_key: currentUserUploadKey,
-              backup_id: currentBackupId,
-              blob_type: blob.type,
-              blob_size: blob.size,
-            },
-          });
-          setLastSentryEventId(eventId || null);
-          setLastRequestId(currentRequestId);
-          setLastStatusCode(currentStatusCode);
-        } catch (error) {
-          console.error("Error capturing sentry event:", error);
-        }
-        setIsProcessingTranscription(false);
-        setProcessingStatus("idle");
-      }
-    },
-    [
-      setIsProcessingTranscription,
-      currentBackupId,
-      initialRecordingMode,
-      uploadFile,
-      uploadChunksAsFallback,
-    ]
-  );
-
-  const handleRecordingStart = useCallback(() => {
-    setProcessingStatus("recording");
-  }, []);
-
-  const handleRecordingStop = useCallback(
-    (blob: Blob | null, backupId?: string | null) => {
-      if (blob) {
-        setAudioBlob(blob);
-        if (backupId) {
-          setCurrentBackupId(backupId);
-        }
-        // Pass backupId directly to ensure it gets deleted after successful upload
-        startTranscription(blob, backupId);
-      }
-      setProcessingStatus({ state: "uploading", progress: 0 });
-    },
-    [startTranscription]
-  );
+  const {
+    audioBlob,
+    processingStatus,
+    setProcessingStatus,
+    uploadError,
+    errorDetails,
+    currentBackupId,
+    startTranscription,
+    handleRecordingStart,
+    handleRecordingStop,
+  } = useAudioUpload({
+    initialRecordingMode,
+    setIsProcessingTranscription,
+  });
 
   return (
     <div className="mx-auto mt-8 w-full max-w-3xl">
@@ -532,23 +64,24 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
                   d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              {uploadError} {lastRequestId ? `(req ${lastRequestId})` : ""}
+              {uploadError}{" "}
+              {errorDetails.requestId ? `(req ${errorDetails.requestId})` : ""}
             </AlertDescription>
           </Alert>
           <ErrorReportCard
             data={{
               title: "Audio upload/transcription failure",
-              requestId: lastRequestId,
-              statusCode: lastStatusCode,
+              requestId: errorDetails.requestId,
+              statusCode: errorDetails.statusCode,
               recordingMode: initialRecordingMode,
               fileSizeBytes: audioBlob?.size ?? null,
-              durationSeconds: lastDuration,
+              durationSeconds: errorDetails.duration,
               errorMessage: uploadError,
               extra: {
-                user_upload_key: userUploadKey,
+                user_upload_key: errorDetails.userUploadKey,
                 backup_id: currentBackupId,
               },
-              sentryEventId: lastSentryEventId,
+              sentryEventId: errorDetails.sentryEventId,
             }}
           />
         </>
