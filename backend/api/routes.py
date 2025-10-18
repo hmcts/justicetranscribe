@@ -239,6 +239,8 @@ async def get_upload_url(
         blob_name=user_upload_blob_path,
         expiry_hours=4,
     )
+    # throw error for testing:
+    # raise HTTPException(status_code=500, detail="Test error")
 
     return UploadUrlResponse(
         upload_url=presigned_url,

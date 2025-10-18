@@ -19,6 +19,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
     uploadError,
     errorDetails,
     currentBackupId,
+    isUploadUrlReady,
     startTranscription,
     handleRecordingStart,
     handleRecordingStop,
@@ -38,6 +39,7 @@ function AudioUploader({ initialRecordingMode, onClose }: AudioUploaderProps) {
             audioBlob={audioBlob}
             startTranscription={startTranscription}
             initialRecordingMode={initialRecordingMode}
+            isUploadUrlReady={isUploadUrlReady}
             onRecordingStart={handleRecordingStart}
             onRecordingStop={handleRecordingStop}
             onClose={onClose}

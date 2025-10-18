@@ -33,6 +33,7 @@ export default function useAudioUpload({
   const [uploadUrlData, setUploadUrlData] = useState<UploadUrlData | null>(
     null
   );
+  const [isUploadUrlReady, setIsUploadUrlReady] = useState<boolean>(false);
   const [errorDetails, setErrorDetails] = useState<UploadErrorDetails>({
     requestId: null,
     statusCode: null,
@@ -57,9 +58,13 @@ export default function useAudioUpload({
     return supportedMimeType || "audio/webm";
   }, []);
 
-  // Fetch upload URL when component mounts
-  useEffect(() => {
-    const fetchUploadUrl = async () => {
+  // Fetch upload URL with retry logic
+  const fetchUploadUrl = useCallback(async (): Promise<boolean> => {
+    const maxRetries = 3;
+    const retryDelay = 1000;
+
+    /* eslint-disable no-await-in-loop */
+    for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
       try {
         const mimeType = detectSupportedMimeType();
         const fileExtension = mimeType.includes("mp4") ? "mp4" : "webm";
@@ -67,8 +72,19 @@ export default function useAudioUpload({
         const urlResult = await apiClient.getUploadUrl(fileExtension);
 
         if (urlResult.error) {
-          console.error("Failed to pre-fetch upload URL:", urlResult.error);
-          return;
+          // eslint-disable-next-line no-console
+          console.error(
+            `Failed to fetch upload URL (attempt ${attempt}/${maxRetries}):`,
+            urlResult.error
+          );
+          if (attempt < maxRetries) {
+            await new Promise<void>((resolve) => {
+              setTimeout(resolve, retryDelay);
+            });
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+          return false;
         }
 
         if (urlResult.data) {
@@ -77,14 +93,46 @@ export default function useAudioUpload({
             ...prev,
             userUploadKey: urlResult.data!.user_upload_s3_file_key,
           }));
+          return true;
         }
       } catch (error) {
-        console.error("Error pre-fetching upload URL:", error);
+        // eslint-disable-next-line no-console
+        console.error(
+          `Error fetching upload URL (attempt ${attempt}/${maxRetries}):`,
+          error
+        );
+        if (attempt < maxRetries) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, retryDelay);
+          });
+        }
+      }
+    }
+    /* eslint-enable no-await-in-loop */
+
+    return false;
+  }, [detectSupportedMimeType]);
+
+  // Fetch upload URL when component mounts
+  useEffect(() => {
+    const initializeUploadUrl = async () => {
+      setIsUploadUrlReady(false);
+      const success = await fetchUploadUrl();
+      setIsUploadUrlReady(success);
+
+      if (!success) {
+        setUploadError(
+          "Failed to initialize upload. Please refresh the page or check your connection."
+        );
+        Sentry.captureMessage("Failed to pre-fetch upload URL after retries", {
+          level: "error",
+          tags: { area: "audio-upload-init" },
+        });
       }
     };
 
-    fetchUploadUrl();
-  }, [detectSupportedMimeType]);
+    initializeUploadUrl();
+  }, [fetchUploadUrl]);
 
   const uploadFile = useCallback(
     async (blob: Blob, uploadUrl: string): Promise<void> => {
@@ -178,28 +226,20 @@ export default function useAudioUpload({
           );
         }
 
-        // Use pre-fetched upload URL data, or fetch a new one if not available
-        let uploadData: UploadUrlData;
-        if (uploadUrlData) {
-          uploadData = uploadUrlData;
-        } else {
-          console.warn(
-            "Pre-fetched upload URL not available, fetching new one"
-          );
-          const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
-          const urlResult = await apiClient.getUploadUrl(fileExtension);
-
-          if (urlResult.error) {
-            const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
-            console.error(errorMsg);
-            throw new Error(errorMsg);
-          }
-
-          uploadData = urlResult.data!;
+        // Upload URL should always be available due to pre-fetch with retry logic
+        if (!uploadUrlData) {
+          const errorMsg = "Upload URL not available. This should not happen.";
+          // eslint-disable-next-line no-console
+          console.error(errorMsg);
+          Sentry.captureMessage(errorMsg, {
+            level: "error",
+            tags: { area: "audio-upload" },
+          });
+          throw new Error(errorMsg);
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } = uploadData;
+        const { upload_url, user_upload_s3_file_key } = uploadUrlData;
         currentUserUploadKey = user_upload_s3_file_key;
         setErrorDetails((prev) => ({
           ...prev,
@@ -210,8 +250,6 @@ export default function useAudioUpload({
         if (attempt > 1) {
           setUploadError(null);
         }
-
-        // Single file upload
 
         // CHUNKED UPLOAD: Force chunked mode commented out
         // const isLocalDev = process.env.NODE_ENV === "development";
@@ -298,10 +336,16 @@ export default function useAudioUpload({
             await audioBackupDB.deleteAudioBackup(idToDelete);
             setCurrentBackupId(null);
           } catch (error) {
+            // eslint-disable-next-line no-console
             console.error("Error deleting backup:", error);
             // Don't alert user about backup deletion failure
           }
         }
+
+        // Clear and re-fetch upload URL for the next recording
+        // This ensures each upload uses a fresh, single-use URL
+        setUploadUrlData(null);
+        setIsUploadUrlReady(false);
       };
 
       // Sequential retry logic without loops or recursion
@@ -318,6 +362,7 @@ export default function useAudioUpload({
             error instanceof Error
               ? error
               : new Error("Unknown error occurred");
+          // eslint-disable-next-line no-console
           console.error(`Upload attempt ${attempt} failed:`, lastError.message);
 
           // Extract request ID and status code from error if available
@@ -369,6 +414,7 @@ export default function useAudioUpload({
             duration: errorDetails.duration,
           });
         } catch (error) {
+          // eslint-disable-next-line no-console
           console.error("Error capturing sentry event:", error);
         }
         setIsProcessingTranscription(false);
@@ -381,6 +427,7 @@ export default function useAudioUpload({
       initialRecordingMode,
       uploadFile,
       uploadUrlData,
+      fetchUploadUrl,
       // uploadChunksAsFallback, // CHUNKED UPLOAD: Commented out
       errorDetails.duration,
     ]
@@ -412,6 +459,7 @@ export default function useAudioUpload({
     uploadError,
     errorDetails,
     currentBackupId,
+    isUploadUrlReady,
     startTranscription,
     handleRecordingStart,
     handleRecordingStop,

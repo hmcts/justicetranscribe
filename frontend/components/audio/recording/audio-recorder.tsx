@@ -43,11 +43,13 @@ const LONG_RECORDING_WARNING_KEY = "audio-recorder-long-recording-warning-seen";
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
   onRecordingStart: () => void;
+  disabled: boolean;
 }
 
 function AudioRecorderComponent({
   onRecordingStop,
   onRecordingStart,
+  disabled = false,
 }: MicRecorderProps) {
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -570,9 +572,10 @@ function AudioRecorderComponent({
                     onClick={startRecording}
                     className="mt-2 h-12 w-full"
                     size="lg"
+                    disabled={disabled}
                   >
                     <Mic className="mr-2 size-4" />
-                    Start recording
+                    {disabled ? "Initializing..." : "Start recording"}
                   </Button>
                 </div>
               </div>
