@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import posthog from "posthog-js";
 import * as Sentry from "@sentry/nextjs";
 import { AudioProcessingStatus } from "@/components/audio/processing/processing-loader";
@@ -16,6 +16,11 @@ interface UseAudioUploadOptions {
   setIsProcessingTranscription: (isProcessing: boolean) => void;
 }
 
+interface UploadUrlData {
+  upload_url: string;
+  user_upload_s3_file_key: string;
+}
+
 export default function useAudioUpload({
   initialRecordingMode,
   setIsProcessingTranscription,
@@ -25,6 +30,9 @@ export default function useAudioUpload({
     useState<AudioProcessingStatus>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [currentBackupId, setCurrentBackupId] = useState<string | null>(null);
+  const [uploadUrlData, setUploadUrlData] = useState<UploadUrlData | null>(
+    null
+  );
   const [errorDetails, setErrorDetails] = useState<UploadErrorDetails>({
     requestId: null,
     statusCode: null,
@@ -32,6 +40,51 @@ export default function useAudioUpload({
     userUploadKey: null,
     duration: null,
   });
+
+  // Detect the supported MIME type for recording
+  const detectSupportedMimeType = useCallback((): string => {
+    const mimeTypes = [
+      "video/mp4", // iOS primary format
+      "audio/mp4", // Desktop MP4 format
+      "audio/webm", // WebM fallback
+    ];
+
+    const supportedMimeType = mimeTypes.find((mimeType) =>
+      MediaRecorder.isTypeSupported(mimeType)
+    );
+
+    // Default fallback
+    return supportedMimeType || "audio/webm";
+  }, []);
+
+  // Fetch upload URL when component mounts
+  useEffect(() => {
+    const fetchUploadUrl = async () => {
+      try {
+        const mimeType = detectSupportedMimeType();
+        const fileExtension = mimeType.includes("mp4") ? "mp4" : "webm";
+
+        const urlResult = await apiClient.getUploadUrl(fileExtension);
+
+        if (urlResult.error) {
+          console.error("Failed to pre-fetch upload URL:", urlResult.error);
+          return;
+        }
+
+        if (urlResult.data) {
+          setUploadUrlData(urlResult.data);
+          setErrorDetails((prev) => ({
+            ...prev,
+            userUploadKey: urlResult.data!.user_upload_s3_file_key,
+          }));
+        }
+      } catch (error) {
+        console.error("Error pre-fetching upload URL:", error);
+      }
+    };
+
+    fetchUploadUrl();
+  }, [detectSupportedMimeType]);
 
   const uploadFile = useCallback(
     async (blob: Blob, uploadUrl: string): Promise<void> => {
@@ -115,7 +168,6 @@ export default function useAudioUpload({
       };
 
       const performSingleAttempt = async (attempt: number): Promise<void> => {
-        const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
         setProcessingStatus({ state: "uploading", progress: 0 });
         setUploadError(null);
 
@@ -126,16 +178,28 @@ export default function useAudioUpload({
           );
         }
 
-        const urlResult = await apiClient.getUploadUrl(fileExtension);
+        // Use pre-fetched upload URL data, or fetch a new one if not available
+        let uploadData: UploadUrlData;
+        if (uploadUrlData) {
+          uploadData = uploadUrlData;
+        } else {
+          console.warn(
+            "Pre-fetched upload URL not available, fetching new one"
+          );
+          const fileExtension = blob.type.includes("mp4") ? "mp4" : "webm";
+          const urlResult = await apiClient.getUploadUrl(fileExtension);
 
-        if (urlResult.error) {
-          const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
-          console.error(errorMsg);
-          throw new Error(errorMsg);
+          if (urlResult.error) {
+            const errorMsg = `Upload URL request failed: ${JSON.stringify(urlResult.error)}`;
+            console.error(errorMsg);
+            throw new Error(errorMsg);
+          }
+
+          uploadData = urlResult.data!;
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
+        const { upload_url, user_upload_s3_file_key } = uploadData;
         currentUserUploadKey = user_upload_s3_file_key;
         setErrorDetails((prev) => ({
           ...prev,
@@ -148,7 +212,6 @@ export default function useAudioUpload({
         }
 
         // Single file upload
-        const finalFileKey = user_upload_s3_file_key;
 
         // CHUNKED UPLOAD: Force chunked mode commented out
         // const isLocalDev = process.env.NODE_ENV === "development";
@@ -211,14 +274,14 @@ export default function useAudioUpload({
         //   }
         // }
 
-        const transcriptionJobResult =
-          await apiClient.startTranscriptionJob(finalFileKey);
+        // const transcriptionJobResult =
+        //   await apiClient.startTranscriptionJob(finalFileKey);
 
-        if (transcriptionJobResult.error) {
-          const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
-          console.error(errorMsg);
-          throw new Error(errorMsg);
-        }
+        // if (transcriptionJobResult.error) {
+        //   const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
+        //   console.error(errorMsg);
+        //   throw new Error(errorMsg);
+        // }
 
         setProcessingStatus("transcribing");
 
@@ -317,6 +380,7 @@ export default function useAudioUpload({
       currentBackupId,
       initialRecordingMode,
       uploadFile,
+      uploadUrlData,
       // uploadChunksAsFallback, // CHUNKED UPLOAD: Commented out
       errorDetails.duration,
     ]

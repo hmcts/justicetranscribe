@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Per-user transcription polling service** that automatically discovers and processes audio files from Azure Blob Storage
 - New methods in `AsyncAzureBlobManager`: `list_blobs_in_prefix()`, `get_blob_metadata()`, `set_blob_metadata()`
-- `ENABLE_TRANSCRIPTION_POLLING` environment variable to enable/disable automatic polling (default: false)
 - Blob metadata marking system to track processed files and avoid reprocessing
 - On first poll operation, deletes old audio blobs.
 
@@ -27,12 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Release Notes
 
-**This feature is complete but unreleased pending frontend integration work.** The polling service is disabled by default (`ENABLE_TRANSCRIPTION_POLLING=false`) to maintain backward compatibility. Frontend changes are required to:
 1. Remove API calls to the deprecated `/start-transcription-job` endpoint
 2. Rely on automatic processing after audio upload to blob storage
 3. Handle "processing" UI state while polling service processes files
-
-Once frontend changes are complete, the polling service can be enabled in production by setting `ENABLE_TRANSCRIPTION_POLLING=true`.
 
 ## [0.1.1] - 2025-10-17
 

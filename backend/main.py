@@ -41,11 +41,6 @@ def ensure_user_polling_started(user_email: str) -> None:
     user_email : str
         The email address of the user to start polling for.
     """
-    settings = get_settings()
-
-    # Only start polling if it's enabled
-    if not settings.ENABLE_TRANSCRIPTION_POLLING:
-        return
 
     # Use lock to prevent race conditions on concurrent requests
     with _polling_tasks_lock:
@@ -57,7 +52,9 @@ def ensure_user_polling_started(user_email: str) -> None:
                 # Task is still running, nothing to do
                 return
             # Task has completed/failed, remove it and create a new one
-            logger.warning(f"Polling task for user {user_email} was done, restarting...")
+            logger.warning(
+                f"Polling task for user {user_email} was done, restarting..."
+            )
             del active_polling_tasks[user_email]
 
         # Create and start new polling service for this user
@@ -72,17 +69,17 @@ async def lifespan(app_: FastAPI):  # noqa: ARG001
     log.info("Starting up...")
 
     # Check if transcription polling is enabled
-    settings = get_settings()
-    if settings.ENABLE_TRANSCRIPTION_POLLING:
-        log.info("Transcription polling is ENABLED - per-user polling services will start on user requests")
-    else:
-        log.info("Transcription polling is DISABLED - files must be processed via API endpoint")
+    log.info(
+        "Transcription polling is ENABLED - per-user polling services will start on user requests"
+    )
 
     yield
 
     # Cancel all active polling tasks on shutdown
     if active_polling_tasks:
-        log.info("Shutting down %d active polling service(s)...", len(active_polling_tasks))
+        log.info(
+            "Shutting down %d active polling service(s)...", len(active_polling_tasks)
+        )
         for user_email, task in active_polling_tasks.items():
             log.info("Cancelling polling service for user: %s", user_email)
             task.cancel()
@@ -128,8 +125,8 @@ if origins:
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,  # Needed for Easy Auth and cookies
-        allow_methods=["*"],     # Let OPTIONS succeed without guessing methods
-        allow_headers=["*"],     # Avoids 403 on Authorization, custom headers, etc.
+        allow_methods=["*"],  # Let OPTIONS succeed without guessing methods
+        allow_headers=["*"],  # Avoids 403 on Authorization, custom headers, etc.
         expose_headers=["X-Request-ID"],
         max_age=86400,  # Cache preflight for 24 hours
     )
@@ -142,12 +139,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 async def request_id_middleware(request, call_next):
     return await add_request_id(request, call_next)
 
+
 @app.exception_handler(FastAPIHTTPException)
-async def http_exception_wrapper(request, exc):  # noqa: ARG001 - request required by FastAPI interface
+async def http_exception_wrapper(request, exc):  # noqa: ARG001
     return await http_exception_handler(exc)
 
+
 @app.exception_handler(Exception)
-async def unhandled_exception_wrapper(request, exc):  # noqa: ARG001 - request required by FastAPI interface
+async def unhandled_exception_wrapper(request, exc):  # noqa: ARG001
     return await unhandled_exception_handler(exc)
 
 
