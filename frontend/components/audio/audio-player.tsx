@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 
 interface AudioPlayerProps {
   audioBlob: Blob;
-  restrictDownload?: boolean;
+  restrictDownload: boolean;
 }
 
 function AudioPlayerComponent({

@@ -17,7 +17,9 @@ function SpeakerAndTranscriptEditor({
 
   return (
     <div className="space-y-4">
-      {audioBlob && <AudioPlayerComponent audioBlob={audioBlob} />}
+      {audioBlob && (
+        <AudioPlayerComponent audioBlob={audioBlob} restrictDownload={false} />
+      )}
 
       <Card>
         <div className="relative">
