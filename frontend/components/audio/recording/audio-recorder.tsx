@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Mic, Loader2, RefreshCw } from "lucide-react";
+import { Mic, Loader2, Moon } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
@@ -388,13 +388,38 @@ function AudioRecorderComponent({
                 </h1>
               </div>
 
-              {/* Refresh Notification - One line below header */}
-              <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
-                <div className="flex items-center justify-center gap-2">
-                  <RefreshCw className="size-3.5 text-amber-600 dark:text-amber-400" />
-                  <p className="text-sm text-amber-800 dark:text-amber-300">
-                    💡 Refresh Justice Transcribe before recording a new meeting
-                  </p>
+              {/* Do Not Disturb Reminder */}
+              <div
+                role="status"
+                aria-label="Reminder to enable Do Not Disturb mode"
+                className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3"
+                style={{
+                  borderColor: "#D8C8FF",
+                  backgroundColor: "#F4F1FF",
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="mt-0.5 rounded-full p-2"
+                    style={{ backgroundColor: "#CABDFF" }}
+                  >
+                    <Moon
+                      className="size-5"
+                      style={{ color: "#1F1247" }}
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <h3
+                      className="text-sm font-semibold"
+                      style={{ color: "#1F1247" }}
+                    >
+                      Silence notifications
+                    </h3>
+                    <p className="mt-0.5 text-sm" style={{ color: "#362952" }}>
+                      Turn on Do Not Disturb while recording.
+                    </p>
+                  </div>
                 </div>
               </div>
             </>
