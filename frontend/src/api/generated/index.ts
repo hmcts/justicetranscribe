@@ -4,11 +4,13 @@
 /* eslint-disable */
 
 export type { DialogueEntry } from './models/DialogueEntry';
-export type { GenerateMinutesRequest } from './models/GenerateMinutesRequest';
+export { GenerateMinutesRequest } from './models/GenerateMinutesRequest';
 export type { HTTPValidationError } from './models/HTTPValidationError';
+export type { LangfuseScoreRequest } from './models/LangfuseScoreRequest';
+export type { LangfuseTraceRequest } from './models/LangfuseTraceRequest';
 export type { MinuteVersion_Input } from './models/MinuteVersion_Input';
 export type { MinuteVersion_Output } from './models/MinuteVersion_Output';
-export type { StartTranscriptionJobRequest } from './models/StartTranscriptionJobRequest';
+export type { OnboardingStatusResponse } from './models/OnboardingStatusResponse';
 export type { TemplateMetadata } from './models/TemplateMetadata';
 export { TemplateName } from './models/TemplateName';
 export type { TemplateResponse } from './models/TemplateResponse';

@@ -26,28 +26,40 @@ from utils.settings import get_settings
 TOO_MANY_REQUESTS = 429
 
 
-async def transcribe_audio(user_upload_s3_file_key: str) -> list[DialogueEntry]:
-    result = await perform_transcription_steps_with_azure_and_aws(
-        user_upload_s3_file_key
-    )
+@retry(
+    retry=retry_if_exception_type((Exception,)),  # Retry on any exception during download
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(3),
+)
+async def download_audio_blob_with_retry(user_upload_blob_path: str) -> Path:
+    """
+    Download audio blob from Azure Storage with retry logic.
 
-    # Convert to British English spelling regardless of which service was used
-    for entry in result:
-        entry.text = convert_american_to_british_spelling(entry.text)
+    Retries up to 3 times on network/transient errors.
+    Returns the path to the downloaded temporary file.
 
-    return result
+    Parameters
+    ----------
+    user_upload_blob_path : str
+        The path to the blob in Azure Storage.
 
+    Returns
+    -------
+    Path
+        Path to the temporary file containing the downloaded audio.
 
-async def perform_transcription_steps_with_azure_and_aws(
-    user_upload_blob_path: str,
-) -> list[DialogueEntry]:
+    Raises
+    ------
+    FileNotFoundError
+        If the blob doesn't exist in storage.
+    Exception
+        If download fails after all retries.
+    """
+    file_extension = Path(user_upload_blob_path).suffix.lower()
     temp_file_path = None
 
     try:
-        file_extension = Path(user_upload_blob_path).suffix.lower()
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=file_extension
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
             logger.info(
                 f"Downloading file from Azure Blob Storage: {user_upload_blob_path} to {temp_file.name}"
             )
@@ -74,7 +86,7 @@ async def perform_transcription_steps_with_azure_and_aws(
                     temp_file.write(content)
 
             except Exception as azure_utils_error:
-                logger.warning(f"AsyncAzureBlobManager failed, falling back to get_blob_service_client: {azure_utils_error}")
+                logger.warning(f"Primary download method failed, falling back: {azure_utils_error}")
 
                 # Fallback to existing working pattern
                 async with get_blob_service_client() as blob_service_client:
@@ -87,7 +99,44 @@ async def perform_transcription_steps_with_azure_and_aws(
                     temp_file.write(content)
 
             temp_file_path = Path(temp_file.name)
+            logger.info(f"Successfully downloaded blob to {temp_file_path}")
+            return temp_file_path
 
+    except Exception:
+        # Clean up temp file on error
+        if temp_file_path and temp_file_path.exists():
+            await cleanup_files(temp_file_path)
+        raise
+
+
+async def transcribe_audio(user_upload_s3_file_key: str) -> list[DialogueEntry]:
+    result = await perform_transcription_steps_with_azure_and_aws(
+        user_upload_s3_file_key
+    )
+
+    # Convert to British English spelling regardless of which service was used
+    for entry in result:
+        entry.text = convert_american_to_british_spelling(entry.text)
+
+    return result
+
+
+async def perform_transcription_steps_with_azure_and_aws(
+    user_upload_blob_path: str,
+) -> list[DialogueEntry]:
+    """
+    Download blob and transcribe audio.
+
+    Blob download has retry logic (3 attempts).
+    Transcription has limited retry logic (2 attempts max).
+    """
+    temp_file_path = None
+
+    try:
+        # Download with retry (3 attempts for network resilience)
+        temp_file_path = await download_audio_blob_with_retry(user_upload_blob_path)
+
+        # Transcribe (max 2 attempts - fast fail on API errors)
         result = await transcribe_audio_with_azure(temp_file_path)
 
     except Exception:
@@ -125,12 +174,16 @@ def convert_to_dialogue_entries(transcript_data: list[dict]) -> list[DialogueEnt
 @retry(
     retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException)),
     wait=wait_exponential(multiplier=1, min=4, max=10),
-    stop=stop_after_attempt(5),
+    stop=stop_after_attempt(2),  # Reduced from 5 to 2 (1 retry max) - fast fail on API errors
 )
 async def transcribe_audio_with_azure(audio_file_path: Path):
     """
-    Async version of transcribe audio using Azure Speech-to-Text API
+    Async version of transcribe audio using Azure Speech-to-Text API.
+
+    Retries once on HTTP errors or timeouts (max 2 attempts total).
+    Transcription API errors are usually not transient, so we fail fast.
     """
+
     url = "https://production-justice-ai.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2024-11-15"
     settings = get_settings()
     if not settings.AZURE_SPEECH_KEY:

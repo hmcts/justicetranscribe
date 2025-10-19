@@ -481,4 +481,141 @@ class AsyncAzureBlobManager:
             logger.error(f"Failed to check if blob exists {container}/{blob_name}: {e}")
             return False
 
+    async def list_blobs_in_prefix(
+        self,
+        prefix: str,
+        container_name: str | None = None,
+        include_metadata: bool = True
+    ) -> list[dict]:
+        """List all non-deleted blobs with a given prefix (async).
+
+        Parameters
+        ----------
+        prefix : str
+            The prefix to filter blobs by (e.g., "user-uploads/").
+        container_name : str, optional
+            Container name. If None, uses the default container from settings.
+        include_metadata : bool, optional
+            Whether to include blob metadata in results. Default is True.
+
+        Returns
+        -------
+        list[dict]
+            List of dictionaries containing blob information:
+            - name: str (blob name/path)
+            - metadata: dict (blob metadata if include_metadata=True)
+            - last_modified: datetime
+            - size: int (blob size in bytes)
+        """
+        try:
+            container = container_name or self.container_name
+            blobs = []
+
+            # Create async BlobServiceClient
+            async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
+                container_client = blob_service_client.get_container_client(container)
+
+                # List blobs with the given prefix
+                # By default, this excludes soft-deleted blobs
+                async for blob in container_client.list_blobs(name_starts_with=prefix, include=["metadata"] if include_metadata else None):
+                    blob_info = {
+                        "name": blob.name,
+                        "last_modified": blob.last_modified,
+                        "size": blob.size,
+                    }
+                    if include_metadata:
+                        blob_info["metadata"] = blob.metadata or {}
+                    blobs.append(blob_info)
+
+            logger.info(f"Listed {len(blobs)} blobs with prefix '{prefix}' in container '{container}'")
+
+        except Exception as e:
+            logger.error(f"Failed to list blobs with prefix '{prefix}' in container '{container}': {e}")
+            return []
+        else:
+            return blobs
+
+    async def get_blob_metadata(self, blob_name: str, container_name: str | None = None) -> dict:
+        """Get metadata for a specific blob (async).
+
+        Parameters
+        ----------
+        blob_name : str
+            Name of the blob.
+        container_name : str, optional
+            Container name. If None, uses the default container from settings.
+
+        Returns
+        -------
+        dict
+            Dictionary containing blob metadata. Empty dict if blob not found or error.
+        """
+        try:
+            container = container_name or self.container_name
+
+            # Create async BlobServiceClient
+            async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
+                blob_client = blob_service_client.get_blob_client(
+                    container=container,
+                    blob=blob_name
+                )
+
+                # Get blob properties which includes metadata
+                properties = await blob_client.get_blob_properties()
+                return properties.metadata or {}
+
+        except ResourceNotFoundError:
+            logger.warning(f"Blob not found when getting metadata: {container}/{blob_name}")
+            return {}
+        except Exception as e:
+            logger.error(f"Failed to get metadata for blob {container}/{blob_name}: {e}")
+            return {}
+
+    async def set_blob_metadata(
+        self,
+        blob_name: str,
+        metadata: dict,
+        container_name: str | None = None
+    ) -> bool:
+        """Set metadata on a specific blob (async).
+
+        Parameters
+        ----------
+        blob_name : str
+            Name of the blob.
+        metadata : dict
+            Dictionary of metadata key-value pairs to set on the blob.
+            Keys must be valid HTTP header names (alphanumeric + underscore).
+        container_name : str, optional
+            Container name. If None, uses the default container from settings.
+
+        Returns
+        -------
+        bool
+            True if successful, False otherwise.
+        """
+        try:
+            container = container_name or self.container_name
+
+            # Create async BlobServiceClient
+            async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
+                blob_client = blob_service_client.get_blob_client(
+                    container=container,
+                    blob=blob_name
+                )
+
+                # Set the metadata
+                await blob_client.set_blob_metadata(metadata=metadata)
+
+            logger.info(f"Successfully set metadata on blob: {container}/{blob_name}")
+
+        except ResourceNotFoundError:
+            logger.error(f"Blob not found when setting metadata: {container}/{blob_name}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to set metadata on blob {container}/{blob_name}: {e}")
+            return False
+        else:
+            return True
+
 

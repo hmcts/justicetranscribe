@@ -1,4 +1,5 @@
 from langfuse.decorators import langfuse_context, observe
+from shared_utils.database.postgres_models import DialogueEntry
 from uwotm8 import convert_american_to_british_spelling
 
 from app.llm.llm_client import (
@@ -7,7 +8,6 @@ from app.llm.llm_client import (
 )
 from app.minutes.templates.utils import format_transcript_string_for_prompt
 from utils.markdown import markdown_to_html
-from shared_utils.database.postgres_models import DialogueEntry
 
 
 @observe(name="generate_short_n_sweet_summary", as_type="generation")

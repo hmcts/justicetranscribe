@@ -15,7 +15,7 @@ class TemplateResponse(BaseModel):
 
 class TranscriptionMetadata(BaseModel):
     """Pydantic model for transcription metadata."""
-    
+
     model_config = ConfigDict()
 
     id: uuid.UUID
@@ -25,7 +25,7 @@ class TranscriptionMetadata(BaseModel):
     is_showable_in_ui: bool
     speakers: list[str] = Field(default_factory=list)
 
-    @field_serializer('created_datetime', 'updated_datetime')
+    @field_serializer("created_datetime", "updated_datetime")
     def serialize_datetime(self, value: datetime | None) -> str | None:
         return value.isoformat() if value else None
 

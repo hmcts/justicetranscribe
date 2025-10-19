@@ -9,8 +9,8 @@ import Header from "@/components/layout/header";
 
 import { TranscriptsProvider } from "@/providers/transcripts";
 import { UserSettingsProvider } from "@/providers/user-settings";
-import PosthogProvider from "../providers/posthog";
 import AccessGate from "@/providers/access-gate";
+import PosthogProvider from "../providers/posthog";
 
 const inter = Inter({ subsets: ["latin"] });
 

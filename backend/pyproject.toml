@@ -6,7 +6,7 @@ fix = true
 
 [project]
 name = "justicetranscribe_backend"
-version = "0.1.0"
+version = "0.1.1"
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "python-multipart>=0.0.9",
@@ -110,3 +110,5 @@ known-first-party = ["backend", "frontend"]
 "tests/*" = ["S101", "S106", "PLR0913", "PLR0915", "PLR2004", "TD003", "S311", "SLF001"]
 "*/tests/*" = ["S101", "S106", "PLR0913", "PLR0915", "PLR2004", "TD003", "SLF001"]
 "*/tests_playwright/*" = ["S101", "S106", "PLR0913", "PLR2004", "TD003", "SLF001"]
+"scripts/*" = ["T201", "EXE001", "PTH100", "PTH120", "PLR2004"]
+"alembic/*" = ["ALL"]

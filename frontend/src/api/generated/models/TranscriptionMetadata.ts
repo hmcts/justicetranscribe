@@ -6,10 +6,11 @@
  * Pydantic model for transcription metadata.
  */
 export type TranscriptionMetadata = {
-  id: string;
-  title: string;
-  created_datetime: string;
-  updated_datetime?: string | null;
-  is_showable_in_ui: boolean;
-  speakers: string[];
+    id: string;
+    title: string;
+    created_datetime: (string | null);
+    updated_datetime?: (string | null);
+    is_showable_in_ui: boolean;
+    speakers?: Array<string>;
 };
+

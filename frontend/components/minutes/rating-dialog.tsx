@@ -75,7 +75,7 @@ function RatingDialog({
               className="size-12 text-yellow-400"
             />
           </div>
-          <div className="space-y-2 ph-no-capture">
+          <div className="space-y-2">
             <label
               htmlFor="feedback-textarea"
               className="text-sm font-medium text-gray-700"

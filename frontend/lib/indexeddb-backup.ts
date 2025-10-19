@@ -9,12 +9,21 @@ interface AudioBackup {
   recordingDuration?: number;
 }
 
+interface AudioChunk {
+  id: string;
+  chunkIndex: number;
+  data: Blob;
+  timestamp: number;
+}
+
 class IndexedDBBackup {
   private dbName = "AudioBackupDB";
 
   private version = 3;
 
   private storeName = "audioBackups";
+
+  private chunksStoreName = "audioChunks";
 
   private db: IDBDatabase | null = null;
 
@@ -23,7 +32,8 @@ class IndexedDBBackup {
       const request = indexedDB.open(this.dbName, this.version);
 
       request.onerror = (event) => {
-        const errorMsg = (event.target as IDBOpenDBRequest).error?.message || "Unknown error";
+        const errorMsg =
+          (event.target as IDBOpenDBRequest).error?.message || "Unknown error";
         const error = new Error(`Failed to open IndexedDB: ${errorMsg}`);
         console.error("[IndexedDB] Open error:", error);
         Sentry.captureException(error);
@@ -40,10 +50,20 @@ class IndexedDBBackup {
         const db = (event.target as IDBOpenDBRequest).result;
         console.log("[IndexedDB] Upgrading database to version", this.version);
 
+        // Create audioBackups store if it doesn't exist
         if (!db.objectStoreNames.contains(this.storeName)) {
           const store = db.createObjectStore(this.storeName, { keyPath: "id" });
           store.createIndex("timestamp", "timestamp", { unique: false });
           console.log("[IndexedDB] Created object store");
+        }
+
+        // Create audioChunks store for streaming chunks
+        if (!db.objectStoreNames.contains(this.chunksStoreName)) {
+          const chunksStore = db.createObjectStore(this.chunksStoreName, {
+            keyPath: ["id", "chunkIndex"],
+          });
+          chunksStore.createIndex("id", "id", { unique: false });
+          chunksStore.createIndex("timestamp", "timestamp", { unique: false });
         }
       };
     });
@@ -101,7 +121,8 @@ class IndexedDBBackup {
       const request = store.getAll();
 
       request.onerror = (event) => {
-        const errorMsg = (event.target as IDBRequest).error?.message || "Unknown error";
+        const errorMsg =
+          (event.target as IDBRequest).error?.message || "Unknown error";
         const error = new Error(`Failed to get all audio backups: ${errorMsg}`);
         console.error("[IndexedDB] Get all error:", error);
         Sentry.captureException(error);
@@ -157,6 +178,132 @@ class IndexedDBBackup {
     }
   }
 
+  // STREAMING METHODS: Stream chunks directly to IndexedDB
+  async appendChunk(
+    backupId: string,
+    chunkIndex: number,
+    chunkData: Blob
+  ): Promise<void> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(
+        [this.chunksStoreName],
+        "readwrite"
+      );
+      const store = transaction.objectStore(this.chunksStoreName);
+
+      const chunk: AudioChunk = {
+        id: backupId,
+        chunkIndex,
+        data: chunkData,
+        timestamp: Date.now(),
+      };
+
+      const request = store.put(chunk);
+
+      request.onerror = () => {
+        console.error("❌ Failed to save audio chunk:", request.error);
+        reject(new Error("Failed to save audio chunk"));
+      };
+
+      request.onsuccess = () => {
+        resolve();
+      };
+    });
+  }
+
+  async getChunks(backupId: string): Promise<AudioChunk[]> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(
+        [this.chunksStoreName],
+        "readonly"
+      );
+      const store = transaction.objectStore(this.chunksStoreName);
+      const index = store.index("id");
+      const request = index.getAll(backupId);
+
+      request.onerror = () => {
+        reject(new Error("Failed to get audio chunks"));
+      };
+
+      request.onsuccess = () => {
+        // Sort chunks by chunkIndex to ensure correct order
+        const chunks = request.result.sort(
+          (a, b) => a.chunkIndex - b.chunkIndex
+        );
+        resolve(chunks);
+      };
+    });
+  }
+
+  async reconstructBlob(backupId: string, mimeType: string): Promise<Blob> {
+    const chunks = await this.getChunks(backupId);
+    const blobParts = chunks.map((chunk) => chunk.data);
+    return new Blob(blobParts, { type: mimeType });
+  }
+
+  async deleteChunks(backupId: string): Promise<void> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(
+        [this.chunksStoreName],
+        "readwrite"
+      );
+      const store = transaction.objectStore(this.chunksStoreName);
+      const index = store.index("id");
+      const request = index.openCursor(IDBKeyRange.only(backupId));
+
+      request.onerror = () => {
+        reject(new Error("Failed to delete audio chunks"));
+      };
+
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+    });
+  }
+
+  // DEBUGGING: Check IndexedDB status and list all chunks
+  async debugIndexedDB(): Promise<void> {
+    try {
+      await this.init();
+
+      // List all chunks
+      const transaction = this.db!.transaction(
+        [this.chunksStoreName],
+        "readonly"
+      );
+      const store = transaction.objectStore(this.chunksStoreName);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        // Debug info available but not logged
+      };
+
+      request.onerror = () => {
+        // Error handled silently
+      };
+    } catch (err) {
+      // Debug error handled silently
+    }
+  }
+
   static generateBackupId(): string {
     return `backup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
@@ -164,4 +311,4 @@ class IndexedDBBackup {
 
 export const audioBackupDB = new IndexedDBBackup();
 export { IndexedDBBackup };
-export type { AudioBackup };
+export type { AudioBackup, AudioChunk };

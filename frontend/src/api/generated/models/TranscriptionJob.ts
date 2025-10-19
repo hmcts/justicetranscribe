@@ -11,5 +11,7 @@ export type TranscriptionJob = {
     dialogue_entries: Array<DialogueEntry>;
     error_message?: (string | null);
     s3_audio_url?: (string | null);
+    needs_cleanup?: boolean;
+    cleanup_failure_reason?: (string | null);
 };
 

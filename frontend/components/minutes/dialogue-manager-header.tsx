@@ -73,7 +73,7 @@ export default function DialogueHeader({
             type="text"
             value={newTitle || ""}
             onChange={(e) => setNewTitle(e.target.value)}
-            className="mb-0 rounded-md bg-muted/50 px-2 py-1 text-2xl font-bold"
+            className="ph-mask mb-0 rounded-md bg-muted/50 px-2 py-1 text-2xl font-bold"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -91,7 +91,7 @@ export default function DialogueHeader({
           />
         ) : (
           <h1
-            className="mb-0 rounded-md px-2 py-1 text-left text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
+            className="ph-mask mb-0 rounded-md px-2 py-1 text-left text-2xl font-bold transition-colors hover:cursor-pointer hover:bg-muted/50"
             onClick={() => setIsEditing(true)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -99,9 +99,10 @@ export default function DialogueHeader({
                 setIsEditing(true);
               }
             }}
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role
             role="button"
             tabIndex={0}
-            aria-label={`Edit meeting title: ${currentTranscription?.title || DEFAULT_MEETING_TITLE}`}
+            aria-label="Edit meeting title"
           >
             {currentTranscription?.title || DEFAULT_MEETING_TITLE}
           </h1>

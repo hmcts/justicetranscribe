@@ -35,6 +35,9 @@ Thumbs.db
 *.swo
 *~
 
+# TypeScript build cache
+*.tsbuildinfo
+
 # Logs
 *.log
 npm-debug.log*

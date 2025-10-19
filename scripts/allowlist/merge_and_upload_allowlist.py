@@ -177,15 +177,21 @@ def validate_and_clean_dataframe(df: pd.DataFrame, source: str) -> pd.DataFrame:
             f"{source}: Missing required columns. Found: {df.columns.tolist()}"
         )
     
-    # Check for null values
-    null_emails = df['email'].isna().sum()
-    null_providers = df['provider'].isna().sum()
+    # Drop rows with null/empty values instead of erroring
+    initial_count = len(df)
+    df = df.dropna(subset=['email', 'provider'])
+    # Convert to string and strip whitespace, then filter out empty strings
+    df['email'] = df['email'].astype(str).str.strip()
+    df['provider'] = df['provider'].astype(str).str.strip()
+    df = df[df['email'] != '']
+    df = df[df['provider'] != '']
+    dropped_count = initial_count - len(df)
     
-    if null_emails > 0:
-        raise DataQualityError(f"{source}: Found {null_emails} null email values")
+    if dropped_count > 0:
+        print(f"   ⚠️  Dropped {dropped_count} rows with empty/null values")
     
-    if null_providers > 0:
-        raise DataQualityError(f"{source}: Found {null_providers} null provider values")
+    if len(df) == 0:
+        raise DataQualityError(f"{source}: No valid data remaining after cleaning")
     
     # Check for header rows in data (case-insensitive)
     header_like_rows = df[
@@ -248,21 +254,28 @@ def load_local_file(file_path: Path) -> pd.DataFrame:
         # File has headers
         df = df_with_header
     else:
-        # No headers, assume email,provider format
-        df = pd.read_csv(file_path, names=["email", "provider"], encoding="utf-8")
+        # No headers or wrong format - treat first column as email
+        print("   📝 No standard headers found, treating first column as email")
+        # Read only the first column and force it to be treated as string
+        df = pd.read_csv(file_path, usecols=[0], names=["email"], dtype={"email": str}, encoding="utf-8")
+    
+    # If provider column is missing or all empty, add default provider
+    if 'provider' not in df.columns or df['provider'].isna().all() or (df['provider'].astype(str).str.strip() == '').all():
+        print("   📝 No provider column found, adding default 'unknown' provider")
+        df['provider'] = 'unknown'
     
     print(f"📊 Loaded {len(df)} rows from local file")
     
     return df
 
 
-def merge_allowlists(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
+def merge_allowlists(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> Tuple[pd.DataFrame, dict, list]:
     """Merge existing and new allowlists, removing duplicates.
     
     Priority: Existing entries take precedence (keeps original provider for duplicates)
     
     Returns:
-        Tuple of (merged_df, stats_dict)
+        Tuple of (merged_df, stats_dict, new_user_emails_list)
     """
     print("🔄 Merging allowlists...")
     
@@ -277,11 +290,15 @@ def merge_allowlists(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> Tuple[p
     # Keep chronological order - existing users first, then new users
     merged = combined.drop_duplicates(subset=['email'], keep='first').reset_index(drop=True)
     
+    # Get the list of truly new users (emails that weren't in existing)
+    truly_new_emails = new_emails - existing_emails
+    new_user_emails = sorted(list(truly_new_emails))  # Sort for consistent output
+    
     # Calculate stats
     stats = {
         'existing_count': len(existing_df),
         'new_file_count': len(new_df),
-        'truly_new': len(new_emails - existing_emails),
+        'truly_new': len(truly_new_emails),
         'duplicates_removed': len(combined) - len(merged),
         'final_count': len(merged)
     }
@@ -293,7 +310,7 @@ def merge_allowlists(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> Tuple[p
     print(f"   - Duplicates removed: {stats['duplicates_removed']}")
     print(f"   - Final total: {stats['final_count']}")
     
-    return merged, stats
+    return merged, stats, new_user_emails
 
 
 def merge_and_upload(environment: str, local_file: Path) -> None:
@@ -341,7 +358,7 @@ def merge_and_upload(environment: str, local_file: Path) -> None:
     
     # Step 4: Merge
     print()
-    merged_df, stats = merge_allowlists(existing_df, new_df)
+    merged_df, stats, new_user_emails = merge_allowlists(existing_df, new_df)
     
     # Step 5: Final validation on merged data
     print()
@@ -356,6 +373,15 @@ def merge_and_upload(environment: str, local_file: Path) -> None:
     print(f"✅ Success! {environment.upper()} allowlist updated")
     print(f"   📊 Final count: {len(merged_df)} users")
     print(f"   ➕ Added: {stats['truly_new']} new users")
+    
+    # Display new user emails for follow-up
+    if new_user_emails:
+        print()
+        print("📧 New user emails (for follow-up):")
+        print(f"   {'; '.join(new_user_emails)}")
+    else:
+        print()
+        print("📧 No new users added")
 
 
 def main():
