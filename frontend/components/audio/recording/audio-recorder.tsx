@@ -36,6 +36,7 @@ import {
   formatRemainingTime,
 } from "@/lib/recording-config";
 import { AudioDevice, MicrophonePermission } from "./microphone-permission";
+import useIsMobile from "@/hooks/use-mobile";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
@@ -371,6 +372,8 @@ function AudioRecorderComponent({
     };
   }, [recordedAudio]);
 
+  const isMobile = useIsMobile();
+
   return (
     <div className="space-y-4">
       {!permissionGranted || !audioDevices.length ? (
@@ -388,40 +391,44 @@ function AudioRecorderComponent({
                 </h1>
               </div>
 
-              {/* Do Not Disturb Reminder */}
-              <div
-                role="status"
-                aria-label="Reminder to enable Do Not Disturb mode"
-                className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3"
-                style={{
-                  borderColor: "#D8C8FF",
-                  backgroundColor: "#F4F1FF",
-                }}
-              >
-                <div className="flex items-start gap-3">
+              {isMobile && (
+                <>
+                  {/* Do Not Disturb Reminder */}
                   <div
-                    className="mt-0.5 rounded-full p-2"
-                    style={{ backgroundColor: "#CABDFF" }}
+                    role="status"
+                    aria-label="Reminder to enable Do Not Disturb mode"
+                    className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3"
+                    style={{
+                      borderColor: "#D8C8FF",
+                      backgroundColor: "#F4F1FF",
+                    }}
                   >
-                    <Moon
-                      className="size-5"
-                      style={{ color: "#1F1247" }}
-                      aria-hidden="true"
-                    />
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="mt-0.5 rounded-full p-2"
+                        style={{ backgroundColor: "#CABDFF" }}
+                      >
+                        <Moon
+                          className="size-5"
+                          style={{ color: "#1F1247" }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h3
+                          className="text-sm font-semibold"
+                          style={{ color: "#1F1247" }}
+                        >
+                          Silence notifications
+                        </h3>
+                        <p className="mt-0.5 text-sm" style={{ color: "#362952" }}>
+                          Turn on Do Not Disturb while recording.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3
-                      className="text-sm font-semibold"
-                      style={{ color: "#1F1247" }}
-                    >
-                      Silence notifications
-                    </h3>
-                    <p className="mt-0.5 text-sm" style={{ color: "#362952" }}>
-                      Turn on Do Not Disturb while recording.
-                    </p>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </>
           )}
 
