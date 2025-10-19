@@ -47,6 +47,7 @@ class TranscriptionPollingService:
         self.user_email = user_email
         self.user_uploads_prefix = f"user-uploads/{user_email}/"
         self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
+        self.max_retry_attempts = 2  # Allow 2 total attempts (1 retry max as requested)
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
         self._is_first_poll = True
@@ -54,6 +55,64 @@ class TranscriptionPollingService:
             f"Polling service initialized for user {user_email} - "
             f"will only process files uploaded after {self.startup_time.isoformat()}"
         )
+
+    def _should_skip_blob(self, blob: dict) -> bool:
+        """
+        Check if a blob should be skipped when looking for files to process.
+
+        Used during polling to filter out blobs that should NOT be transcribed:
+        - Already successfully processed blobs
+        - Permanently failed blobs (exceeded retry limit)
+        - Blobs uploaded before service started (handled by startup cleanup)
+        - Non-audio files or files belonging to other users
+
+        Returns True if the blob should be skipped for transcription processing.
+
+        Parameters
+        ----------
+        blob : dict
+            Blob information dictionary.
+
+        Returns
+        -------
+        bool
+            True if blob should be skipped (don't process), False if it should be processed.
+        """
+        blob_name = blob["name"]
+
+        # DEFENSIVE CHECK: Ensure blob belongs to this user
+        if not blob_name.startswith(self.user_uploads_prefix):
+            logger.warning(
+                f"Security check failed: Blob '{blob_name}' does not match "
+                f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
+            )
+            return True
+
+        # Check file extension
+        blob_path = Path(blob_name)
+        if blob_path.suffix.lower() not in self.supported_extensions:
+            return True
+
+        # Skip files uploaded before service started
+        last_modified = blob.get("last_modified")
+        if last_modified and last_modified < self.startup_time:
+            return True
+
+        # Check metadata for processing status
+        metadata = blob.get("metadata", {})
+
+        # Skip if already successfully processed
+        if metadata.get("processed") == "true":
+            return True
+
+        # Skip if permanently failed
+        if metadata.get("status") == "permanently_failed":
+            logger.debug(
+                f"User {self.user_email}: Skipping permanently failed blob: {blob_name}"
+            )
+            return True
+
+        return False
 
     async def poll_for_new_audio_files(self) -> list[dict]:
         """
@@ -82,29 +141,18 @@ class TranscriptionPollingService:
             # Filter for unprocessed audio files
             unprocessed = []
             for blob in all_blobs:
-                blob_name = blob["name"]
-
-                # DEFENSIVE CHECK: Ensure blob belongs to this user
-                if not blob_name.startswith(self.user_uploads_prefix):
-                    logger.warning(
-                        f"Security check failed: Blob '{blob_name}' does not match "
-                        f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
-                    )
+                if self._should_skip_blob(blob):
                     continue
 
-                # Check file extension
-                blob_path = Path(blob_name)
-                if blob_path.suffix.lower() not in self.supported_extensions:
-                    continue
-
-                # Skip files uploaded before service started
-                last_modified = blob.get("last_modified")
-                if last_modified and last_modified < self.startup_time:
-                    continue
-
-                # Check if already processed
+                # Check retry count to avoid infinite loops
                 metadata = blob.get("metadata", {})
-                if metadata.get("processed") == "true":
+                retry_count = int(metadata.get("retry_count", "0"))
+                if retry_count >= self.max_retry_attempts:
+                    logger.warning(
+                        f"User {self.user_email}: Blob {blob['name']} has exceeded max retries "
+                        f"({retry_count}/{self.max_retry_attempts}), marking as permanently failed"
+                    )
+                    await self._mark_blob_permanently_failed(blob["name"], metadata)
                     continue
 
                 unprocessed.append(blob)
@@ -289,7 +337,7 @@ class TranscriptionPollingService:
 
     async def _mark_blob_with_error(self, blob_path: str, error_message: str) -> None:
         """
-        Mark a blob with error information in metadata.
+        Mark a blob with error information and increment retry count.
 
         Parameters
         ----------
@@ -299,18 +347,131 @@ class TranscriptionPollingService:
             The error message to store.
         """
         try:
+            # Get current metadata to preserve retry count
+            current_metadata = await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
+            current_retry_count = int(current_metadata.get("retry_count", "0"))
+            new_retry_count = current_retry_count + 1
+
             metadata = {
                 "processed": "false",
-                "error": error_message[:1000],  # Limit error message length
-                "error_at": datetime.now(UTC).isoformat(),
+                "retry_count": str(new_retry_count),
+                "last_attempt": datetime.now(UTC).isoformat(),
+                "last_error": error_message[:1000],  # Limit error message length
+                "status": "retrying"  # Will be retried on next poll
             }
             await self.azure_blob_manager.set_blob_metadata(
                 blob_name=blob_path,
                 metadata=metadata
             )
-            logger.info(f"Marked blob with error: {blob_path}")
+            logger.info(
+                f"User {self.user_email}: Marked blob with error (attempt {new_retry_count}): {blob_path}"
+            )
         except Exception as e:
-            logger.error(f"Error marking blob with error {blob_path}: {e}")
+            logger.error(f"User {self.user_email}: Error marking blob with error {blob_path}: {e}")
+
+    async def _mark_blob_permanently_failed(self, blob_path: str, current_metadata: dict) -> None:
+        """
+        Mark a blob as permanently failed after exceeding retry limit.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        current_metadata : dict
+            Current metadata from the blob.
+        """
+        try:
+            metadata = {
+                "processed": "false",
+                "status": "permanently_failed",
+                "retry_count": current_metadata.get("retry_count", "0"),
+                "last_attempt": datetime.now(UTC).isoformat(),
+                "last_error": current_metadata.get("last_error", "Max retries exceeded"),
+                "failed_at": datetime.now(UTC).isoformat(),
+            }
+            await self.azure_blob_manager.set_blob_metadata(
+                blob_name=blob_path,
+                metadata=metadata
+            )
+            logger.error(
+                f"User {self.user_email}: Marked blob as permanently failed after "
+                f"{current_metadata.get('retry_count', 0)} attempts: {blob_path}"
+            )
+        except Exception as e:
+            logger.error(
+                f"User {self.user_email}: Error marking blob as permanently failed {blob_path}: {e}"
+            )
+
+    def _should_delete_old_blob(self, metadata: dict) -> tuple[bool, str]:
+        """
+        Determine if an old blob should be deleted during startup cleanup.
+
+        Parameters
+        ----------
+        metadata : dict
+            The blob's metadata dictionary.
+
+        Returns
+        -------
+        tuple[bool, str]
+            (should_delete, reason) - True if should delete, with reason for logging.
+        """
+        # Case 1: Successfully processed blobs - safe to delete
+        if metadata.get("processed") == "true":
+            return True, "successfully processed"
+
+        # Case 2: Legacy blob without metadata - delete for data protection
+        # These are pre-migration blobs that never had metadata tracking
+        if not metadata or (
+            "processed" not in metadata
+            and "retry_count" not in metadata
+            and "status" not in metadata
+        ):
+            return True, "legacy blob without metadata"
+
+        # Case 3: Blob with retry metadata - keep for processing/investigation
+        status = metadata.get("status", "unknown")
+        retry_count = metadata.get("retry_count", "0")
+        return False, f"has metadata (status={status}, retry_count={retry_count})"
+
+    def _evaluate_blob_for_cleanup(self, blob: dict) -> tuple[bool, str | None]:
+        """
+        Evaluate if a blob should be included in cleanup.
+
+        Parameters
+        ----------
+        blob : dict
+            Blob information dictionary.
+
+        Returns
+        -------
+        tuple[bool, str | None]
+            (should_cleanup, reason) - True if should delete, reason for logging or None to skip.
+        """
+        blob_name = blob["name"]
+
+        # Security check
+        if not blob_name.startswith(self.user_uploads_prefix):
+            logger.error(
+                f"Security check failed during cleanup: Blob '{blob_name}' does not match "
+                f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
+            )
+            return False, None
+
+        # Only consider audio files
+        blob_path = Path(blob_name)
+        if blob_path.suffix.lower() not in self.supported_extensions:
+            return False, None
+
+        # Check if blob is old
+        last_modified = blob.get("last_modified")
+        if not (last_modified and last_modified < self.startup_time):
+            return False, None
+
+        # Determine if this old blob should be deleted based on metadata
+        metadata = blob.get("metadata", {})
+        should_delete, reason = self._should_delete_old_blob(metadata)
+        return should_delete, reason
 
     async def _cleanup_old_blobs_on_startup(self) -> None:
         """
@@ -331,27 +492,24 @@ class TranscriptionPollingService:
                 include_metadata=True
             )
 
-            # Find blobs older than startup time
+            # Evaluate blobs for cleanup
             old_blobs = []
             for blob in all_blobs:
+                should_delete, reason = self._evaluate_blob_for_cleanup(blob)
+
+                if reason is None:  # Skip blobs that don't meet criteria
+                    continue
+
                 blob_name = blob["name"]
-
-                # DEFENSIVE CHECK: Ensure blob belongs to this user
-                if not blob_name.startswith(self.user_uploads_prefix):
-                    logger.error(
-                        f"Security check failed during cleanup: Blob '{blob_name}' does not match "
-                        f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
-                    )
-                    continue
-
-                blob_path = Path(blob_name)
-                # Only consider audio files
-                if blob_path.suffix.lower() not in self.supported_extensions:
-                    continue
-
-                last_modified = blob.get("last_modified")
-                if last_modified and last_modified < self.startup_time:
+                if should_delete:
                     old_blobs.append(blob)
+                    logger.info(
+                        f"User {self.user_email}: Will clean up old blob ({reason}): {blob_name}"
+                    )
+                else:
+                    logger.info(
+                        f"User {self.user_email}: Keeping old blob ({reason}): {blob_name}"
+                    )
 
             if old_blobs:
                 logger.info(f"User {self.user_email}: Found {len(old_blobs)} old blob(s) to clean up")
