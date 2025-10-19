@@ -49,18 +49,46 @@ async def generate_and_save_meeting_title(
 async def transcribe_and_generate_llm_output(
     user_upload_blob_storage_file_key: str, user_id: UUID, user_email: str, transcription_id: str | None = None
 ):
+    """
+    Transcribe audio and generate LLM output.
+
+    IMPORTANT: Creates transcription record AFTER successful download/transcription
+    to prevent duplicate database records on retry failures.
+
+    Parameters
+    ----------
+    user_upload_blob_storage_file_key : str
+        Path to the audio blob in Azure Storage
+    user_id : UUID
+        ID of the user who uploaded the audio
+    user_email : str
+        Email of the user
+    transcription_id : str | None
+        Optional transcription ID for idempotency. If None, a new one is generated.
+    """
     # Start a Sentry transaction for the whole function
     with sentry_sdk.start_transaction(
         op="task", name="Transcribe and Generate LLM Output"
     ) as transaction:  # noqa: F841
-        transcription_data = Transcription(id=transcription_id)
-        transcription = save_transcription(transcription_data, user_id)
+        transcription = None
+        transcription_job = None
 
         try:
+            # STEP 1: Download and transcribe (with retries)
+            # This is the step most likely to fail, so we do it BEFORE creating DB records
+            logger.info("Starting transcription download and processing...")
             dialogue_entries = await transcribe_audio(user_upload_blob_storage_file_key)
             updated_dialogue_entries = await process_speakers_and_dialogue_entries(
                 dialogue_entries, user_email
             )
+
+            # STEP 2: Create transcription record AFTER successful transcription
+            # This prevents duplicate DB records on retry failures
+            logger.info("Transcription successful, creating database records...")
+            transcription_data = Transcription(id=transcription_id)
+            transcription = save_transcription(transcription_data, user_id)
+
+            # STEP 3: Save transcription job
             transcription_job = save_transcription_job(
                 TranscriptionJob(
                     transcription_id=transcription.id,
@@ -88,14 +116,22 @@ async def transcribe_and_generate_llm_output(
                 logger.error("Failed to save transcription job, skipping blob deletion")
 
         except Exception as e:
-            save_transcription_job(
-                TranscriptionJob(
-                    transcription_id=transcription.id,
-                    dialogue_entries=[],
-                    s3_audio_url=user_upload_blob_storage_file_key,
-                    error_message=str(e),
+            logger.error(f"Error during transcription processing: {e}")
+
+            # Only save error transcription_job if transcription was created
+            # If transcription failed before DB record creation, we don't create orphan records
+            if transcription and transcription.id:
+                save_transcription_job(
+                    TranscriptionJob(
+                        transcription_id=transcription.id,
+                        dialogue_entries=[],
+                        s3_audio_url=user_upload_blob_storage_file_key,
+                        error_message=str(e),
+                    )
                 )
-            )
+            else:
+                logger.info("Transcription record not yet created, skipping error job creation")
+
             sentry_sdk.capture_exception(e)
             raise
 
