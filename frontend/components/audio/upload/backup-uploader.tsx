@@ -62,10 +62,7 @@ function BackupUploader({
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
-
-        // Try single file upload first (unless force chunked mode is enabled)
-        let finalFileKey = user_upload_s3_file_key;
+        const { upload_url } = urlResult.data!;
 
         // Check if chunked upload is forced (local development only)
         const isLocalDev = process.env.NODE_ENV === "development";
@@ -123,7 +120,7 @@ function BackupUploader({
           // CHUNKED UPLOAD FALLBACK: If single upload fails, split and upload as chunks
           try {
             // uploadBlobInChunks gets a new upload URL and returns the new file key
-            finalFileKey = await uploadBlobInChunks(blob, blob.type);
+            await uploadBlobInChunks(blob, blob.type);
           } catch (chunkedError) {
             console.error(
               "❌ Both single and chunked upload failed:",
@@ -141,13 +138,6 @@ function BackupUploader({
               `Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`
             );
           }
-        }
-
-        const transcriptionJobResult =
-          await apiClient.startTranscriptionJob(finalFileKey);
-
-        if (transcriptionJobResult.error) {
-          throw new Error("Failed to start transcription job");
         }
 
         setProcessingStatus("transcribing");
