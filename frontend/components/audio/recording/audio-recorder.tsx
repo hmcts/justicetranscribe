@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Mic, Loader2 } from "lucide-react";
+import { Mic, Loader2, RefreshCw } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
