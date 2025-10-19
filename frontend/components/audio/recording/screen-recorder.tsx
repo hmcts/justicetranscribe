@@ -607,10 +607,7 @@ function ScreenRecorder({
                   >
                     Silence notifications
                   </h3>
-                  <p
-                    className="mt-0.5 text-sm"
-                    style={{ color: "#362952" }}
-                  >
+                  <p className="mt-0.5 text-sm" style={{ color: "#362952" }}>
                     Turn on Do Not Disturb while recording.
                   </p>
                 </div>
