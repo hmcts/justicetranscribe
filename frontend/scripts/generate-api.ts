@@ -3,7 +3,7 @@ const { generate } = require("openapi-typescript-codegen");
 async function generateApi() {
   try {
     await generate({
-      input: "http://localhost:8080/api/openapi.json",
+      input: "http://localhost:8000/api/openapi.json",
       output: "./src/api/generated",
       exportCore: false,
       exportServices: false,

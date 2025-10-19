@@ -1,3 +1,5 @@
+/* eslint-disable jsx-a11y/media-has-caption */
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -30,8 +32,13 @@ export default function HelpPage() {
   const [isLoadingBasic, setIsLoadingBasic] = useState<boolean>(true);
   const [errorBasic, setErrorBasic] = useState<string | null>(null);
 
-  const [videoAdvanced, setVideoAdvanced] = useState<SanityVideoData | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [videoAdvanced, setVideoAdvanced] = useState<SanityVideoData | null>(
+    null
+  );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoadingAdvanced, setIsLoadingAdvanced] = useState<boolean>(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [errorAdvanced, setErrorAdvanced] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,8 +74,17 @@ export default function HelpPage() {
       // Fetch both videos in parallel
       try {
         const [resBasic, resAdvanced] = await Promise.all([
-          fetch(buildEndpoint(SANITY_BASIC_TUTORIAL_ID, SANITY_BASIC_TUTORIAL_UUID), { cache: "no-store" }),
-          fetch(buildEndpoint(SANITY_ADVANCED_TUTORIAL_ID, SANITY_ADVANCED_TUTORIAL_UUID), { cache: "no-store" }),
+          fetch(
+            buildEndpoint(SANITY_BASIC_TUTORIAL_ID, SANITY_BASIC_TUTORIAL_UUID),
+            { cache: "no-store" }
+          ),
+          fetch(
+            buildEndpoint(
+              SANITY_ADVANCED_TUTORIAL_ID,
+              SANITY_ADVANCED_TUTORIAL_UUID
+            ),
+            { cache: "no-store" }
+          ),
         ]);
 
         // Basic
@@ -86,10 +102,13 @@ export default function HelpPage() {
         // Advanced
         if (!resAdvanced.ok) {
           const body = await resAdvanced.text();
-          throw new Error(`Advanced request failed (${resAdvanced.status}): ${body}`);
+          throw new Error(
+            `Advanced request failed (${resAdvanced.status}): ${body}`
+          );
         }
         const jsonAdvanced = await resAdvanced.json();
-        const resultAdvanced: SanityVideoData | null = jsonAdvanced?.result ?? null;
+        const resultAdvanced: SanityVideoData | null =
+          jsonAdvanced?.result ?? null;
         if (!resultAdvanced || !resultAdvanced.videoUrl) {
           throw new Error("Advanced video not found or missing playable URL.");
         }
@@ -107,6 +126,89 @@ export default function HelpPage() {
 
     fetchVideo();
   }, []);
+  const renderBasicTutorial = () => {
+    if (isLoadingBasic) {
+      return (
+        <div className="aspect-video w-full animate-pulse rounded-2xl bg-gray-200" />
+      );
+    }
+    if (errorBasic) {
+      return (
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {errorBasic}
+        </div>
+      );
+    }
+    if (!videoBasic) {
+      return null;
+    }
+    return (
+      <Dialog>
+        <DialogTrigger asChild>
+          <button
+            type="button"
+            className="group relative block w-full overflow-hidden rounded-2xl bg-muted/20 transition-transform duration-300 ease-out hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-600"
+            aria-label="Open basic tutorial video"
+          >
+            {/* Media */}
+            <div className="relative aspect-video w-full">
+              {videoBasic.thumbnailUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={videoBasic.thumbnailUrl}
+                  alt={
+                    videoBasic.thumbnailAlt ||
+                    videoBasic.title ||
+                    "Tutorial thumbnail"
+                  }
+                  className="absolute inset-0 size-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 size-full bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-600" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />
+            </div>
+            {/* Label top-left */}
+            <div className="absolute left-5 top-4 z-10 text-left text-white/90">
+              <span className="text-sm font-medium tracking-wide">
+                Video Tutorial
+              </span>
+            </div>
+            {/* Duration pill */}
+            <div className="absolute right-5 top-4 z-10 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+              6:50
+            </div>
+            {/* Title bottom-left - smaller, left aligned */}
+            <div className="absolute bottom-5 left-5 z-10 pr-6">
+              <p className="text-lg font-semibold leading-tight text-white drop-shadow-sm md:text-xl">
+                {videoBasic.title || "Welcome to Justice Transcribe"}
+              </p>
+            </div>
+            {/* Hover Play Button */}
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+              <div className="translate-y-1 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+                <div className="rounded-full bg-white/90 p-5 shadow-md">
+                  <Play className="size-6 text-blue-600" />
+                </div>
+              </div>
+            </div>
+          </button>
+        </DialogTrigger>
+        <DialogContent className="max-w-3xl p-0">
+          <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
+            <video
+              controls
+              autoPlay
+              playsInline
+              src={videoBasic.videoUrl}
+              className="size-full object-contain"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Main Content */}
@@ -121,78 +223,18 @@ export default function HelpPage() {
 
         {/* Tutorial Cards */}
         <section className="mb-6" aria-labelledby="tutorials-heading">
-          <h2 id="tutorials-heading" className="sr-only">Tutorials</h2>
+          <h2 id="tutorials-heading" className="sr-only">
+            Tutorials
+          </h2>
           <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
             {/* Basic Tutorial Tile */}
-            {isLoadingBasic ? (
-              <div className="aspect-video w-full animate-pulse rounded-2xl bg-gray-200" />
-            ) : errorBasic ? (
-              <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorBasic}</div>
-            ) : videoBasic ? (
-              <Dialog>
-                  <DialogTrigger asChild>
-                    <button
-                      type="button"
-                      className="group relative block w-full overflow-hidden rounded-2xl bg-muted/20 transition-transform duration-300 ease-out hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-600"
-                      aria-label="Open basic tutorial video"
-                    >
-                      {/* Media */}
-                      <div className="relative aspect-video w-full">
-                        {videoBasic.thumbnailUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={videoBasic.thumbnailUrl}
-                            alt={videoBasic.thumbnailAlt || videoBasic.title || "Tutorial thumbnail"}
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-600" />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />
-                      </div>
-                      {/* Label top-left */}
-                      <div className="absolute left-5 top-4 z-10 text-left text-white/90">
-                        <span className="text-sm font-medium tracking-wide">Video Tutorial</span>
-                      </div>
-                      {/* Duration pill */}
-                      <div className="absolute right-5 top-4 z-10 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
-                        6:50
-                      </div>
-                      {/* Title bottom-left - smaller, left aligned */}
-                      <div className="absolute bottom-5 left-5 z-10 pr-6">
-                        <p className="text-lg font-semibold leading-tight text-white drop-shadow-sm md:text-xl">
-                          {videoBasic.title || "Welcome to Justice Transcribe"}
-                        </p>
-                      </div>
-                      {/* Hover Play Button */}
-                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                        <div className="translate-y-1 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
-                          <div className="rounded-full bg-white/90 p-5 shadow-md">
-                            <Play className="size-6 text-blue-600" />
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-3xl p-0">
-                    <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
-                      <video
-                        controls
-                        autoPlay
-                        playsInline
-                        src={videoBasic.videoUrl}
-                        className="h-full w-full object-contain"
-                      />
-                    </div>
-                  </DialogContent>
-                </Dialog>
-            ) : null}
+            {renderBasicTutorial()}
 
             {/* Advanced Tutorial Tile - Coming Soon */}
             <div className="group relative block w-full overflow-hidden rounded-2xl bg-muted/20 transition-transform duration-300 ease-out hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-600">
               {/* Media */}
               <div className="relative aspect-video w-full">
-                <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-600" />
+                <div className="absolute inset-0 size-full bg-gradient-to-br from-cyan-500 via-sky-500 to-blue-600" />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/70" />
                 {/* Drum roll emoji overlay */}
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -201,7 +243,9 @@ export default function HelpPage() {
               </div>
               {/* Label top-left */}
               <div className="absolute left-5 top-4 z-10 text-left text-white/90">
-                <span className="text-sm font-medium tracking-wide">Advanced Tutorial</span>
+                <span className="text-sm font-medium tracking-wide">
+                  Advanced Tutorial
+                </span>
               </div>
               {/* Title bottom-left */}
               <div className="absolute bottom-5 left-5 z-10 pr-6">
@@ -218,18 +262,22 @@ export default function HelpPage() {
           className="mb-6 rounded-lg border border-green-200 bg-green-50 p-6"
           aria-labelledby="need-support-heading"
         >
-          <h2 id="need-support-heading" className="mb-2 text-xl font-bold text-green-700">
+          <h2
+            id="need-support-heading"
+            className="mb-2 text-xl font-bold text-green-700"
+          >
             Need additional support?
           </h2>
           <p className="mb-4 text-black">
-            Join our Microsoft Teams channel for real-time assistance from our support team.
+            Join our Microsoft Teams channel for real-time assistance from our
+            support team.
           </p>
-          <Button 
-            asChild 
+          <Button
+            asChild
             className="text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10652F] focus-visible:ring-offset-2"
-            style={{ 
+            style={{
               backgroundColor: "#10652F",
-              borderColor: "#10652F"
+              borderColor: "#10652F",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "#0d4f26";
@@ -258,7 +306,8 @@ export default function HelpPage() {
             Justice Transcribe — Approved Use Cases
           </h2>
           <p className="mb-3">
-            Per the Data Protection assessment, Justice Transcribe can be used for:
+            Per the Data Protection assessment, Justice Transcribe can be used
+            for:
           </p>
           <ul className="mb-3 ml-6 list-disc space-y-1">
             <li>Induction</li>
@@ -302,7 +351,8 @@ export default function HelpPage() {
                 until it turns blue and shows Connected.
               </li>
               <li>
-                Wait a few seconds for the VPN indicator to appear at the top of your screen.
+                Wait a few seconds for the VPN indicator to appear at the top of
+                your screen.
               </li>
               <li>If this doesn&apos;t work, contact the IT Service Desk.</li>
             </ol>
@@ -352,10 +402,7 @@ export default function HelpPage() {
               Review our organization&apos;s AI usage policies and best
               practices.
             </p>
-            <Button 
-              variant="outline"
-              asChild
-            >
+            <Button variant="outline" asChild>
               <a
                 href="https://intranet.justice.gov.uk/guidance/it-services/ai-in-moj/ai-usage-guidelines/"
                 target="_blank"
@@ -374,7 +421,9 @@ export default function HelpPage() {
               Conversation Script for People on Probation
             </h3>
             <p className="mb-3">
-              See this document for a simple script to explain Justice Transcribe to people on probation. It explains what it does, why we use it, and how we handle data safely and compliantly.
+              See this document for a simple script to explain Justice
+              Transcribe to people on probation. It explains what it does, why
+              we use it, and how we handle data safely and compliantly.
             </p>
             <Button variant="outline" asChild>
               <a
@@ -391,9 +440,12 @@ export default function HelpPage() {
 
           {/* SARs Request Guidance */}
           <section className="rounded-lg border p-6">
-            <h3 className="mb-2 text-lg font-semibold">SARs Request Guidance</h3>
+            <h3 className="mb-2 text-lg font-semibold">
+              SARs Request Guidance
+            </h3>
             <p className="mb-3">
-              For guidance on how to comply with Subject Access Requests (SARs) email us on
+              For guidance on how to comply with Subject Access Requests (SARs)
+              email us on
               <a
                 href="mailto:transcribe@justice.gov.uk"
                 className="mx-1 font-medium underline"

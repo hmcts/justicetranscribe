@@ -934,4 +934,223 @@ class TestAsyncAzureBlobManager:
         assert result is False, "blob_exists should return False on general exception"
         assert "Failed to check if blob exists test_container/test_blob.txt: General error" in caplog.text, "Should log general error"
 
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    @patch("app.audio.azure_utils.logger")
+    async def test_list_blobs_in_prefix_success(self, mock_logger, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test successful listing of blobs with a prefix."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # Mock blob items returned from list_blobs
+        mock_blob1 = MagicMock()
+        mock_blob1.name = "user-uploads/test@example.com/file1.mp4"
+        mock_blob1.last_modified = "2024-01-01T12:00:00Z"
+        mock_blob1.size = 1024
+        mock_blob1.metadata = {"processed": "false"}
+
+        mock_blob2 = MagicMock()
+        mock_blob2.name = "user-uploads/test@example.com/file2.mp4"
+        mock_blob2.last_modified = "2024-01-02T12:00:00Z"
+        mock_blob2.size = 2048
+        mock_blob2.metadata = None
+
+        # list_blobs returns an async iterable
+        async def mock_list_blobs(*args, **kwargs):  # noqa: ARG001
+            for blob in [mock_blob1, mock_blob2]:
+                yield blob
+
+        mock_container_client.list_blobs = mock_list_blobs
+
+        # Test
+        result = await async_blob_manager.list_blobs_in_prefix("user-uploads/")
+
+        # Assertions
+        assert len(result) == 2, "Should return 2 blobs"
+        assert result[0]["name"] == "user-uploads/test@example.com/file1.mp4"
+        assert result[0]["metadata"] == {"processed": "false"}
+        assert result[1]["name"] == "user-uploads/test@example.com/file2.mp4"
+        assert result[1]["metadata"] == {}  # None should be converted to {}
+        mock_logger.info.assert_called_once_with("Listed 2 blobs with prefix 'user-uploads/' in container 'test_container'")
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    @patch("app.audio.azure_utils.logger")
+    async def test_list_blobs_in_prefix_empty(self, mock_logger, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test listing blobs when no blobs match the prefix."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # list_blobs returns empty async iterable
+        async def mock_list_blobs(*args, **kwargs):  # noqa: ARG001
+            # Empty async generator
+            if False:  # Never executes, but makes it a generator
+                yield
+
+        mock_container_client.list_blobs = mock_list_blobs
+
+        # Test
+        result = await async_blob_manager.list_blobs_in_prefix("nonexistent-prefix/")
+
+        # Assertions
+        assert len(result) == 0, "Should return empty list"
+        mock_logger.info.assert_called_once_with("Listed 0 blobs with prefix 'nonexistent-prefix/' in container 'test_container'")
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_list_blobs_in_prefix_exception(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager, caplog):
+        """Test listing blobs with exception."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # list_blobs raises exception
+        async def mock_list_blobs(*args, **kwargs):  # noqa: ARG001
+            error_msg = "List error"
+            raise RuntimeError(error_msg)
+            yield  # Make it a generator # noqa: RET502, RUF100
+
+        mock_container_client.list_blobs = mock_list_blobs
+
+        # Test
+        result = await async_blob_manager.list_blobs_in_prefix("user-uploads/")
+
+        # Assertions
+        assert result == [], "Should return empty list on exception"
+        assert "Failed to list blobs with prefix 'user-uploads/' in container 'test_container': List error" in caplog.text
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_get_blob_metadata_success(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test successful retrieval of blob metadata."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+
+        # Mock blob properties
+        mock_properties = MagicMock()
+        mock_properties.metadata = {"processed": "true", "processed_at": "2024-01-01T12:00:00Z"}
+        mock_blob_client.get_blob_properties = AsyncMock(return_value=mock_properties)
+
+        # Test
+        result = await async_blob_manager.get_blob_metadata("user-uploads/test@example.com/file.mp4")
+
+        # Assertions
+        assert result == {"processed": "true", "processed_at": "2024-01-01T12:00:00Z"}
+        mock_blob_client.get_blob_properties.assert_awaited_once()
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_get_blob_metadata_none(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test retrieval of blob metadata when metadata is None."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+
+        # Mock blob properties with None metadata
+        mock_properties = MagicMock()
+        mock_properties.metadata = None
+        mock_blob_client.get_blob_properties = AsyncMock(return_value=mock_properties)
+
+        # Test
+        result = await async_blob_manager.get_blob_metadata("user-uploads/test@example.com/file.mp4")
+
+        # Assertions
+        assert result == {}, "Should return empty dict when metadata is None"
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_get_blob_metadata_not_found(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager, caplog):
+        """Test retrieval of blob metadata when blob doesn't exist."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_client.get_blob_properties = AsyncMock(side_effect=ResourceNotFoundError("Blob not found"))
+
+        # Test
+        result = await async_blob_manager.get_blob_metadata("nonexistent.mp4")
+
+        # Assertions
+        assert result == {}, "Should return empty dict when blob not found"
+        assert "Blob not found when getting metadata: test_container/nonexistent.mp4" in caplog.text
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_get_blob_metadata_exception(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager, caplog):
+        """Test retrieval of blob metadata with general exception."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_client.get_blob_properties = AsyncMock(side_effect=Exception("General error"))
+
+        # Test
+        result = await async_blob_manager.get_blob_metadata("test.mp4")
+
+        # Assertions
+        assert result == {}, "Should return empty dict on exception"
+        assert "Failed to get metadata for blob test_container/test.mp4: General error" in caplog.text
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    @patch("app.audio.azure_utils.logger")
+    async def test_set_blob_metadata_success(self, mock_logger, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager):
+        """Test successful setting of blob metadata."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_client.set_blob_metadata = AsyncMock()
+
+        # Test
+        metadata = {"processed": "true", "processed_at": "2024-01-01T12:00:00Z"}
+        result = await async_blob_manager.set_blob_metadata("user-uploads/test@example.com/file.mp4", metadata)
+
+        # Assertions
+        assert result is True, "set_blob_metadata should return True on success"
+        mock_blob_client.set_blob_metadata.assert_awaited_once_with(metadata=metadata)
+        mock_logger.info.assert_called_once_with("Successfully set metadata on blob: test_container/user-uploads/test@example.com/file.mp4")
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_set_blob_metadata_not_found(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager, caplog):
+        """Test setting blob metadata when blob doesn't exist."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_client.set_blob_metadata = AsyncMock(side_effect=ResourceNotFoundError("Blob not found"))
+
+        # Test
+        result = await async_blob_manager.set_blob_metadata("nonexistent.mp4", {"key": "value"})
+
+        # Assertions
+        assert result is False, "set_blob_metadata should return False when blob not found"
+        assert "Blob not found when setting metadata: test_container/nonexistent.mp4" in caplog.text
+
+    @patch("app.audio.azure_utils.AsyncBlobServiceClient")
+    async def test_set_blob_metadata_exception(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager, caplog):
+        """Test setting blob metadata with general exception."""
+        # Setup mocks
+        mock_blob_service_client = MagicMock()
+        mock_blob_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_client.set_blob_metadata = AsyncMock(side_effect=Exception("General error"))
+
+        # Test
+        result = await async_blob_manager.set_blob_metadata("test.mp4", {"key": "value"})
+
+        # Assertions
+        assert result is False, "set_blob_metadata should return False on exception"
+        assert "Failed to set metadata on blob test_container/test.mp4: General error" in caplog.text
+
 

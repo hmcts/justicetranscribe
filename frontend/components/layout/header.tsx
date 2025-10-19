@@ -9,10 +9,10 @@ import { Home, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HeaderProps {
-  className?: string;
+  className: string;
 }
 
-export default function Header({ className = undefined }: HeaderProps) {
+export default function Header({ className = "" }: HeaderProps) {
   const { selectedRecordingMode } = useTranscripts();
   const router = useRouter();
   const pathname = usePathname();
@@ -20,7 +20,7 @@ export default function Header({ className = undefined }: HeaderProps) {
 
   const handleHomeClick = useCallback(() => {
     const hasQueryParams = (searchParams?.toString().length ?? 0) > 0;
-    
+
     if (pathname === "/" && !hasQueryParams) {
       // Already on clean home page - trigger event to reset view state
       window.dispatchEvent(new CustomEvent("reset-to-welcome"));
@@ -42,6 +42,7 @@ export default function Header({ className = undefined }: HeaderProps) {
             <button
               onClick={handleHomeClick}
               className="flex items-center gap-2 text-black"
+              type="button"
             >
               <span
                 className="font-medium text-black"

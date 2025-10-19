@@ -4,6 +4,5 @@
 /* eslint-disable */
 export enum TemplateName {
     GENERAL = 'General',
-    SHORT_N_SWEET = 'Short \'n\' Sweet',
     CRISSA = 'Crissa',
 }

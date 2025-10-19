@@ -13,13 +13,11 @@ import { getCurrentUser, updateCurrentUser } from "@/lib/database";
 interface UserSettingsContextType {
   user: User | null;
   loading: boolean;
-  updateUserSettings: (
-    updates: Partial<Pick<User, "hide_citations">>,
-  ) => Promise<User | null>;
+  updateUserSettings: (updates: Partial<User>) => Promise<User | null>;
 }
 
 const UserSettingsContext = createContext<UserSettingsContextType | undefined>(
-  undefined,
+  undefined
 );
 
 export function UserSettingsProvider({
@@ -37,9 +35,7 @@ export function UserSettingsProvider({
       .finally(() => setLoading(false));
   }, []);
 
-  const updateUserSettings = async (
-    updates: Partial<Pick<User, "hide_citations">>,
-  ) => {
+  const updateUserSettings = async (updates: Partial<User>) => {
     setLoading(true);
     try {
       const updated = await updateCurrentUser(updates);
@@ -56,7 +52,7 @@ export function UserSettingsProvider({
       loading,
       updateUserSettings,
     }),
-    [user, loading],
+    [user, loading]
   );
 
   return (
@@ -70,7 +66,7 @@ export function useUserSettings() {
   const context = useContext(UserSettingsContext);
   if (context === undefined) {
     throw new Error(
-      "useUserSettings must be used within a UserSettingsProvider",
+      "useUserSettings must be used within a UserSettingsProvider"
     );
   }
   return context;
