@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Info, Mic, AlertTriangle, RefreshCw, Clock } from "lucide-react";
+import { Info, Mic, AlertTriangle, RefreshCw, Clock, Moon } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
 
@@ -26,6 +26,7 @@ import {
   getRemainingTime,
   formatRemainingTime,
 } from "@/lib/recording-config";
+import useIsMobile from "@/hooks/use-mobile";
 
 // Local storage key for the dialog preference
 const DIALOG_PREFERENCE_KEY = "tab-recorder-show-instructions-dialog";
@@ -153,6 +154,7 @@ function ScreenRecorder({
   const [remainingMinutes, setRemainingMinutes] = useState<string>("");
   const [showLongRecordingWarning, setShowLongRecordingWarning] =
     useState(false);
+  const isMobile = useIsMobile();
 
   // Load dialog preference from local storage on component mount
   useEffect(() => {
@@ -576,15 +578,24 @@ function ScreenRecorder({
             </AlertDescription>
           </Alert>
 
-          {/* Refresh Notification */}
-          <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
-            <div className="flex items-center justify-center gap-2">
-              <RefreshCw className="size-3.5 text-amber-600 dark:text-amber-400" />
-              <p className="text-sm text-amber-800 dark:text-amber-300">
-                💡 Refresh Justice Transcribe before recording a new meeting
-              </p>
+          {/* Do Not Disturb Reminder - Only show on mobile */}
+          {isMobile && (
+            <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3" style={{ borderColor: '#D8C8FF', backgroundColor: '#F4F1FF' }}>
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full p-2" style={{ backgroundColor: '#CABDFF' }}>
+                  <Moon className="size-5" style={{ color: '#1F1247' }} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold" style={{ color: '#1F1247' }}>
+                    Silence notifications
+                  </h3>
+                  <p className="mt-0.5 text-sm" style={{ color: '#4A3F6B' }}>
+                    Turn on Do Not Disturb while recording.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 
