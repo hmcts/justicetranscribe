@@ -19,21 +19,23 @@ import {
 } from "@/components/ui/dialog";
 
 import { useTranscripts } from "@/providers/transcripts";
-import RecordingControl from "@/components/audio/recording-control";
-import { 
-  hasReachedMaxDuration, 
-  shouldShowWarning, 
+import RecordingControl from "@/components/audio/recording/recording-control";
+import {
+  hasReachedMaxDuration,
+  shouldShowWarning,
   getRemainingTime,
-  formatRemainingTime
+  formatRemainingTime,
 } from "@/lib/recording-config";
 
 // Local storage key for the dialog preference
 const DIALOG_PREFERENCE_KEY = "tab-recorder-show-instructions-dialog";
-const LONG_RECORDING_WARNING_KEY = "screen-recorder-long-recording-warning-seen";
+const LONG_RECORDING_WARNING_KEY =
+  "screen-recorder-long-recording-warning-seen";
 
 interface ScreenRecorderProps {
   onRecordingStop: (blob: Blob | null) => void;
   onRecordingStart: () => void;
+  disabled: boolean;
 }
 
 interface ScreenShareGuidanceProps {
@@ -133,6 +135,7 @@ function ScreenShareGuidance({ isVisible }: ScreenShareGuidanceProps) {
 function ScreenRecorder({
   onRecordingStop,
   onRecordingStart,
+  disabled = false,
 }: ScreenRecorderProps) {
   const [err, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -148,7 +151,8 @@ function ScreenRecorder({
   const [showShareGuidance, setShowShareGuidance] = useState(false);
   const [showTimeWarning, setShowTimeWarning] = useState(false);
   const [remainingMinutes, setRemainingMinutes] = useState<string>("");
-  const [showLongRecordingWarning, setShowLongRecordingWarning] = useState(false);
+  const [showLongRecordingWarning, setShowLongRecordingWarning] =
+    useState(false);
 
   // Load dialog preference from local storage on component mount
   useEffect(() => {
@@ -207,7 +211,7 @@ function ScreenRecorder({
               }
             }
           };
-          
+
           visibilityListenerRef.current = visibilityHandler;
           document.addEventListener("visibilitychange", visibilityHandler);
         }
@@ -226,10 +230,13 @@ function ScreenRecorder({
         // Continue recording even if wake lock fails
       }
     }
-    
+
     // Remove the visibility change event listener to prevent memory leak
     if (visibilityListenerRef.current) {
-      document.removeEventListener("visibilitychange", visibilityListenerRef.current);
+      document.removeEventListener(
+        "visibilitychange",
+        visibilityListenerRef.current
+      );
       visibilityListenerRef.current = null;
     }
   }, [wakeLock]);
@@ -292,7 +299,9 @@ function ScreenRecorder({
 
     // Check if we've reached the maximum duration
     if (hasReachedMaxDuration(recordingTime)) {
-      console.log("Maximum recording duration reached. Auto-stopping recording.");
+      console.log(
+        "Maximum recording duration reached. Auto-stopping recording."
+      );
       stopRecording();
     }
   }, [recordingTime, isRecording, stopRecording]);
@@ -593,40 +602,54 @@ function ScreenRecorder({
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-2rem)]">
-          <div className="flex flex-col sm:flex-row items-start gap-4">
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-2xl">
+          <div className="flex flex-col items-start gap-4 sm:flex-row">
             {/* Warning Icon */}
             <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30">
               <AlertTriangle className="size-6 text-amber-600 dark:text-amber-400" />
             </div>
-            
+
             {/* Content */}
             <div className="flex-1 pt-0 sm:pt-1">
               <DialogHeader className="space-y-3 pb-0">
-                <DialogTitle className="text-left text-lg sm:text-xl font-semibold">
+                <DialogTitle className="text-left text-lg font-semibold sm:text-xl">
                   Please refresh before recording
                 </DialogTitle>
-                <DialogDescription className="text-left text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                  There&apos;s a temporary issue affecting long sessions. To avoid disruption, please refresh before you begin. If a session exceeds 60 minutes, it will stop and upload automatically.
+                <DialogDescription className="text-left text-sm text-gray-600 dark:text-gray-400 sm:text-base">
+                  There&apos;s a temporary issue affecting long sessions. To
+                  avoid disruption, please refresh before you begin. If a
+                  session exceeds 60 minutes, it will stop and upload
+                  automatically.
                 </DialogDescription>
               </DialogHeader>
 
               {/* Bullet Points */}
-              <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 border-t pt-4 sm:pt-6">
+              <div className="mt-4 space-y-3 border-t pt-4 sm:mt-6 sm:space-y-4 sm:pt-6">
                 <div className="flex items-start gap-3">
-                  <RefreshCw className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
+                  <RefreshCw className="mt-0.5 size-4 shrink-0 text-gray-600 dark:text-gray-400 sm:size-5" />
                   <div className="text-sm sm:text-base">
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">Refresh before recording</span>
-                    <span className="text-gray-600 dark:text-gray-400"> to ensure a clean start.</span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      Refresh before recording
+                    </span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {" "}
+                      to ensure a clean start.
+                    </span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start gap-3">
-                  <Clock className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
+                  <Clock className="mt-0.5 size-4 shrink-0 text-gray-600 dark:text-gray-400 sm:size-5" />
                   <div className="text-sm sm:text-base">
-                    <span className="text-gray-600 dark:text-gray-400">If your meeting goes past </span>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">60:00</span>
-                    <span className="text-gray-600 dark:text-gray-400">, recording will auto-stop and upload.</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      If your meeting goes past{" "}
+                    </span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      60:00
+                    </span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      , recording will auto-stop and upload.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -763,9 +786,10 @@ function ScreenRecorder({
                 ? () => setShowInstructionsDialog(true)
                 : startRecording
             }
+            disabled={disabled}
           >
             <Mic className="mr-2 size-4" />
-            Start Recording Virtual Meeting
+            {disabled ? "Initializing..." : "Start Recording Virtual Meeting"}
           </Button>
         ) : (
           <div className="space-y-4">

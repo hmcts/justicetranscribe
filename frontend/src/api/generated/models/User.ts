@@ -7,6 +7,7 @@ export type User = {
     created_datetime?: string;
     updated_datetime?: (string | null);
     email: string;
-    hide_citations?: (boolean | null);
+    azure_user_id: string;
+    has_completed_onboarding?: boolean;
 };
 

@@ -10,6 +10,7 @@
     "lint:fix": "next lint --fix",
     "format": "next lint --fix && prettier '**/*.{json,yaml}' --write --ignore-path .gitignore",
     "type-check": "tsc --noEmit",
+    "validate": "npm run format && npm run type-check",
     "generate-api": "ts-node scripts/generate-api.ts",
     "test": "vitest",
     "test:unit": "vitest run tests/unit",

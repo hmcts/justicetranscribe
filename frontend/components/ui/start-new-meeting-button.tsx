@@ -1,3 +1,4 @@
+/* eslint-disable react/require-default-props */
 import React from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ const StartNewMeetingButton = React.forwardRef<
         onClick={onClick}
         disabled={disabled}
         className={`${baseClasses} ${sizeClasses} ${widthClasses} ${className}`}
+        // eslint-disable-next-line react/jsx-props-no-spreading
         {...props}
       >
         {showIcon && (

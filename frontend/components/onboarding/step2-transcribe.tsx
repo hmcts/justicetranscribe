@@ -1,3 +1,5 @@
+/* eslint-disable jsx-a11y/media-has-caption */
+
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -17,7 +19,9 @@ const SANITY_VIDEO_DOCUMENT_UUID = "146f7345-0da6-48b5-9a24-851bc7548298";
 const SANITY_VIDEO_DOCUMENT_ID = `${SANITY_VIDEO_DOCUMENT_TYPE};${SANITY_VIDEO_DOCUMENT_UUID}`;
 
 export default function Step2BasicTutorial() {
-  const [selectedVideo, setSelectedVideo] = useState<SanityVideoData | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<SanityVideoData | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -42,8 +46,12 @@ export default function Step2BasicTutorial() {
         : `v${SANITY_API_VERSION}`;
 
       const encodedQuery = encodeURIComponent(query);
-      const encodedId = encodeURIComponent(JSON.stringify(SANITY_VIDEO_DOCUMENT_ID));
-      const encodedUuid = encodeURIComponent(JSON.stringify(SANITY_VIDEO_DOCUMENT_UUID));
+      const encodedId = encodeURIComponent(
+        JSON.stringify(SANITY_VIDEO_DOCUMENT_ID)
+      );
+      const encodedUuid = encodeURIComponent(
+        JSON.stringify(SANITY_VIDEO_DOCUMENT_UUID)
+      );
       const endpoint = `https://${SANITY_PROJECT_ID}.api.sanity.io/${apiVersion}/data/query/${SANITY_DATASET}?query=${encodedQuery}&%24id=${encodedId}&%24uuid=${encodedUuid}&perspective=published`;
 
       try {
@@ -89,7 +97,7 @@ export default function Step2BasicTutorial() {
   return (
     <div className="w-full space-y-6">
       {/* Content area - YouTube-like: main player left, sidebar right */}
-      <div className="grid grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-12 items-start gap-6">
         {/* Video Section */}
         <div className="col-span-12 md:col-span-7 lg:col-span-8">
           <div className="w-full">
@@ -109,7 +117,7 @@ export default function Step2BasicTutorial() {
                   playsInline
                   ref={videoRef}
                   src={selectedVideo.videoUrl}
-                  className="h-full w-full object-contain"
+                  className="size-full object-contain"
                 />
               </div>
             )}
@@ -117,14 +125,19 @@ export default function Step2BasicTutorial() {
         </div>
 
         {/* Steps Section */}
-        <div className="col-span-12 md:col-span-5 lg:col-span-4 min-w-0 md:min-w-[280px] lg:min-w-[320px]">
+        <div className="col-span-12 min-w-0 md:col-span-5 md:min-w-[280px] lg:col-span-4 lg:min-w-[320px]">
           <div className="mb-4 text-left">
-            <h1 className="text-3xl font-semibold sm:text-4xl">Transcribe a Meeting</h1>
+            <h1 className="text-3xl font-semibold sm:text-4xl">
+              Transcribe a Meeting
+            </h1>
             <h2 className="bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-xl font-medium text-transparent">
               Using Justice Transcribe is simple
             </h2>
           </div>
-          <div className="space-y-4 text-black" aria-label="How to record a meeting steps">
+          <div
+            className="space-y-4 text-black"
+            aria-label="How to record a meeting steps"
+          >
             <p className="text-base">
               <span className="mr-2 font-semibold text-blue-600">1.</span>
               Click start new meeting and select in person or virtual meeting
@@ -154,4 +167,3 @@ export default function Step2BasicTutorial() {
     </div>
   );
 }
-

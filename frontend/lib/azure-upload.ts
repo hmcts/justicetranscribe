@@ -15,10 +15,10 @@ export interface UploadProgressCallback {
 
 /**
  * Uploads a blob or chunks using Azure's Block Blob API
- * 
+ *
  * This function handles chunked uploads in a way that's compatible with Azure's
  * SAS URL signatures by using the PutBlock and PutBlockList APIs.
- * 
+ *
  * @param options.blob - The blob to upload (will be split into chunks)
  * @param options.chunks - Pre-existing chunks to upload (from IndexedDB)
  * @param options.mimeType - MIME type of the file (e.g., "audio/mp4")
@@ -46,6 +46,7 @@ export async function uploadBlobAsChunks(options: {
     throw new Error("Failed to get upload URL for chunked upload");
   }
 
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   const { upload_url, user_upload_s3_file_key } = urlResult.data!;
 
   // Parse the base URL (without query params)
@@ -63,7 +64,7 @@ export async function uploadBlobAsChunks(options: {
     const chunkSize = 1024 * 1024; // 1MB chunks
     const totalChunks = Math.ceil(blob.size / chunkSize);
     chunksToUpload = [];
-    for (let i = 0; i < totalChunks; i++) {
+    for (let i = 0; i < totalChunks; i += 1) {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, blob.size);
       chunksToUpload.push(blob.slice(start, end));
@@ -76,7 +77,7 @@ export async function uploadBlobAsChunks(options: {
   const totalChunks = chunksToUpload.length;
 
   // Phase 1: Upload each chunk as a block
-  for (let i = 0; i < totalChunks; i++) {
+  for (let i = 0; i < totalChunks; i += 1) {
     const chunk = chunksToUpload[i];
 
     // Generate a block ID (must be base64 encoded, same length for all blocks)
@@ -86,14 +87,14 @@ export async function uploadBlobAsChunks(options: {
     // Use Azure's PutBlock API: ?comp=block&blockid=<id>
     const blockUploadUrl = `${baseUrl}?comp=block&blockid=${encodeURIComponent(
       blockId
-    )}${sasParams.substring(1) ? "&" + sasParams.substring(1) : ""}`;
+    )}${sasParams.substring(1) ? `&${sasParams.substring(1)}` : ""}`;
 
     // Report progress (account for the final commit step)
     if (onProgress) {
       onProgress(Math.round((i / (totalChunks + 1)) * 100));
     }
 
-    // Upload individual block
+    // eslint-disable-next-line no-await-in-loop
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
 
@@ -121,7 +122,7 @@ export async function uploadBlobAsChunks(options: {
 
   // Phase 2: Commit all blocks using PutBlockList
   const commitUrl = `${baseUrl}?comp=blocklist${
-    sasParams.substring(1) ? "&" + sasParams.substring(1) : ""
+    sasParams.substring(1) ? `&${sasParams.substring(1)}` : ""
   }`;
 
   // Create the block list XML
@@ -165,7 +166,7 @@ ${blockIds.map((id) => `  <Latest>${id}</Latest>`).join("\n")}
 
 /**
  * Upload chunks from IndexedDB backup using Azure Block Blob API
- * 
+ *
  * @param backupId - The backup ID containing chunks in IndexedDB
  * @param mimeType - MIME type of the file
  * @param onProgress - Optional progress callback
@@ -183,4 +184,3 @@ export async function uploadChunksFromBackup(
 
   return uploadBlobAsChunks({ chunks, mimeType, onProgress });
 }
-

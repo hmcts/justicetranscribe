@@ -231,7 +231,7 @@ export default function OnboardingPage() {
       {/* Skip to main content for screen readers */}
       <a
         href="#main-content"
-        className="sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg focus:not-sr-only"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg"
       >
         Skip to main content
       </a>
@@ -253,16 +253,17 @@ export default function OnboardingPage() {
         id="main-content"
         className={
           (currentStep === 2 || currentStep === 3) && hasValidLicense !== false
-            ? "w-full max-w-7xl mx-auto px-4 pb-24 md:pb-0 pt-6"
+            ? "mx-auto w-full max-w-7xl px-4 pb-24 pt-6 md:pb-0"
             : "container mx-auto max-w-2xl px-3 pb-0 pt-4"
         }
       >
         {/* Main heading for accessibility */}
         <h1 className="sr-only">Complete your Justice Transcribe setup</h1>
         {/* Step content - centered vertically */}
-        {(currentStep === 2 || currentStep === 3) && hasValidLicense !== false ? (
-          <>{renderStep()}</>
-        ) : currentStep === 1 || currentStep === 4 ? (
+        {((currentStep === 2 || currentStep === 3) &&
+          hasValidLicense !== false) ||
+        currentStep === 1 ||
+        currentStep === 4 ? (
           <>{renderStep()}</>
         ) : (
           <div className="flex min-h-[calc(100svh-64px)] flex-col justify-center">
@@ -316,14 +317,22 @@ export default function OnboardingPage() {
                       Back
                     </Button>
                     <div className="flex items-center gap-3">
-                      {(currentStep === 2 && step2GateActive) && (
-                        <span className="text-sm text-muted-foreground" aria-live="polite">
-                          You can continue in {`${Math.floor(step2RemainingSeconds / 60)}:${String(step2RemainingSeconds % 60).padStart(2, "0")}`}
+                      {currentStep === 2 && step2GateActive && (
+                        <span
+                          className="text-sm text-muted-foreground"
+                          aria-live="polite"
+                        >
+                          You can continue in{" "}
+                          {`${Math.floor(step2RemainingSeconds / 60)}:${String(step2RemainingSeconds % 60).padStart(2, "0")}`}
                         </span>
                       )}
-                      {(currentStep === 3 && step3GateActive) && (
-                        <span className="text-sm text-muted-foreground" aria-live="polite">
-                          You can continue in {`${Math.floor(step3RemainingSeconds / 60)}:${String(step3RemainingSeconds % 60).padStart(2, "0")}`}
+                      {currentStep === 3 && step3GateActive && (
+                        <span
+                          className="text-sm text-muted-foreground"
+                          aria-live="polite"
+                        >
+                          You can continue in{" "}
+                          {`${Math.floor(step3RemainingSeconds / 60)}:${String(step3RemainingSeconds % 60).padStart(2, "0")}`}
                         </span>
                       )}
                       <Button
