@@ -1,7 +1,5 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
-import { useTranscripts } from "@/providers/transcripts";
-import StartNewMeetingButton from "@/components/ui/start-new-meeting-button";
 import { Button } from "@/components/ui/button";
 
 export type AudioProcessingStatus =
@@ -19,13 +17,6 @@ export default function ProcessingLoader({
   status,
   onStopPolling,
 }: ProcessingLoaderProps) {
-  const { newTranscription } = useTranscripts();
-
-  const handleNewTranscription = () => {
-    onStopPolling();
-    newTranscription();
-  };
-
   if (typeof status === "object" && status.state === "uploading") {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center justify-center space-y-6 py-12">
@@ -116,12 +107,12 @@ export default function ProcessingLoader({
         >
           Return to Home
         </Button>
-        <StartNewMeetingButton
+        {/* <StartNewMeetingButton
           onClick={handleNewTranscription}
           className="min-h-[44px] w-auto px-6 py-2 shadow-md transition-all duration-200 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 motion-safe:hover:scale-105 motion-safe:active:scale-95 md:text-lg"
           fullWidth={false}
           showIcon={false}
-        />
+        /> */}
       </div>
     </div>
   );

@@ -72,7 +72,7 @@ export const getAllTranscriptionMetadata = async (): Promise<
     const metadata = result.data || [];
     return metadata.map((m) => ({
       ...m,
-      created_datetime: new Date(m.created_datetime).toISOString(),
+      created_datetime: new Date(m.created_datetime || "").toISOString(),
     }));
   } catch (error) {
     console.error("Error fetching transcriptions metadata:", error);
@@ -221,7 +221,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
  * Pass only the fields you want to update (e.g., { hide_citations: true })
  */
 export const updateCurrentUser = async (
-  updates: Partial<Pick<User, "hide_citations">>
+  updates: Partial<User>
 ): Promise<User | null> => {
   try {
     const result = await apiClient.request<User>("/user", {

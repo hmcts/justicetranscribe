@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTranscripts } from "@/providers/transcripts";
 import TranscriptEditor from "@/components/transcription/transcript-editor";
-import AudioPlayerComponent from "@/components/audio/audio-player";
+import AudioPlayerComponent from "@/components/audio/playback/audio-player";
 
 interface SpeakerAndTranscriptEditorProps {
   currentCitationIndex: number | null;

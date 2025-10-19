@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { useTranscripts } from "@/providers/transcripts";
-import RecordingControl from "@/components/audio/recording-control";
+import RecordingControl from "@/components/audio/recording/recording-control";
 import {
   hasReachedMaxDuration,
   shouldShowWarning,
@@ -35,6 +35,7 @@ const LONG_RECORDING_WARNING_KEY =
 interface ScreenRecorderProps {
   onRecordingStop: (blob: Blob | null) => void;
   onRecordingStart: () => void;
+  disabled: boolean;
 }
 
 interface ScreenShareGuidanceProps {
@@ -134,6 +135,7 @@ function ScreenShareGuidance({ isVisible }: ScreenShareGuidanceProps) {
 function ScreenRecorder({
   onRecordingStop,
   onRecordingStart,
+  disabled = false,
 }: ScreenRecorderProps) {
   const [err, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -784,9 +786,10 @@ function ScreenRecorder({
                 ? () => setShowInstructionsDialog(true)
                 : startRecording
             }
+            disabled={disabled}
           >
             <Mic className="mr-2 size-4" />
-            Start Recording Virtual Meeting
+            {disabled ? "Initializing..." : "Start Recording Virtual Meeting"}
           </Button>
         ) : (
           <div className="space-y-4">
