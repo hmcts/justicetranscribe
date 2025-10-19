@@ -7,6 +7,7 @@ export interface ContentDisplayProps {
   audioBlob: Blob | null;
   startTranscription: (blob: Blob, backupIdToDelete?: string | null) => void;
   initialRecordingMode: "mic" | "screen";
+  isUploadUrlReady: boolean;
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
   onRecordingStart: () => void;
   onClose: () => void;

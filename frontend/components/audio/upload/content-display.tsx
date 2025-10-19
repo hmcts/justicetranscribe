@@ -27,6 +27,7 @@ export default function ContentDisplay({
   audioBlob,
   startTranscription,
   initialRecordingMode,
+  isUploadUrlReady,
   onRecordingStop,
   onRecordingStart,
   onClose,
@@ -112,11 +113,13 @@ export default function ContentDisplay({
             <AudioRecorderComponent
               onRecordingStart={onRecordingStart}
               onRecordingStop={onRecordingStop}
+              disabled={!isUploadUrlReady}
             />
           ) : (
             <ScreenRecorder
               onRecordingStop={onRecordingStop}
               onRecordingStart={onRecordingStart}
+              disabled={!isUploadUrlReady}
             />
           )}
         </div>
