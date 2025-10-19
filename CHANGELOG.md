@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Per-user transcription polling service** that automatically discovers and processes audio files from Azure Blob Storage
 - New methods in `AsyncAzureBlobManager`: `list_blobs_in_prefix()`, `get_blob_metadata()`, `set_blob_metadata()`
 - `ENABLE_TRANSCRIPTION_POLLING` environment variable to enable/disable automatic polling (default: false)
-- Blob metadata marking system to track processed files and avoid reprocessing
-- On first poll operation, deletes old audio blobs.
+- Retry tracking system using blob metadata (`retry_count`, `status`, `last_error`, `last_attempt`)
+- Blob metadata marking to track processed files, retry attempts, and permanently failed jobs
+- Cleanup utility scripts: `delete_null_title_meetings.py` and `inspect_meetings.py`
 
 ### Changed
 
@@ -24,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/start-transcription-job` API endpoint marked as deprecated
 - Transcription workflow now supports both API-triggered and auto-discovery modes (expand-contract pattern)
 - `get_current_user` dependency now auto-starts polling service for authenticated users
+- Retry logic refactored: blob download retries (3 attempts) separate from transcription API retries (2 attempts max)
+
+### Fixed
+
+#### Backend
+
+- Duplicate transcription records no longer created on retry failures - database save now deferred until after successful audio processing
+- Polling service retry limit set to 2 attempts (1 retry max) to prevent duplicate record creation
 
 ### Release Notes
 
