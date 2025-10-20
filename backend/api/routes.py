@@ -66,8 +66,14 @@ router = APIRouter()
 UK_TIMEZONE = pytz.timezone("Europe/London")
 
 
-@router.get("/healthcheck")
+@router.get("/health")
 async def health_check():
+    return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@router.get("/healthcheck")
+async def health_check_legacy():
+    """Legacy endpoint for backwards compatibility"""
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 

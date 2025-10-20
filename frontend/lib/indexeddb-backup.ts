@@ -77,6 +77,18 @@ class IndexedDBBackup {
       await this.init();
     }
 
+    // Check if the required object store exists
+    if (!this.db!.objectStoreNames.contains(this.storeName)) {
+      console.warn(
+        "[IndexedDB] Object store not found, reinitializing database..."
+      );
+      // Close the current connection
+      this.db!.close();
+      this.db = null;
+      // Reinitialize with the correct version
+      await this.init();
+    }
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([this.storeName], "readwrite");
       const store = transaction.objectStore(this.storeName);
@@ -94,6 +106,18 @@ class IndexedDBBackup {
 
   async getAudioBackup(id: string): Promise<AudioBackup | null> {
     if (!this.db) {
+      await this.init();
+    }
+
+    // Check if the required object store exists
+    if (!this.db!.objectStoreNames.contains(this.storeName)) {
+      console.warn(
+        "[IndexedDB] Object store not found, reinitializing database..."
+      );
+      // Close the current connection
+      this.db!.close();
+      this.db = null;
+      // Reinitialize with the correct version
       await this.init();
     }
 
@@ -116,6 +140,18 @@ class IndexedDBBackup {
     if (!this.db) {
       // eslint-disable-next-line no-console
       console.log("[IndexedDB] Database not initialized, initializing...");
+      await this.init();
+    }
+
+    // Check if the required object store exists
+    if (!this.db!.objectStoreNames.contains(this.storeName)) {
+      console.warn(
+        "[IndexedDB] Object store not found, reinitializing database..."
+      );
+      // Close the current connection
+      this.db!.close();
+      this.db = null;
+      // Reinitialize with the correct version
       await this.init();
     }
 
@@ -144,6 +180,18 @@ class IndexedDBBackup {
 
   async deleteAudioBackup(id: string): Promise<void> {
     if (!this.db) {
+      await this.init();
+    }
+
+    // Check if the required object store exists
+    if (!this.db!.objectStoreNames.contains(this.storeName)) {
+      console.warn(
+        "[IndexedDB] Object store not found, reinitializing database..."
+      );
+      // Close the current connection
+      this.db!.close();
+      this.db = null;
+      // Reinitialize with the correct version
       await this.init();
     }
 
@@ -193,6 +241,18 @@ class IndexedDBBackup {
       await this.init();
     }
 
+    // Check if the required object store exists
+    if (!this.db!.objectStoreNames.contains(this.chunksStoreName)) {
+      console.warn(
+        "[IndexedDB] Object store not found, reinitializing database..."
+      );
+      // Close the current connection
+      this.db!.close();
+      this.db = null;
+      // Reinitialize with the correct version
+      await this.init();
+    }
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(
         [this.chunksStoreName],
@@ -222,6 +282,18 @@ class IndexedDBBackup {
 
   async getChunks(backupId: string): Promise<AudioChunk[]> {
     if (!this.db) {
+      await this.init();
+    }
+
+    // Check if the required object store exists
+    if (!this.db!.objectStoreNames.contains(this.chunksStoreName)) {
+      console.warn(
+        "[IndexedDB] Object store not found, reinitializing database..."
+      );
+      // Close the current connection
+      this.db!.close();
+      this.db = null;
+      // Reinitialize with the correct version
       await this.init();
     }
 
@@ -259,6 +331,18 @@ class IndexedDBBackup {
       await this.init();
     }
 
+    // Check if the required object store exists
+    if (!this.db!.objectStoreNames.contains(this.chunksStoreName)) {
+      console.warn(
+        "[IndexedDB] Object store not found, reinitializing database..."
+      );
+      // Close the current connection
+      this.db!.close();
+      this.db = null;
+      // Reinitialize with the correct version
+      await this.init();
+    }
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(
         [this.chunksStoreName],
@@ -288,6 +372,18 @@ class IndexedDBBackup {
   async debugIndexedDB(): Promise<void> {
     try {
       await this.init();
+
+      // Check if the required object store exists
+      if (!this.db!.objectStoreNames.contains(this.chunksStoreName)) {
+        console.warn(
+          "[IndexedDB] Object store not found, reinitializing database..."
+        );
+        // Close the current connection
+        this.db!.close();
+        this.db = null;
+        // Reinitialize with the correct version
+        await this.init();
+      }
 
       // List all chunks
       const transaction = this.db!.transaction(
