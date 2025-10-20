@@ -90,7 +90,7 @@ function TranscriptEditor({ currentCitationIndex }: TranscriptEditorProps) {
           entry_index: entryIndex,
         });
       } catch (error) {
-        alert(`Failed to update speaker names: ${error}`);
+        console.error(`Failed to update speaker names: ${error}`);
       }
     }
     setEditingIndex(null);
