@@ -10,14 +10,6 @@ import posthog from "posthog-js";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 import {
   Select,
@@ -35,8 +27,8 @@ import {
   getRemainingTime,
   formatRemainingTime,
 } from "@/lib/recording-config";
-import { AudioDevice, MicrophonePermission } from "./microphone-permission";
 import useIsMobile from "@/hooks/use-mobile";
+import { AudioDevice, MicrophonePermission } from "./microphone-permission";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
@@ -336,6 +328,7 @@ function AudioRecorderComponent({
 
     // Check if we've reached the maximum duration
     if (hasReachedMaxDuration(recordingTime)) {
+      // eslint-disable-next-line no-console
       console.log(
         "Maximum recording duration reached. Auto-stopping recording."
       );
@@ -421,7 +414,10 @@ function AudioRecorderComponent({
                         >
                           Silence notifications
                         </h3>
-                        <p className="mt-0.5 text-sm" style={{ color: "#362952" }}>
+                        <p
+                          className="mt-0.5 text-sm"
+                          style={{ color: "#362952" }}
+                        >
                           Turn on Do Not Disturb while recording.
                         </p>
                       </div>

@@ -427,7 +427,6 @@ export default function useAudioUpload({
       initialRecordingMode,
       uploadFile,
       uploadUrlData,
-      fetchUploadUrl,
       // uploadChunksAsFallback, // CHUNKED UPLOAD: Commented out
       errorDetails.duration,
     ]

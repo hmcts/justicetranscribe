@@ -10,7 +10,10 @@ import posthog from "posthog-js";
 import { useTranscripts } from "@/providers/transcripts";
 import DialogueHeader from "@/components/minutes/dialogue-manager-header";
 import MinutesEditor from "@/components/minutes/minutes-editor";
-import { WhatsNewModal, useWhatsNewModal } from "@/components/ui/whats-new-modal";
+import {
+  WhatsNewModal,
+  useWhatsNewModal,
+} from "@/components/ui/whats-new-modal";
 
 function DialogueManager() {
   const [currentCitationIndex, setCurrentCitationIndex] = useState<

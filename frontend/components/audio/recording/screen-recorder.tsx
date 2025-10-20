@@ -283,6 +283,7 @@ function ScreenRecorder({
 
     // Check if we've reached the maximum duration
     if (hasReachedMaxDuration(recordingTime)) {
+      // eslint-disable-next-line no-console
       console.log(
         "Maximum recording duration reached. Auto-stopping recording."
       );

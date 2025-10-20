@@ -10,7 +10,14 @@
     "project": ["./tsconfig.json"]
   },
   "rules": {
-    "prettier/prettier": "warn"
+    "prettier/prettier": "warn",
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "tailwindcss/no-custom-classname": [
+      "warn",
+      {
+        "whitelist": ["ph-mask"]
+      }
+    ]
   },
   "plugins": ["tailwindcss"]
 }

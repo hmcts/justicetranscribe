@@ -67,6 +67,7 @@ class ApiClient {
         return;
       }
 
+      // eslint-disable-next-line no-console
       console.log("✅ Authentication session refreshed successfully");
     } catch (error) {
       console.error("❌ Failed to refresh auth session:", error);
@@ -98,6 +99,7 @@ class ApiClient {
 
           // Use id_token instead of access_token - it's a proper JWT!
           if (provider.id_token) {
+            // eslint-disable-next-line no-console
             console.log(
               "🎫 Using ID token (JWT):",
               `${provider.id_token.substring(0, 50)}...`
@@ -156,6 +158,7 @@ class ApiClient {
         requestOptions.credentials = "include";
       }
 
+      // eslint-disable-next-line no-console
       console.log(
         `🔄 Making ${options.method || "GET"} request to ${url}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`
       );

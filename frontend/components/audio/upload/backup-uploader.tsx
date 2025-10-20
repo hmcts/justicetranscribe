@@ -70,6 +70,7 @@ function BackupUploader({
           isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === "true";
 
         if (forceChunked) {
+          // eslint-disable-next-line no-console
           console.log(
             "🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload"
           );
@@ -155,7 +156,7 @@ function BackupUploader({
           }
         } catch (error) {
           // Sentry.captureException(error);
-          alert(`error deleting backup: ${error}`);
+          console.error(`error deleting backup: ${error}`);
         }
       } catch (error) {
         setUploadError(
@@ -167,7 +168,12 @@ function BackupUploader({
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, backup.id, onUploadSuccess]
+    [
+      setIsProcessingTranscription,
+      backup.id,
+      onUploadSuccess,
+      uploadBlobInChunks,
+    ]
   );
 
   const handleRetryUpload = () => {

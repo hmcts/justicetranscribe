@@ -93,6 +93,7 @@ export const deleteTranscription = async (id: string): Promise<void> => {
       throw new Error(`Error deleting transcription: ${result.error}`);
     }
 
+    // eslint-disable-next-line no-console
     console.log("Transcription deleted successfully");
   } catch (error) {
     console.error("Error deleting transcription:", error);

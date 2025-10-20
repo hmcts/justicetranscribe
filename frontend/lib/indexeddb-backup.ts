@@ -42,18 +42,21 @@ class IndexedDBBackup {
 
       request.onsuccess = () => {
         this.db = request.result;
+        // eslint-disable-next-line no-console
         console.log("[IndexedDB] Successfully opened database");
         resolve();
       };
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+        // eslint-disable-next-line no-console
         console.log("[IndexedDB] Upgrading database to version", this.version);
 
         // Create audioBackups store if it doesn't exist
         if (!db.objectStoreNames.contains(this.storeName)) {
           const store = db.createObjectStore(this.storeName, { keyPath: "id" });
           store.createIndex("timestamp", "timestamp", { unique: false });
+          // eslint-disable-next-line no-console
           console.log("[IndexedDB] Created object store");
         }
 
@@ -111,6 +114,7 @@ class IndexedDBBackup {
 
   async getAllAudioBackups(): Promise<AudioBackup[]> {
     if (!this.db) {
+      // eslint-disable-next-line no-console
       console.log("[IndexedDB] Database not initialized, initializing...");
       await this.init();
     }
@@ -131,6 +135,7 @@ class IndexedDBBackup {
 
       request.onsuccess = () => {
         const result = request.result || [];
+        // eslint-disable-next-line no-console
         console.log(`[IndexedDB] Retrieved ${result.length} audio backup(s)`);
         resolve(result);
       };
