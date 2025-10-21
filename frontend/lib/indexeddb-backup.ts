@@ -231,55 +231,6 @@ class IndexedDBBackup {
     }
   }
 
-  // STREAMING METHODS: Stream chunks directly to IndexedDB
-  async appendChunk(
-    backupId: string,
-    chunkIndex: number,
-    chunkData: Blob
-  ): Promise<void> {
-    if (!this.db) {
-      await this.init();
-    }
-
-    // Check if the required object store exists
-    if (!this.db!.objectStoreNames.contains(this.chunksStoreName)) {
-      console.warn(
-        "[IndexedDB] Object store not found, reinitializing database..."
-      );
-      // Close the current connection
-      this.db!.close();
-      this.db = null;
-      // Reinitialize with the correct version
-      await this.init();
-    }
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(
-        [this.chunksStoreName],
-        "readwrite"
-      );
-      const store = transaction.objectStore(this.chunksStoreName);
-
-      const chunk: AudioChunk = {
-        id: backupId,
-        chunkIndex,
-        data: chunkData,
-        timestamp: Date.now(),
-      };
-
-      const request = store.put(chunk);
-
-      request.onerror = () => {
-        console.error("❌ Failed to save audio chunk:", request.error);
-        reject(new Error("Failed to save audio chunk"));
-      };
-
-      request.onsuccess = () => {
-        resolve();
-      };
-    });
-  }
-
   async getChunks(backupId: string): Promise<AudioChunk[]> {
     if (!this.db) {
       await this.init();

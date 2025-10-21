@@ -100,160 +100,139 @@ export default function useAudioUpload({
     []
   );
 
+  // Helper: Clean up backup after successful upload
+  const cleanupBackup = useCallback(
+    async (backupIdToDelete?: string | null) => {
+      const idToDelete = backupIdToDelete || currentBackupId;
+      if (!idToDelete) return;
+
+      try {
+        await audioBackupDB.deleteAudioBackup(idToDelete);
+        setCurrentBackupId(null);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Error deleting backup:", error);
+        // Don't alert user about backup deletion failure
+      }
+    },
+    [currentBackupId]
+  );
+
+  // Helper: Report error to Sentry with full context
+  const reportError = useCallback(
+    (error: Error, blob: Blob) => {
+      const errorWithMetadata = error as Error & {
+        requestId?: string;
+        status?: number;
+      };
+
+      const eventId = Sentry.captureException(error, {
+        tags: {
+          area: "audio-upload",
+          recording_mode: initialRecordingMode,
+        },
+        extra: {
+          request_id: errorWithMetadata.requestId || null,
+          status_code: errorWithMetadata.status || null,
+          user_upload_key: errorDetails.userUploadKey,
+          backup_id: currentBackupId,
+          blob_type: blob.type,
+          blob_size: blob.size,
+        },
+      });
+
+      setErrorDetails({
+        requestId: errorWithMetadata.requestId || null,
+        statusCode: errorWithMetadata.status || null,
+        sentryEventId: eventId || null,
+        userUploadKey: errorDetails.userUploadKey,
+        duration: errorDetails.duration,
+      });
+    },
+    [initialRecordingMode, currentBackupId, errorDetails]
+  );
+
+  // Helper: Single upload attempt
+  const attemptUpload = useCallback(
+    async (blob: Blob, attemptNumber: number) => {
+      // Validate upload URL is available
+      if (!uploadUrl) {
+        const errorMsg = "Upload URL not available. This should not happen.";
+        // eslint-disable-next-line no-console
+        console.error(errorMsg);
+        Sentry.captureMessage(errorMsg, {
+          level: "error",
+          tags: { area: "audio-upload" },
+        });
+        throw new Error(errorMsg);
+      }
+
+      // Show retry message if needed
+      if (attemptNumber > 1) {
+        setUploadError(`Retrying upload (attempt ${attemptNumber} of 2)...`);
+      }
+
+      // Upload the file
+      setProcessingStatus({ state: "uploading", progress: 0 });
+      await uploadFile(blob, uploadUrl);
+
+      // Track success
+      setProcessingStatus("transcribing");
+      posthog.capture("transcription_started", {
+        file_type: blob.type,
+        source: blob instanceof File ? "upload" : "recording",
+        retry_attempt: attemptNumber,
+      });
+    },
+    [uploadFile, uploadUrl]
+  );
+
   const startTranscription = useCallback(
     async (blob: Blob, backupIdToDelete?: string | null) => {
-      const maxRetries = 2;
+      const MAX_RETRIES = 2;
       let lastError: Error | null = null;
-      let currentRequestId: string | null = null;
-      let currentStatusCode: number | null = null;
-      const currentUserUploadKey: string | null = null;
 
-      const delay = (ms: number): Promise<void> => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve();
-          }, ms);
-        });
-      };
-
-      const performSingleAttempt = async (attempt: number): Promise<void> => {
-        setProcessingStatus({ state: "uploading", progress: 0 });
-        setUploadError(null);
-
-        // Show retry attempt to user
-        if (attempt > 1) {
-          setUploadError(
-            `Retrying upload (attempt ${attempt} of ${maxRetries})...`
-          );
-        }
-
-        // Upload URL should always be available due to pre-fetch with retry logic
-        if (!uploadUrl) {
-          const errorMsg = "Upload URL not available. This should not happen.";
-          // eslint-disable-next-line no-console
-          console.error(errorMsg);
-          Sentry.captureMessage(errorMsg, {
-            level: "error",
-            tags: { area: "audio-upload" },
-          });
-          throw new Error(errorMsg);
-        }
-
-        // Clear retry message on successful URL fetch
-        if (attempt > 1) {
-          setUploadError(null);
-        }
-
-        await uploadFile(blob, uploadUrl);
-
-        setProcessingStatus("transcribing");
-
-        posthog.capture("transcription_started", {
-          file_type: blob.type,
-          source: blob instanceof File ? "upload" : "recording",
-          retry_attempt: attempt,
-        });
-
-        // Clean up backup after successful upload
-        const idToDelete = backupIdToDelete || currentBackupId;
-        if (idToDelete) {
-          try {
-            await audioBackupDB.deleteAudioBackup(idToDelete);
-            setCurrentBackupId(null);
-          } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error("Error deleting backup:", error);
-            // Don't alert user about backup deletion failure
-          }
-        }
-
-        // Clear and re-fetch upload URL for the next recording
-        // This ensures each upload uses a fresh, single-use URL
-        setUploadUrl(null);
-        setIsUploadUrlReady(false);
-      };
-
-      // Sequential retry logic without loops or recursion
-      let attempt = 1;
-      let success = false;
-
-      while (attempt <= maxRetries && !success) {
+      // Try upload with retries
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
         try {
+          setUploadError(null);
           // eslint-disable-next-line no-await-in-loop
-          await performSingleAttempt(attempt);
-          success = true;
+          await attemptUpload(blob, attempt);
+
+          // Success! Clean up and prepare for next upload
+          // eslint-disable-next-line no-await-in-loop
+          await cleanupBackup(backupIdToDelete);
+          setUploadUrl(null);
+          setIsUploadUrlReady(false);
+          return; // Exit on success
         } catch (error) {
           lastError =
-            error instanceof Error
-              ? error
-              : new Error("Unknown error occurred");
+            error instanceof Error ? error : new Error("Unknown error");
           // eslint-disable-next-line no-console
           console.error(`Upload attempt ${attempt} failed:`, lastError.message);
 
-          // Extract request ID and status code from error if available
-          const err = lastError as Error & {
-            requestId?: string;
-            status?: number;
-          };
-          currentRequestId = err?.requestId || null;
-          currentStatusCode = err?.status ?? null;
-
-          if (attempt < maxRetries) {
+          // Wait before retry (except on last attempt)
+          if (attempt < MAX_RETRIES) {
             // eslint-disable-next-line no-await-in-loop
-            await delay(1000);
+            await new Promise((resolve) => {
+              setTimeout(resolve, 1000);
+            });
           }
-          attempt += 1;
         }
       }
 
-      if (!success) {
-        // All retries failed
-        setUploadError(
-          lastError?.message || "Error occurred while transcribing"
-        );
-        // Capture rich context for failed upload/transcription
-        try {
-          const err = lastError as Error & {
-            requestId?: string;
-            status?: number;
-          };
-          const eventId = Sentry.captureException(err, {
-            tags: {
-              area: "audio-upload",
-              recording_mode: initialRecordingMode,
-            },
-            extra: {
-              request_id: currentRequestId,
-              status_code: currentStatusCode,
-              user_upload_key: currentUserUploadKey,
-              backup_id: currentBackupId,
-              blob_type: blob.type,
-              blob_size: blob.size,
-            },
-          });
-          setErrorDetails({
-            requestId: currentRequestId,
-            statusCode: currentStatusCode,
-            sentryEventId: eventId || null,
-            userUploadKey: currentUserUploadKey,
-            duration: errorDetails.duration,
-          });
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error("Error capturing sentry event:", error);
-        }
-        setIsProcessingTranscription(false);
-        setProcessingStatus("idle");
+      // All retries failed - report error
+      setUploadError(lastError?.message || "Error occurred while transcribing");
+      try {
+        reportError(lastError!, blob);
+      } catch (reportingError) {
+        // eslint-disable-next-line no-console
+        console.error("Error capturing sentry event:", reportingError);
       }
+      setIsProcessingTranscription(false);
+      setProcessingStatus("idle");
     },
-    [
-      setIsProcessingTranscription,
-      currentBackupId,
-      initialRecordingMode,
-      uploadFile,
-      uploadUrl,
-      errorDetails.duration,
-    ]
+    [attemptUpload, cleanupBackup, reportError, setIsProcessingTranscription]
   );
 
   const handleRecordingStart = useCallback(() => {

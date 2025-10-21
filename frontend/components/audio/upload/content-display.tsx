@@ -113,7 +113,7 @@ export default function ContentDisplay({
             <AudioRecorderComponent
               onRecordingStart={onRecordingStart}
               onRecordingStop={onRecordingStop}
-              disabled={!isUploadUrlReady}
+              // disabled={!isUploadUrlReady}
             />
           ) : (
             <ScreenRecorder
