@@ -19,7 +19,7 @@ interface AudioChunk {
 class IndexedDBBackup {
   private dbName = "AudioBackupDB";
 
-  private version = 3;
+  private version = 4;
 
   private storeName = "audioBackups";
 
