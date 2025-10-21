@@ -46,7 +46,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
     error: templatesError,
   } = useTemplates();
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
     if (!currentVersion?.id || !currentTranscription?.id) return;
 
     setIsEditing(false);
@@ -66,10 +66,10 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
         error instanceof Error
           ? `Failed to save changes: ${error.message}`
           : "Failed to save changes. Please try again.";
-      alert(errorMessage);
+      console.error(errorMessage);
       throw error;
     }
-  };
+  }, [currentVersion, currentTranscription?.id]);
 
   const generateAIMinutes = useCallback(
     async (template: TemplateMetadata) => {
@@ -104,7 +104,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           error instanceof Error
             ? error.message
             : "Failed to generate AI minutes. Please try again.";
-        alert(errorMessage);
+        console.error(errorMessage);
         throw error;
       } finally {
         setIsGenerating(false);
@@ -156,13 +156,13 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           error instanceof Error
             ? error.message
             : "Failed to generate AI edit. Please try again.";
-        alert(errorMessage);
+        console.error(errorMessage);
         throw error;
       } finally {
         setIsGenerating(false);
       }
     },
-    [currentTranscription?.id, currentVersion, selectedTemplate]
+    [currentTranscription?.id, currentVersion, selectedTemplate, handleSaveEdit]
   );
 
   const handleTemplateChange = useCallback(
@@ -230,7 +230,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           error instanceof Error
             ? `Failed to fetch minute versions: ${error.message}`
             : "Failed to fetch minute versions. Please try again.";
-        alert(errorMessage);
+        console.error(errorMessage);
       }
     };
 
@@ -263,7 +263,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
         comment,
       });
     } catch (error) {
-      alert("Failed to save rating. Please try again.");
+      console.error("Failed to save rating. Please try again.");
       throw error;
     }
   };
@@ -324,7 +324,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           </div>
         )}
         {currentVersion && (
-          <div className="w-full overflow-visible ph-mask">
+          <div className="ph-mask w-full overflow-visible">
             <SimpleEditor
               initialContent={currentVersion?.html_content ?? ""}
               isEditing={isEditing}

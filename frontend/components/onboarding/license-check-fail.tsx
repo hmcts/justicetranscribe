@@ -39,7 +39,8 @@ export default function LicenseCheckFail({ onRetry }: LicenseCheckFailProps) {
           </p>
 
           <p className="text-lg leading-relaxed text-gray-700">
-            If you want early access, click below to complete our application form.
+            If you want early access, click below to complete our application
+            form.
           </p>
         </div>
       </div>

@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     SENTRY_DSN: str
     # CORS configuration from infrastructure
     CORS_ALLOWED_ORIGINS: str | None = None
-
+    # Transcription polling service configuration
 
     @field_validator("LANGFUSE_HOST")
     @classmethod
@@ -86,12 +86,12 @@ class Settings(BaseSettings):
         allowlist_configs = {
             "dev": {
                 "container": self.ALLOWLIST_CONTAINER,
-                "blob_name": "lookups/allowlist.csv"
+                "blob_name": "lookups/allowlist.csv",
             },
             "prod": {
                 "container": self.ALLOWLIST_CONTAINER,
-                "blob_name": "lookups/allowlist.csv"
-            }
+                "blob_name": "lookups/allowlist.csv",
+            },
         }
 
         return allowlist_configs.get(env, allowlist_configs["dev"])
@@ -99,11 +99,13 @@ class Settings(BaseSettings):
 
 class LocalSettings(Settings):
     """Settings class that loads from .env file for local development."""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 class ProductionSettings(Settings):
     """Settings class for production environments (no .env file)."""
+
     model_config = SettingsConfigDict(extra="ignore")
 
 
@@ -118,7 +120,9 @@ def get_settings(environment: str | None = None):
         Settings: Configured settings instance.
     """
     # Handle None case for lru_cache compatibility
-    env_key = environment if environment is not None else os.getenv("ENVIRONMENT", "local")
+    env_key = (
+        environment if environment is not None else os.getenv("ENVIRONMENT", "local")
+    )
 
     # Choose the appropriate settings class based on environment
     if env_key == "local":

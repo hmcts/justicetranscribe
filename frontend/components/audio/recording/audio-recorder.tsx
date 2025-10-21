@@ -3,21 +3,13 @@
 
 "use client";
 
-import { Mic, Loader2, BellOff, AlertTriangle, RefreshCw, Clock } from "lucide-react";
+import { Mic, Loader2, Moon } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 import {
   Select,
@@ -27,71 +19,50 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import RecordingControl from "@/components/audio/recording-control";
+import RecordingControl from "@/components/audio/recording/recording-control";
+import { audioBackupDB, IndexedDBBackup } from "@/lib/indexeddb-backup";
 import {
-  audioBackupDB,
-  AudioBackup,
-  IndexedDBBackup,
-} from "@/lib/indexeddb-backup";
-import { AudioDevice, MicrophonePermission } from "./microphone-permission";
-import { 
-  hasReachedMaxDuration, 
-  shouldShowWarning, 
+  hasReachedMaxDuration,
+  shouldShowWarning,
   getRemainingTime,
-  formatRemainingTime
+  formatRemainingTime,
 } from "@/lib/recording-config";
-
-// Local storage key for the long recording warning
-const LONG_RECORDING_WARNING_KEY = "audio-recorder-long-recording-warning-seen";
+import useIsMobile from "@/hooks/use-mobile";
+import { AudioDevice, MicrophonePermission } from "./microphone-permission";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
   onRecordingStart: () => void;
+  disabled: boolean;
 }
 
 function AudioRecorderComponent({
   onRecordingStop,
   onRecordingStart,
+  disabled = false,
 }: MicRecorderProps) {
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
-
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [showProcessingRecording, setShowProcessingRecording] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [showTimeWarning, setShowTimeWarning] = useState(false);
   const [remainingMinutes, setRemainingMinutes] = useState<string>("");
-  const [showLongRecordingWarning, setShowLongRecordingWarning] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const chunkIndexRef = useRef<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const backupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentBackupIdRef = useRef<string | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const visibilityListenerRef = useRef<(() => void) | null>(null);
-
-  // Check if long recording warning has been shown before
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const warningSeen = localStorage.getItem(LONG_RECORDING_WARNING_KEY);
-        if (!warningSeen) {
-          setShowLongRecordingWarning(true);
-        }
-      } catch (error) {
-        console.error("Error accessing localStorage:", error);
-      }
-    }
-  }, []);
 
   const handlePermissionGranted = (devices: AudioDevice[]) => {
     setAudioDevices(devices);
@@ -113,12 +84,12 @@ function AudioRecorderComponent({
             setWakeLock(newLock);
           }
         };
-        
+
         visibilityListenerRef.current = visibilityHandler;
         document.addEventListener("visibilitychange", visibilityHandler);
       }
     } catch (err) {
-      console.log("Wake Lock error:", err);
+      // Wake Lock error handled silently
     }
   };
 
@@ -128,13 +99,16 @@ function AudioRecorderComponent({
         await wakeLock.release();
         setWakeLock(null);
       } catch (err) {
-        console.log("Wake Lock release error:", err);
+        // Wake Lock release error handled silently
       }
     }
-    
+
     // Remove the visibility change event listener to prevent memory leak
     if (visibilityListenerRef.current) {
-      document.removeEventListener("visibilitychange", visibilityListenerRef.current);
+      document.removeEventListener(
+        "visibilitychange",
+        visibilityListenerRef.current
+      );
       visibilityListenerRef.current = null;
     }
   }, [wakeLock]);
@@ -151,7 +125,7 @@ function AudioRecorderComponent({
       URL.revokeObjectURL(audioUrlRef.current);
       audioUrlRef.current = null;
     }
-    
+
     setRecordedAudio(null);
     if (audioRef.current) {
       audioRef.current.src = "";
@@ -159,49 +133,36 @@ function AudioRecorderComponent({
     onRecordingStop(null, null);
   };
 
-  const createPeriodicBackup = useCallback(async () => {
-    if (!mediaRecorderRef.current || mediaChunksRef.current.length === 0) {
-      return;
+  // STREAMING: Stream chunks directly to IndexedDB instead of periodic backups
+  const streamChunkToIndexedDB = useCallback(async (chunkData: Blob) => {
+    if (!currentBackupIdRef.current) {
+      currentBackupIdRef.current = IndexedDBBackup.generateBackupId();
     }
 
     try {
-      const selectedMimeType = mediaRecorderRef.current.mimeType;
-      const currentChunks = [...mediaChunksRef.current];
-      const audioBlob = new Blob(currentChunks, { type: selectedMimeType });
-
-      if (!currentBackupIdRef.current) {
-        currentBackupIdRef.current = IndexedDBBackup.generateBackupId();
-      }
-
-      const backup: AudioBackup = {
-        id: currentBackupIdRef.current,
-        blob: audioBlob,
-        fileName: `recording_${new Date().toISOString()}.${selectedMimeType.includes("mp4") ? "mp4" : "webm"}`,
-        timestamp: Date.now(),
-        mimeType: selectedMimeType,
-        recordingDuration: recordingTime,
-      };
-
-      await audioBackupDB.saveAudioBackup(backup);
+      await audioBackupDB.appendChunk(
+        currentBackupIdRef.current,
+        chunkIndexRef.current,
+        chunkData
+      );
+      // Only increment index after successful storage to avoid gaps
+      chunkIndexRef.current += 1;
     } catch (err) {
-      console.error("Failed to create periodic backup:", err);
-    }
-  }, [recordingTime]);
-
-  const startPeriodicBackup = useCallback(() => {
-    if (backupIntervalRef.current) {
-      clearInterval(backupIntervalRef.current);
-    }
-
-    backupIntervalRef.current = setInterval(() => {
-      createPeriodicBackup();
-    }, 15000); // Backup every 15 seconds
-  }, [createPeriodicBackup]);
-
-  const stopPeriodicBackup = useCallback(() => {
-    if (backupIntervalRef.current) {
-      clearInterval(backupIntervalRef.current);
-      backupIntervalRef.current = null;
+      console.error("❌ Failed to stream chunk to IndexedDB:", err);
+      // Try to initialize IndexedDB if it failed
+      try {
+        await audioBackupDB.init();
+        await audioBackupDB.appendChunk(
+          currentBackupIdRef.current,
+          chunkIndexRef.current,
+          chunkData
+        );
+        // Only increment index after successful retry
+        chunkIndexRef.current += 1;
+      } catch (retryErr) {
+        console.error("❌ Failed to store chunk even after retry:", retryErr);
+        // Index not incremented - next chunk will overwrite this slot
+      }
     }
   }, []);
 
@@ -245,57 +206,68 @@ function AudioRecorderComponent({
       const options = { mimeType: selectedMimeType };
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
-      mediaChunksRef.current = [];
+      chunkIndexRef.current = 0; // Reset chunk index for new recording
 
-      mediaRecorder.ondataavailable = (event) => {
+      // STREAMING: Stream each chunk directly to IndexedDB as it arrives
+      mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
-          mediaChunksRef.current.push(event.data);
+          await streamChunkToIndexedDB(event.data);
         }
       };
 
-      mediaRecorder.onstop = () => {
-        if (mediaChunksRef.current.length > 0) {
-          const audioBlob = new Blob(mediaChunksRef.current, {
-            type: selectedMimeType, // Use the selected MIME type
-          });
-          onRecordingStop(audioBlob, currentBackupIdRef.current);
+      mediaRecorder.onstop = async () => {
+        // STREAMING: Reconstruct final blob from streamed chunks
+        if (currentBackupIdRef.current && chunkIndexRef.current > 0) {
+          try {
+            const audioBlob = await audioBackupDB.reconstructBlob(
+              currentBackupIdRef.current,
+              selectedMimeType
+            );
+            onRecordingStop(audioBlob, currentBackupIdRef.current);
 
-          posthog.capture("in_person_recording_completed", {
-            duration_seconds: recordingTime,
-            file_size_bytes: audioBlob.size,
-          });
+            posthog.capture("in_person_recording_completed", {
+              duration_seconds: recordingTime,
+              file_size_bytes: audioBlob.size,
+            });
+          } catch (err) {
+            console.error("Failed to reconstruct final blob:", err);
+            onRecordingStop(null, currentBackupIdRef.current);
+          }
+        } else {
+          onRecordingStop(null, currentBackupIdRef.current);
         }
 
-        // Clean up
-        stopPeriodicBackup();
+        // Clean up media resources and reset refs
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
-        
+
         mediaRecorderRef.current = null;
         setMediaStream(null);
         setIsRecording(false);
         setRecordingTime(0);
-        
+
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        
+
         currentBackupIdRef.current = null;
+        chunkIndexRef.current = 0; // Reset chunk index
         releaseWakeLock();
       };
 
       await requestWakeLock();
+
+      // DEBUG: Check IndexedDB status before starting recording
+      // await audioBackupDB.debugIndexedDB();
+
       mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
       onRecordingStart();
 
-      // Start backup after initial recording data is available
-      setTimeout(() => {
-        startPeriodicBackup();
-      }, 5000); // Wait 5 seconds before starting backups
+      // STREAMING: No need for delayed backup start - chunks stream immediately
 
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
@@ -311,7 +283,6 @@ function AudioRecorderComponent({
 
   const stopRecording = () => {
     setShowProcessingRecording(true);
-    stopPeriodicBackup();
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
@@ -326,14 +297,13 @@ function AudioRecorderComponent({
     if (mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
-      stopPeriodicBackup();
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     } else if (mediaRecorderRef.current.state === "paused") {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
-      startPeriodicBackup();
+      // STREAMING: Resume timer but streaming continues automatically
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
@@ -358,7 +328,10 @@ function AudioRecorderComponent({
 
     // Check if we've reached the maximum duration
     if (hasReachedMaxDuration(recordingTime)) {
-      console.log("Maximum recording duration reached. Auto-stopping recording.");
+      // eslint-disable-next-line no-console
+      console.log(
+        "Maximum recording duration reached. Auto-stopping recording."
+      );
       stopRecording();
     }
   }, [recordingTime, isRecording, isPaused]);
@@ -375,14 +348,14 @@ function AudioRecorderComponent({
       URL.revokeObjectURL(audioUrlRef.current);
       audioUrlRef.current = null;
     }
-    
+
     // Create new URL only when we have audio to play
     if (recordedAudio && audioRef.current) {
       const audioSource = URL.createObjectURL(recordedAudio);
       audioUrlRef.current = audioSource;
       audioRef.current.src = audioSource;
     }
-    
+
     // Cleanup function to revoke URL when component unmounts or recordedAudio changes
     return () => {
       if (audioUrlRef.current) {
@@ -392,81 +365,10 @@ function AudioRecorderComponent({
     };
   }, [recordedAudio]);
 
+  const isMobile = useIsMobile();
+
   return (
     <div className="space-y-4">
-      {/* Long Recording Warning Dialog */}
-      <Dialog
-        open={showLongRecordingWarning}
-        onOpenChange={(open) => {
-          setShowLongRecordingWarning(open);
-          if (!open) {
-            try {
-              localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
-            } catch (error) {
-              console.error("Error saving warning preference:", error);
-            }
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-2rem)]">
-          <div className="flex flex-col sm:flex-row items-start gap-4">
-            {/* Warning Icon */}
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30">
-              <AlertTriangle className="size-6 text-amber-600 dark:text-amber-400" />
-            </div>
-            
-            {/* Content */}
-            <div className="flex-1 pt-0 sm:pt-1">
-              <DialogHeader className="space-y-3 pb-0">
-                <DialogTitle className="text-left text-lg sm:text-xl font-semibold">
-                  Please refresh before recording
-                </DialogTitle>
-                <DialogDescription className="text-left text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                  There&apos;s a temporary issue affecting long sessions. To avoid disruption, please refresh before you begin. If a session exceeds 60 minutes, it will stop and upload automatically.
-                </DialogDescription>
-              </DialogHeader>
-
-              {/* Bullet Points */}
-              <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 border-t pt-4 sm:pt-6">
-                <div className="flex items-start gap-3">
-                  <RefreshCw className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
-                  <div className="text-sm sm:text-base">
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">Refresh before recording</span>
-                    <span className="text-gray-600 dark:text-gray-400"> to ensure a clean start.</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <Clock className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
-                  <div className="text-sm sm:text-base">
-                    <span className="text-gray-600 dark:text-gray-400">If your meeting goes past </span>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">60:00</span>
-                    <span className="text-gray-600 dark:text-gray-400">, recording will auto-stop and upload.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Continue Button */}
-              <DialogFooter className="mt-6 border-t pt-4">
-                <Button
-                  onClick={() => {
-                    setShowLongRecordingWarning(false);
-                    try {
-                      localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
-                    } catch (error) {
-                      console.error("Error saving warning preference:", error);
-                    }
-                  }}
-                  className="w-full sm:w-auto"
-                >
-                  Continue
-                </Button>
-              </DialogFooter>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {!permissionGranted || !audioDevices.length ? (
         <MicrophonePermission
           onPermissionGranted={handlePermissionGranted}
@@ -482,15 +384,47 @@ function AudioRecorderComponent({
                 </h1>
               </div>
 
-              {/* Refresh Notification - One line below header */}
-              <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
-                <div className="flex items-center justify-center gap-2">
-                  <RefreshCw className="size-3.5 text-amber-600 dark:text-amber-400" />
-                  <p className="text-sm text-amber-800 dark:text-amber-300">
-                    💡 Refresh Justice Transcribe before recording a new meeting
-                  </p>
-                </div>
-              </div>
+              {isMobile && (
+                <>
+                  {/* Do Not Disturb Reminder */}
+                  <div
+                    role="status"
+                    aria-label="Reminder to enable Do Not Disturb mode"
+                    className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3"
+                    style={{
+                      borderColor: "#D8C8FF",
+                      backgroundColor: "#F4F1FF",
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="mt-0.5 rounded-full p-2"
+                        style={{ backgroundColor: "#CABDFF" }}
+                      >
+                        <Moon
+                          className="size-5"
+                          style={{ color: "#1F1247" }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h3
+                          className="text-sm font-semibold"
+                          style={{ color: "#1F1247" }}
+                        >
+                          Silence notifications
+                        </h3>
+                        <p
+                          className="mt-0.5 text-sm"
+                          style={{ color: "#362952" }}
+                        >
+                          Turn on Do Not Disturb while recording.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -557,9 +491,10 @@ function AudioRecorderComponent({
                     onClick={startRecording}
                     className="mt-2 h-12 w-full"
                     size="lg"
+                    disabled={disabled}
                   >
                     <Mic className="mr-2 size-4" />
-                    Start recording
+                    {disabled ? "Initializing..." : "Start recording"}
                   </Button>
                 </div>
               </div>

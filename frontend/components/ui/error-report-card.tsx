@@ -10,7 +10,7 @@ type ErrorReportInput = {
   requestId?: string | null;
   sentryEventId?: string | null;
   sentryTraceId?: string | null;
-  posthogDistinctId?: string |  null;
+  posthogDistinctId?: string | null;
   statusCode?: number | null;
   recordingMode?: "mic" | "screen" | "upload" | null;
   fileSizeBytes?: number | null;
@@ -19,11 +19,7 @@ type ErrorReportInput = {
   errorMessage?: string | null;
 };
 
-export default function ErrorReportCard({
-  data,
-}: {
-  data: ErrorReportInput;
-}) {
+export default function ErrorReportCard({ data }: { data: ErrorReportInput }) {
   const report = React.useMemo(() => {
     const now = new Date().toISOString();
     const phid = (posthog as any)?.get_distinct_id?.() || null;
@@ -87,10 +83,12 @@ export default function ErrorReportCard({
         <div className="font-semibold">Error report</div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={copy}>
-            <Copy className="mr-1 h-3 w-3" />
+            <Copy className="mr-1 size-3" />
             Copy
           </Button>
-          <Button size="sm" onClick={download}>Download JSON</Button>
+          <Button size="sm" onClick={download}>
+            Download JSON
+          </Button>
         </div>
       </div>
       <pre className="max-h-64 overflow-auto rounded bg-muted p-3 text-xs">

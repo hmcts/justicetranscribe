@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Info, Mic, AlertTriangle, RefreshCw, Clock } from "lucide-react";
+import { Info, Mic, Moon } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
 
@@ -19,21 +19,22 @@ import {
 } from "@/components/ui/dialog";
 
 import { useTranscripts } from "@/providers/transcripts";
-import RecordingControl from "@/components/audio/recording-control";
-import { 
-  hasReachedMaxDuration, 
-  shouldShowWarning, 
+import RecordingControl from "@/components/audio/recording/recording-control";
+import {
+  hasReachedMaxDuration,
+  shouldShowWarning,
   getRemainingTime,
-  formatRemainingTime
+  formatRemainingTime,
 } from "@/lib/recording-config";
+import useIsMobile from "@/hooks/use-mobile";
 
 // Local storage key for the dialog preference
 const DIALOG_PREFERENCE_KEY = "tab-recorder-show-instructions-dialog";
-const LONG_RECORDING_WARNING_KEY = "screen-recorder-long-recording-warning-seen";
 
 interface ScreenRecorderProps {
   onRecordingStop: (blob: Blob | null) => void;
   onRecordingStart: () => void;
+  disabled: boolean;
 }
 
 interface ScreenShareGuidanceProps {
@@ -133,6 +134,7 @@ function ScreenShareGuidance({ isVisible }: ScreenShareGuidanceProps) {
 function ScreenRecorder({
   onRecordingStop,
   onRecordingStart,
+  disabled = false,
 }: ScreenRecorderProps) {
   const [err, setError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -148,7 +150,7 @@ function ScreenRecorder({
   const [showShareGuidance, setShowShareGuidance] = useState(false);
   const [showTimeWarning, setShowTimeWarning] = useState(false);
   const [remainingMinutes, setRemainingMinutes] = useState<string>("");
-  const [showLongRecordingWarning, setShowLongRecordingWarning] = useState(false);
+  const isMobile = useIsMobile();
 
   // Load dialog preference from local storage on component mount
   useEffect(() => {
@@ -162,20 +164,6 @@ function ScreenRecorder({
         }
       } catch (error) {
         // If there's an error accessing localStorage, default to showing the dialog
-        console.error("Error accessing localStorage:", error);
-      }
-    }
-  }, []);
-
-  // Check if long recording warning has been shown before
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const warningSeen = localStorage.getItem(LONG_RECORDING_WARNING_KEY);
-        if (!warningSeen) {
-          setShowLongRecordingWarning(true);
-        }
-      } catch (error) {
         console.error("Error accessing localStorage:", error);
       }
     }
@@ -207,7 +195,7 @@ function ScreenRecorder({
               }
             }
           };
-          
+
           visibilityListenerRef.current = visibilityHandler;
           document.addEventListener("visibilitychange", visibilityHandler);
         }
@@ -226,10 +214,13 @@ function ScreenRecorder({
         // Continue recording even if wake lock fails
       }
     }
-    
+
     // Remove the visibility change event listener to prevent memory leak
     if (visibilityListenerRef.current) {
-      document.removeEventListener("visibilitychange", visibilityListenerRef.current);
+      document.removeEventListener(
+        "visibilitychange",
+        visibilityListenerRef.current
+      );
       visibilityListenerRef.current = null;
     }
   }, [wakeLock]);
@@ -292,7 +283,10 @@ function ScreenRecorder({
 
     // Check if we've reached the maximum duration
     if (hasReachedMaxDuration(recordingTime)) {
-      console.log("Maximum recording duration reached. Auto-stopping recording.");
+      // eslint-disable-next-line no-console
+      console.log(
+        "Maximum recording duration reached. Auto-stopping recording."
+      );
       stopRecording();
     }
   }, [recordingTime, isRecording, stopRecording]);
@@ -567,90 +561,44 @@ function ScreenRecorder({
             </AlertDescription>
           </Alert>
 
-          {/* Refresh Notification */}
-          <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
-            <div className="flex items-center justify-center gap-2">
-              <RefreshCw className="size-3.5 text-amber-600 dark:text-amber-400" />
-              <p className="text-sm text-amber-800 dark:text-amber-300">
-                💡 Refresh Justice Transcribe before recording a new meeting
-              </p>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Long Recording Warning Dialog */}
-      <Dialog
-        open={showLongRecordingWarning}
-        onOpenChange={(open) => {
-          setShowLongRecordingWarning(open);
-          if (!open) {
-            try {
-              localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
-            } catch (error) {
-              console.error("Error saving warning preference:", error);
-            }
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-2xl max-w-[calc(100vw-2rem)]">
-          <div className="flex flex-col sm:flex-row items-start gap-4">
-            {/* Warning Icon */}
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30">
-              <AlertTriangle className="size-6 text-amber-600 dark:text-amber-400" />
-            </div>
-            
-            {/* Content */}
-            <div className="flex-1 pt-0 sm:pt-1">
-              <DialogHeader className="space-y-3 pb-0">
-                <DialogTitle className="text-left text-lg sm:text-xl font-semibold">
-                  Please refresh before recording
-                </DialogTitle>
-                <DialogDescription className="text-left text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                  There&apos;s a temporary issue affecting long sessions. To avoid disruption, please refresh before you begin. If a session exceeds 60 minutes, it will stop and upload automatically.
-                </DialogDescription>
-              </DialogHeader>
-
-              {/* Bullet Points */}
-              <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4 border-t pt-4 sm:pt-6">
-                <div className="flex items-start gap-3">
-                  <RefreshCw className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
-                  <div className="text-sm sm:text-base">
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">Refresh before recording</span>
-                    <span className="text-gray-600 dark:text-gray-400"> to ensure a clean start.</span>
-                  </div>
+          {/* Do Not Disturb Reminder - Only show on mobile */}
+          {isMobile && (
+            <div
+              role="status"
+              aria-label="Reminder to enable Do Not Disturb mode"
+              className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3"
+              style={{
+                borderColor: "#D8C8FF",
+                backgroundColor: "#F4F1FF",
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="mt-0.5 rounded-full p-2"
+                  style={{ backgroundColor: "#CABDFF" }}
+                >
+                  <Moon
+                    className="size-5"
+                    style={{ color: "#1F1247" }}
+                    aria-hidden="true"
+                  />
                 </div>
-                
-                <div className="flex items-start gap-3">
-                  <Clock className="mt-0.5 size-4 sm:size-5 shrink-0 text-gray-600 dark:text-gray-400" />
-                  <div className="text-sm sm:text-base">
-                    <span className="text-gray-600 dark:text-gray-400">If your meeting goes past </span>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">60:00</span>
-                    <span className="text-gray-600 dark:text-gray-400">, recording will auto-stop and upload.</span>
-                  </div>
+                <div className="flex-1">
+                  <h3
+                    className="text-sm font-semibold"
+                    style={{ color: "#1F1247" }}
+                  >
+                    Silence notifications
+                  </h3>
+                  <p className="mt-0.5 text-sm" style={{ color: "#362952" }}>
+                    Turn on Do Not Disturb while recording.
+                  </p>
                 </div>
               </div>
-
-              {/* Continue Button */}
-              <DialogFooter className="mt-6 border-t pt-4">
-                <Button
-                  onClick={() => {
-                    setShowLongRecordingWarning(false);
-                    try {
-                      localStorage.setItem(LONG_RECORDING_WARNING_KEY, "true");
-                    } catch (error) {
-                      console.error("Error saving warning preference:", error);
-                    }
-                  }}
-                  className="w-full sm:w-auto"
-                >
-                  Continue
-                </Button>
-              </DialogFooter>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          )}
+        </>
+      )}
 
       {/* Instructions Dialog */}
       {showInstructionsInDialog && (
@@ -763,9 +711,10 @@ function ScreenRecorder({
                 ? () => setShowInstructionsDialog(true)
                 : startRecording
             }
+            disabled={disabled}
           >
             <Mic className="mr-2 size-4" />
-            Start Recording Virtual Meeting
+            {disabled ? "Initializing..." : "Start Recording Virtual Meeting"}
           </Button>
         ) : (
           <div className="space-y-4">

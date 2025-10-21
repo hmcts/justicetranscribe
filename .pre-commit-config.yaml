@@ -23,9 +23,9 @@ repos:
         exclude: '^static/|\.lock'
         files: .
 
-      - id: npm-format
-        name: Format frontend files (advisory)
-        entry: bash -c 'cd frontend && npm run format || echo "⚠️  Frontend linting issues found - please review but continuing commit"'
+      - id: npm-validate
+        name: Validate frontend (lint, format, type-check)
+        entry: bash -c 'cd frontend && npm run validate'
         language: system
         pass_filenames: false
         files: ^frontend/

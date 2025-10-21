@@ -17,7 +17,7 @@ export function MicrophonePermission({
   onPermissionGranted,
   onError,
 }: MicrophonePermissionProps) {
-  const getAudioDevices = async () => {
+  const getAudioDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioInputDevices = devices
@@ -33,7 +33,7 @@ export function MicrophonePermission({
     } catch (err) {
       onError("Error getting audio devices");
     }
-  };
+  }, [onPermissionGranted, onError]);
 
   const requestMicrophonePermission = useCallback(async () => {
     try {
@@ -41,7 +41,7 @@ export function MicrophonePermission({
       stream.getTracks().forEach((track) => track.stop());
       await getAudioDevices();
     } catch (err) {
-      console.log("error getting user media", err);
+      console.error("error getting user media", err);
       onError(
         "Microphone permission denied. Please enable it in your browser settings."
       );

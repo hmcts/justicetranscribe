@@ -1,11 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { User } from "@/src/api/generated";
 
-export interface User {
-  user_id: string;
-  name: string;
-  email: string;
-  roles: string[];
-}
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface ApiResponse<T> {
   data?: T;
@@ -72,6 +67,7 @@ class ApiClient {
         return;
       }
 
+      // eslint-disable-next-line no-console
       console.log("✅ Authentication session refreshed successfully");
     } catch (error) {
       console.error("❌ Failed to refresh auth session:", error);
@@ -103,6 +99,7 @@ class ApiClient {
 
           // Use id_token instead of access_token - it's a proper JWT!
           if (provider.id_token) {
+            // eslint-disable-next-line no-console
             console.log(
               "🎫 Using ID token (JWT):",
               `${provider.id_token.substring(0, 50)}...`
@@ -161,6 +158,7 @@ class ApiClient {
         requestOptions.credentials = "include";
       }
 
+      // eslint-disable-next-line no-console
       console.log(
         `🔄 Making ${options.method || "GET"} request to ${url}${retryCount > 0 ? ` (retry ${retryCount})` : ""}`
       );
@@ -190,7 +188,10 @@ class ApiClient {
           const errorMessage = isLocalDevelopment()
             ? "Authentication failed. Check if backend is running."
             : "Authentication failed. Your session may have expired. Please refresh the page to log in again.";
-          const e = new Error(errorMessage) as Error & { requestId?: string; status?: number };
+          const e = new Error(errorMessage) as Error & {
+            requestId?: string;
+            status?: number;
+          };
           e.requestId = requestId;
           e.status = response.status;
           throw e;
@@ -217,7 +218,10 @@ class ApiClient {
           console.error("Error parsing response body:", parseError);
           // If we can't parse the response body, fall back to generic error (errorMessage already set above)
         }
-        const e = new Error(errorMessage) as Error & { requestId?: string; status?: number };
+        const e = new Error(errorMessage) as Error & {
+          requestId?: string;
+          status?: number;
+        };
         e.requestId = bodyRequestId || requestId;
         e.status = response.status;
         throw e;

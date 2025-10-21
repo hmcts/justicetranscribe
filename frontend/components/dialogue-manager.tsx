@@ -10,6 +10,10 @@ import posthog from "posthog-js";
 import { useTranscripts } from "@/providers/transcripts";
 import DialogueHeader from "@/components/minutes/dialogue-manager-header";
 import MinutesEditor from "@/components/minutes/minutes-editor";
+import {
+  WhatsNewModal,
+  useWhatsNewModal,
+} from "@/components/ui/whats-new-modal";
 
 function DialogueManager() {
   const [currentCitationIndex, setCurrentCitationIndex] = useState<
@@ -18,6 +22,7 @@ function DialogueManager() {
   const [activeTab, setActiveTab] = useState("minutes");
 
   const { currentTranscription } = useTranscripts();
+  const { showModal, handleDismiss } = useWhatsNewModal();
 
   const handleCitationClick = (index: number) => {
     setCurrentCitationIndex(index);
@@ -76,6 +81,9 @@ function DialogueManager() {
           </div>
         </div>
       </CardContent>
+
+      {/* What's New Modal */}
+      <WhatsNewModal isOpen={showModal} onClose={handleDismiss} />
     </Card>
   );
 }

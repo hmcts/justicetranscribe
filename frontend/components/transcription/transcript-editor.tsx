@@ -90,7 +90,7 @@ function TranscriptEditor({ currentCitationIndex }: TranscriptEditorProps) {
           entry_index: entryIndex,
         });
       } catch (error) {
-        alert(`Failed to update speaker names: ${error}`);
+        console.error(`Failed to update speaker names: ${error}`);
       }
     }
     setEditingIndex(null);
@@ -137,7 +137,7 @@ function TranscriptEditor({ currentCitationIndex }: TranscriptEditorProps) {
           ref={(el: HTMLDivElement | null) => {
             transcriptRefs.current[index] = el;
           }}
-          className={`mb-2 flex items-start space-x-2 rounded-md p-2 transition-colors ph-mask ${
+          className={`ph-mask mb-2 flex items-start space-x-2 rounded-md p-2 transition-colors ${
             currentCitationIndex === index ? " bg-blue-100" : ""
           }`}
         >

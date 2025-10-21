@@ -7,7 +7,6 @@ import sentry_sdk
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse
 
-from app.audio.process_audio_fully import transcribe_and_generate_llm_output
 from app.audio.utils import (
     generate_blob_upload_url,
     get_file_blob_path,
@@ -44,7 +43,6 @@ from app.minutes.templates.templates_metadata import (
 from app.minutes.types import (
     GenerateMinutesRequest,
     OnboardingStatusResponse,
-    StartTranscriptionJobRequest,
     TemplateResponse,
     TranscriptionMetadata,
     UpdateUserRequest,
@@ -68,8 +66,14 @@ router = APIRouter()
 UK_TIMEZONE = pytz.timezone("Europe/London")
 
 
-@router.get("/healthcheck")
+@router.get("/health")
 async def health_check():
+    return JSONResponse(status_code=200, content={"status": "ok"})
+
+
+@router.get("/healthcheck")
+async def health_check_legacy():
+    """Legacy endpoint for backwards compatibility"""
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
@@ -101,16 +105,18 @@ async def get_onboarding_status(
     """
     # Check if onboarding should be forced in development
     settings = get_settings()
-    force_onboarding = (
-        settings.FORCE_ONBOARDING_DEV and
-        settings.ENVIRONMENT in ["local", "dev"]
-    )
+    force_onboarding = settings.FORCE_ONBOARDING_DEV and settings.ENVIRONMENT in [
+        "local",
+        "dev",
+    ]
 
     # Check allowlist status with fail-open approach
     # Check for local development bypass first
-    if (settings.ENVIRONMENT == "local" and
-        settings.BYPASS_ALLOWLIST_DEV and
-        current_user.email == "developer@localhost.com"):
+    if (
+        settings.ENVIRONMENT == "local"
+        and settings.BYPASS_ALLOWLIST_DEV
+        and current_user.email == "developer@localhost.com"
+    ):
         is_allowlisted = True
     else:
         try:
@@ -120,13 +126,13 @@ async def get_onboarding_status(
                 current_user.email,
                 settings.AZURE_STORAGE_CONNECTION_STRING,
                 allowlist_config["container"],
-                allowlist_config["blob_name"]
+                allowlist_config["blob_name"],
             )
         except Exception as e:
             # FAIL OPEN: Allowlist check failed - log and allow access
             logger.exception(
                 "⚠️ ALLOWLIST CHECK FAILED IN ONBOARDING STATUS - FAILING OPEN ⚠️ | User: %s",
-                current_user.email
+                current_user.email,
             )
             sentry_sdk.capture_exception(
                 e,
@@ -134,16 +140,20 @@ async def get_onboarding_status(
                     "user_email": current_user.email,
                     "endpoint": "/user/onboarding-status",
                     "fail_open": True,
-                    "message": "Allowlist check failed in onboarding-status - allowing access (fail-open mode)"
-                }
+                    "message": "Allowlist check failed in onboarding-status - allowing access (fail-open mode)",
+                },
             )
-            logger.warning("Allowing access for user %s due to allowlist service failure (fail-open)", current_user.email)
+            logger.warning(
+                "Allowing access for user %s due to allowlist service failure (fail-open)",
+                current_user.email,
+            )
             is_allowlisted = True  # Fail open: allow access
 
     return OnboardingStatusResponse(
         has_completed_onboarding=current_user.has_completed_onboarding,
         force_onboarding_override=force_onboarding,
-        should_show_onboarding=(not current_user.has_completed_onboarding) or force_onboarding,
+        should_show_onboarding=(not current_user.has_completed_onboarding)
+        or force_onboarding,
         user_id=current_user.id,
         environment=settings.ENVIRONMENT,
         is_allowlisted=is_allowlisted,
@@ -164,14 +174,16 @@ async def complete_onboarding(
         return {
             "success": True,
             "message": "Onboarding marked as complete",
-            "has_completed_onboarding": updated_user.has_completed_onboarding
+            "has_completed_onboarding": updated_user.has_completed_onboarding,
         }
     else:
         return {
             "success": True,
             "message": "Onboarding completion skipped (dev override mode active)",
-            "has_completed_onboarding": current_user.has_completed_onboarding
+            "has_completed_onboarding": current_user.has_completed_onboarding,
         }
+
+
 @router.post("/user/reset-onboarding")
 async def reset_onboarding(
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
@@ -183,7 +195,7 @@ async def reset_onboarding(
     if settings.ENVIRONMENT not in ["local", "dev"]:
         raise HTTPException(
             status_code=403,
-            detail="This endpoint is only available in local/dev environments"
+            detail="This endpoint is only available in local/dev environments",
         )
 
     # Reset onboarding status
@@ -194,7 +206,7 @@ async def reset_onboarding(
         "message": "Onboarding status reset successfully",
         "has_completed_onboarding": updated_user.has_completed_onboarding,
         "user_id": str(updated_user.id),
-        "email": updated_user.email
+        "email": updated_user.email,
     }
 
 
@@ -209,18 +221,12 @@ async def azure_storage_health_check():
     if validation_result["valid"]:
         return JSONResponse(
             status_code=200,
-            content={
-                "status": "ok",
-                "azure_storage": validation_result
-            }
+            content={"status": "ok", "azure_storage": validation_result},
         )
     else:
         return JSONResponse(
             status_code=503,  # Service Unavailable
-            content={
-                "status": "error",
-                "azure_storage": validation_result
-            }
+            content={"status": "error", "azure_storage": validation_result},
         )
 
 
@@ -239,38 +245,13 @@ async def get_upload_url(
         blob_name=user_upload_blob_path,
         expiry_hours=4,
     )
+    # throw error for testing:
+    # raise HTTPException(status_code=500, detail="Test error")
 
     return UploadUrlResponse(
         upload_url=presigned_url,
         user_upload_s3_file_key=user_upload_blob_path,  # Keep same field name for compatibility
     )
-
-
-async def process_transcription(
-    user_upload_blob_storage_file_key: str, user_id: UUID, user_email: str, transcription_id: str | None = None
-) -> None:
-    """Parent function that handles the TranscriptionJob state management."""
-    await transcribe_and_generate_llm_output(
-        user_upload_blob_storage_file_key, user_id, user_email, transcription_id
-    )
-
-
-@router.post("/start-transcription-job", response_model=None)
-async def start_transcription_job(
-    request: StartTranscriptionJobRequest,
-    current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-) -> None:
-    try:
-        # Pass only primitives to background task, not the User object (SQLAlchemy model)
-        # to avoid keeping database sessions open
-        asyncio.create_task(  # noqa: RUF006
-            process_transcription(
-                request.user_upload_s3_file_key, current_user.id, current_user.email, request.transcription_id
-            )
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/generate-or-edit-minutes")
@@ -543,8 +524,6 @@ async def get_user_profile_route(
     return get_user_by_id(current_user.id)
 
 
-
-
 @router.post("/user", response_model=User)  # changed from .patch to .post
 async def update_current_user_route(
     request: UpdateUserRequest,
@@ -572,7 +551,9 @@ async def submit_langfuse_trace(
             user_id=current_user.email,
         )
 
-        logger.info(f"Langfuse trace '{request.name}' submitted for trace {request.trace_id} by user {current_user.email}")
+        logger.info(
+            f"Langfuse trace '{request.name}' submitted for trace {request.trace_id} by user {current_user.email}"
+        )
 
     except Exception as e:
         _e = f"Failed to submit Langfuse trace: {e!s}"
@@ -598,7 +579,9 @@ async def submit_langfuse_score(
             user_id=current_user.email,
         )
 
-        logger.info(f"Langfuse score submitted for trace {request.trace_id} by user {current_user.email}")
+        logger.info(
+            f"Langfuse score submitted for trace {request.trace_id} by user {current_user.email}"
+        )
 
     except Exception as e:
         _e = f"Failed to submit Langfuse score: {e!s}"

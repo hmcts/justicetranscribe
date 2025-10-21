@@ -28,6 +28,7 @@ export async function pollEndpoint<T>({
 }: PollingConfig): Promise<T> {
   let errorCount = 0;
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       const result = await apiClient.request<PollableResponse>(endpoint, {

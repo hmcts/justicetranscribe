@@ -15,6 +15,7 @@ export default function ProcessingStatus({
     const interval = setInterval(() => {
       const elapsed = (Date.now() - startTime) / 1000;
       const remaining = Math.max(0, estimatedSeconds - elapsed);
+      // eslint-disable-next-line no-console
       console.log("remaining", remaining);
       setTimeRemaining(remaining);
     }, 100);

@@ -1,28 +1,28 @@
 /**
  * Recording Configuration
- * 
+ *
  * Manages the maximum recording duration for audio and screen recordings.
- * 
+ *
  * Configuration:
  * - NEXT_PUBLIC_MAX_RECORDING_MINUTES: Set the max recording duration
- * - Default: 55 minutes for all environments
+ * - Default: 115 minutes for all environments
  */
 
-const DEFAULT_MAX_RECORDING_MINUTES = 55;
+const DEFAULT_MAX_RECORDING_MINUTES = 115;
 
 /**
  * Get the maximum recording duration in seconds
  */
 export function getMaxRecordingDuration(): number {
   const envValue = process.env.NEXT_PUBLIC_MAX_RECORDING_MINUTES;
-  
+
   if (envValue) {
     const parsed = parseInt(envValue, 10);
     if (!Number.isNaN(parsed) && parsed > 0) {
       return parsed * 60; // Convert minutes to seconds
     }
   }
-  
+
   return DEFAULT_MAX_RECORDING_MINUTES * 60; // Convert to seconds
 }
 
@@ -40,7 +40,10 @@ export function getWarningThreshold(): number {
  */
 export function shouldShowWarning(elapsedSeconds: number): boolean {
   const warningThreshold = getWarningThreshold();
-  return elapsedSeconds >= warningThreshold && elapsedSeconds < getMaxRecordingDuration();
+  return (
+    elapsedSeconds >= warningThreshold &&
+    elapsedSeconds < getMaxRecordingDuration()
+  );
 }
 
 /**
@@ -64,6 +67,5 @@ export function getRemainingTime(elapsedSeconds: number): number {
 export function formatRemainingTime(remainingSeconds: number): string {
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
-

@@ -5,10 +5,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import ProcessingLoader, {
   AudioProcessingStatus,
-} from "@/components/audio/processing-loader";
+} from "@/components/audio/processing/processing-loader";
 import { AudioBackup, audioBackupDB } from "@/lib/indexeddb-backup";
 import { useTranscripts } from "@/providers/transcripts";
 import { apiClient } from "@/lib/api-client";
+import { uploadBlobAsChunks } from "@/lib/azure-upload";
 import posthog from "posthog-js";
 
 interface BackupUploaderProps {
@@ -27,6 +28,26 @@ function BackupUploader({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const { setIsProcessingTranscription } = useTranscripts();
 
+  // CHUNKED UPLOAD FALLBACK: Azure Block Blob API compliant chunked upload
+  const uploadBlobInChunks = useCallback(
+    async (blob: Blob, mimeType: string): Promise<string> => {
+      try {
+        const result = await uploadBlobAsChunks({
+          blob,
+          mimeType,
+          onProgress: (progress) => {
+            setProcessingStatus({ state: "uploading", progress });
+          },
+        });
+        return result.fileKey;
+      } catch (error) {
+        console.error("❌ Chunked upload fallback failed:", error);
+        throw error;
+      }
+    },
+    []
+  );
+
   const startTranscription = useCallback(
     async (blob: Blob) => {
       try {
@@ -41,46 +62,83 @@ function BackupUploader({
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } = urlResult.data!;
+        const { upload_url } = urlResult.data!;
 
-        // Create XMLHttpRequest to track upload progress
-        const xhr = new XMLHttpRequest();
-        await new Promise((resolve, reject) => {
-          xhr.upload.addEventListener("progress", (event) => {
-            if (event.lengthComputable) {
-              const progress = Math.round((event.loaded / event.total) * 100);
-              setProcessingStatus({ state: "uploading", progress });
-            }
+        // Check if chunked upload is forced (local development only)
+        const isLocalDev = process.env.NODE_ENV === "development";
+        const forceChunked =
+          isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === "true";
+
+        if (forceChunked) {
+          // eslint-disable-next-line no-console
+          console.log(
+            "🧪 FORCE_CHUNKED_UPLOAD enabled - skipping single upload, using chunked upload"
+          );
+        }
+
+        try {
+          if (forceChunked) {
+            // Force chunked upload for testing
+            throw new Error("Forced chunked upload (test mode)");
+          }
+          // Create XMLHttpRequest to track upload progress
+          const xhr = new XMLHttpRequest();
+          await new Promise((resolve, reject) => {
+            xhr.upload.addEventListener("progress", (event) => {
+              if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                setProcessingStatus({ state: "uploading", progress });
+              }
+            });
+
+            xhr.addEventListener("load", () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error("Failed to upload file to Azure Storage"));
+              }
+            });
+
+            xhr.addEventListener("error", () => {
+              reject(new Error("Network error during upload"));
+            });
+
+            xhr.addEventListener("timeout", () => {
+              reject(new Error("Upload timed out"));
+            });
+
+            xhr.open("PUT", upload_url);
+            // Add required headers for Azure Blob Storage
+            xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
+            xhr.send(blob);
           });
+        } catch (singleUploadError) {
+          console.warn(
+            "Single file upload failed, attempting chunked upload fallback:",
+            singleUploadError
+          );
 
-          xhr.addEventListener("load", () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.response);
-            } else {
-              reject(new Error("Failed to upload file to Azure Storage"));
-            }
-          });
-
-          xhr.addEventListener("error", () => {
-            reject(new Error("Network error during upload"));
-          });
-
-          xhr.addEventListener("timeout", () => {
-            reject(new Error("Upload timed out"));
-          });
-
-          xhr.open("PUT", upload_url);
-          // Add required headers for Azure Blob Storage
-          xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
-          xhr.send(blob);
-        });
-
-        const transcriptionJobResult = await apiClient.startTranscriptionJob(
-          user_upload_s3_file_key
-        );
-
-        if (transcriptionJobResult.error) {
-          throw new Error("Failed to start transcription job");
+          // CHUNKED UPLOAD FALLBACK: If single upload fails, split and upload as chunks
+          try {
+            // uploadBlobInChunks gets a new upload URL and returns the new file key
+            await uploadBlobInChunks(blob, blob.type);
+          } catch (chunkedError) {
+            console.error(
+              "❌ Both single and chunked upload failed:",
+              chunkedError
+            );
+            const uploadErrorMessage =
+              singleUploadError instanceof Error
+                ? singleUploadError.message
+                : String(singleUploadError);
+            const chunkedErrorMessage =
+              chunkedError instanceof Error
+                ? chunkedError.message
+                : String(chunkedError);
+            throw new Error(
+              `Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`
+            );
+          }
         }
 
         setProcessingStatus("transcribing");
@@ -98,7 +156,7 @@ function BackupUploader({
           }
         } catch (error) {
           // Sentry.captureException(error);
-          alert(`error deleting backup: ${error}`);
+          console.error(`error deleting backup: ${error}`);
         }
       } catch (error) {
         setUploadError(
@@ -110,7 +168,12 @@ function BackupUploader({
         setProcessingStatus("idle");
       }
     },
-    [setIsProcessingTranscription, backup.id, onUploadSuccess]
+    [
+      setIsProcessingTranscription,
+      backup.id,
+      onUploadSuccess,
+      uploadBlobInChunks,
+    ]
   );
 
   const handleRetryUpload = () => {
@@ -144,7 +207,7 @@ function BackupUploader({
           <div className="space-y-6">
             {/* Orange Retry Icon */}
             <div className="flex justify-center">
-              <div className="flex size-16 md:size-20 items-center justify-center rounded-full bg-[#FF9500]">
+              <div className="flex size-16 items-center justify-center rounded-full bg-[#FF9500] md:size-20">
                 <svg
                   width="32"
                   height="32"
@@ -166,25 +229,34 @@ function BackupUploader({
 
             <div className="text-center">
               {/* Title */}
-              <h1 className="mb-2 text-2xl md:text-3xl font-semibold text-black dark:text-white">
+              <h1 className="mb-2 text-2xl font-semibold text-black dark:text-white md:text-3xl">
                 Retry the upload
               </h1>
-              
+
               {/* Subtitle */}
-              <p className="mb-4 text-base md:text-xl text-gray-600 dark:text-gray-400">
+              <p className="mb-4 text-base text-gray-600 dark:text-gray-400 md:text-xl">
                 We saved your recording. Re-upload to complete.
               </p>
 
               {/* File Details */}
-              <div className="space-y-1 text-sm md:text-base text-gray-600 dark:text-gray-400">
+              <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400 md:text-base">
                 <p>
-                  <span role="img" aria-label="File">📄</span> {backup.fileName}
+                  <span role="img" aria-label="File">
+                    📄
+                  </span>{" "}
+                  {backup.fileName}
                 </p>
                 <p>
-                  <span role="img" aria-label="Clock">🕐</span> Recorded: {formatTimestamp(backup.timestamp)}
+                  <span role="img" aria-label="Clock">
+                    🕐
+                  </span>{" "}
+                  Recorded: {formatTimestamp(backup.timestamp)}
                 </p>
                 <p>
-                  <span role="img" aria-label="Timer">⏱️</span> Duration: {formatDuration(backup.recordingDuration)}
+                  <span role="img" aria-label="Timer">
+                    ⏱️
+                  </span>{" "}
+                  Duration: {formatDuration(backup.recordingDuration)}
                 </p>
               </div>
             </div>
@@ -194,13 +266,13 @@ function BackupUploader({
               <Button
                 onClick={handleReturnHome}
                 variant="outline"
-                className="w-auto min-h-[44px] px-6 py-2 md:text-lg font-medium shadow-sm transition-all duration-200 motion-safe:hover:scale-105 hover:shadow-md motion-safe:active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                className="min-h-[44px] w-auto px-6 py-2 font-medium shadow-sm transition-all duration-200 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 motion-safe:hover:scale-105 motion-safe:active:scale-95 md:text-lg"
               >
                 Return to Home
               </Button>
               <Button
                 onClick={handleRetryUpload}
-                className="w-auto min-h-[44px] bg-blue-700 px-6 py-2 md:text-lg text-[#E8E8E8] shadow-md transition-all duration-200 motion-safe:hover:scale-105 hover:bg-blue-800 hover:shadow-lg motion-safe:active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+                className="min-h-[44px] w-auto bg-blue-700 px-6 py-2 text-[#E8E8E8] shadow-md transition-all duration-200 hover:bg-blue-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 motion-safe:hover:scale-105 motion-safe:active:scale-95 md:text-lg"
               >
                 Retry Upload
               </Button>

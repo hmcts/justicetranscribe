@@ -1,3 +1,5 @@
+/* eslint-disable jsx-a11y/media-has-caption */
+
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -18,7 +20,9 @@ const SANITY_VIDEO_DOCUMENT_UUID = "7cc10ecb-e007-4072-a9f3-a7f8712287ad";
 const SANITY_VIDEO_DOCUMENT_ID = `${SANITY_VIDEO_DOCUMENT_TYPE};${SANITY_VIDEO_DOCUMENT_UUID}`;
 
 export default function Step3ReviewEdit() {
-  const [selectedVideo, setSelectedVideo] = useState<SanityVideoData | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<SanityVideoData | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -43,8 +47,12 @@ export default function Step3ReviewEdit() {
         : `v${SANITY_API_VERSION}`;
 
       const encodedQuery = encodeURIComponent(query);
-      const encodedId = encodeURIComponent(JSON.stringify(SANITY_VIDEO_DOCUMENT_ID));
-      const encodedUuid = encodeURIComponent(JSON.stringify(SANITY_VIDEO_DOCUMENT_UUID));
+      const encodedId = encodeURIComponent(
+        JSON.stringify(SANITY_VIDEO_DOCUMENT_ID)
+      );
+      const encodedUuid = encodeURIComponent(
+        JSON.stringify(SANITY_VIDEO_DOCUMENT_UUID)
+      );
       const endpoint = `https://${SANITY_PROJECT_ID}.api.sanity.io/${apiVersion}/data/query/${SANITY_DATASET}?query=${encodedQuery}&%24id=${encodedId}&%24uuid=${encodedUuid}&perspective=published`;
 
       try {
@@ -88,13 +96,13 @@ export default function Step3ReviewEdit() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="grid grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-12 items-start gap-6">
         {/* Video Section */}
         <div className="col-span-12 md:col-span-7 lg:col-span-8">
           <div className="w-full">
             {isLoading && (
-              <div className="aspect-video w-full animate-pulse rounded-lg bg-gray-200" />)
-            }
+              <div className="aspect-video w-full animate-pulse rounded-lg bg-gray-200" />
+            )}
             {!isLoading && error && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {error}
@@ -108,7 +116,7 @@ export default function Step3ReviewEdit() {
                   playsInline
                   ref={videoRef}
                   src={selectedVideo.videoUrl}
-                  className="h-full w-full object-contain"
+                  className="size-full object-contain"
                 />
               </div>
             )}
@@ -116,30 +124,42 @@ export default function Step3ReviewEdit() {
         </div>
 
         {/* Sidebar: Title + Checklist */}
-        <div className="col-span-12 md:col-span-5 lg:col-span-4 min-w-0 md:min-w-[280px] lg:min-w-[320px]">
+        <div className="col-span-12 min-w-0 md:col-span-5 md:min-w-[280px] lg:col-span-4 lg:min-w-[320px]">
           <div className="mb-4 text-left">
-            <h1 className="text-3xl font-semibold sm:text-4xl">Review and edit</h1>
+            <h1 className="text-3xl font-semibold sm:text-4xl">
+              Review and edit
+            </h1>
             <h2 className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-xl font-medium text-transparent">
               Your professional judgement is key
             </h2>
           </div>
-          <h3 className="text-xl font-semibold text-black">Common corrections</h3>
+          <h3 className="text-xl font-semibold text-black">
+            Common corrections
+          </h3>
           <div className="space-y-4 text-black">
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Verify names, pronouns, places, and acronyms.</p>
+              <p className="text-base">
+                Verify names, pronouns, places, and acronyms.
+              </p>
             </div>
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Add missing specifics (risk-relevant facts, DOBs).</p>
+              <p className="text-base">
+                Add missing specifics (risk-relevant facts, DOBs).
+              </p>
             </div>
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Stay under 4,000 characters for NDelius.</p>
+              <p className="text-base">
+                Stay under 4,000 characters for NDelius.
+              </p>
             </div>
             <div className="flex items-start space-x-3">
               <Check className="mt-1 size-5 shrink-0 text-green-600" />
-              <p className="text-base">Describe body language, observations and wider context.</p>
+              <p className="text-base">
+                Describe body language, observations and wider context.
+              </p>
             </div>
           </div>
         </div>
