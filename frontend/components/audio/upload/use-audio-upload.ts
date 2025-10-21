@@ -4,10 +4,9 @@ import { useState, useCallback, useEffect } from "react";
 import posthog from "posthog-js";
 import * as Sentry from "@sentry/nextjs";
 import { AudioProcessingStatus } from "@/components/audio/processing/processing-loader";
-import { getDuration } from "@/components/audio/processing/processing-status";
 import { audioBackupDB } from "@/lib/indexeddb-backup";
 import { UploadErrorDetails } from "./types";
-import { fetchUploadUrl, UploadUrlData } from "./upload-utils";
+import { fetchUploadUrl } from "./upload-utils";
 
 interface UseAudioUploadOptions {
   initialRecordingMode: "mic" | "screen";
@@ -23,9 +22,7 @@ export default function useAudioUpload({
     useState<AudioProcessingStatus>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [currentBackupId, setCurrentBackupId] = useState<string | null>(null);
-  const [uploadUrlData, setUploadUrlData] = useState<UploadUrlData | null>(
-    null
-  );
+  const [uploadUrl, setUploadUrl] = useState<string | null>(null);
   const [isUploadUrlReady, setIsUploadUrlReady] = useState<boolean>(false);
   const [errorDetails, setErrorDetails] = useState<UploadErrorDetails>({
     requestId: null,
@@ -42,7 +39,7 @@ export default function useAudioUpload({
       const result = await fetchUploadUrl();
 
       if (result.success && result.data) {
-        setUploadUrlData(result.data);
+        setUploadUrl(result.data.upload_url);
         setErrorDetails((prev) => ({
           ...prev,
           userUploadKey: result.data!.user_upload_s3_file_key,
@@ -64,7 +61,7 @@ export default function useAudioUpload({
   }, []);
 
   const uploadFile = useCallback(
-    async (blob: Blob, uploadUrl: string): Promise<void> => {
+    async (blob: Blob, url: string): Promise<void> => {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
 
@@ -95,7 +92,7 @@ export default function useAudioUpload({
           reject(new Error("Upload timed out"));
         });
 
-        xhr.open("PUT", uploadUrl);
+        xhr.open("PUT", url);
         xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
         xhr.send(blob);
       });
@@ -109,12 +106,7 @@ export default function useAudioUpload({
       let lastError: Error | null = null;
       let currentRequestId: string | null = null;
       let currentStatusCode: number | null = null;
-      let currentUserUploadKey: string | null = null;
-
-      // Calculate duration non-blocking for report (telemetry)
-      getDuration(blob).then((d) =>
-        setErrorDetails((prev) => ({ ...prev, duration: d ?? null }))
-      );
+      const currentUserUploadKey: string | null = null;
 
       const delay = (ms: number): Promise<void> => {
         return new Promise((resolve) => {
@@ -136,7 +128,7 @@ export default function useAudioUpload({
         }
 
         // Upload URL should always be available due to pre-fetch with retry logic
-        if (!uploadUrlData) {
+        if (!uploadUrl) {
           const errorMsg = "Upload URL not available. This should not happen.";
           // eslint-disable-next-line no-console
           console.error(errorMsg);
@@ -147,20 +139,12 @@ export default function useAudioUpload({
           throw new Error(errorMsg);
         }
 
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { upload_url, user_upload_s3_file_key } = uploadUrlData;
-        currentUserUploadKey = user_upload_s3_file_key;
-        setErrorDetails((prev) => ({
-          ...prev,
-          userUploadKey: user_upload_s3_file_key,
-        }));
-
         // Clear retry message on successful URL fetch
         if (attempt > 1) {
           setUploadError(null);
         }
 
-        await uploadFile(blob, upload_url);
+        await uploadFile(blob, uploadUrl);
 
         setProcessingStatus("transcribing");
 
@@ -185,7 +169,7 @@ export default function useAudioUpload({
 
         // Clear and re-fetch upload URL for the next recording
         // This ensures each upload uses a fresh, single-use URL
-        setUploadUrlData(null);
+        setUploadUrl(null);
         setIsUploadUrlReady(false);
       };
 
@@ -267,8 +251,7 @@ export default function useAudioUpload({
       currentBackupId,
       initialRecordingMode,
       uploadFile,
-      uploadUrlData,
-      // uploadChunksAsFallback, // CHUNKED UPLOAD: Commented out
+      uploadUrl,
       errorDetails.duration,
     ]
   );
