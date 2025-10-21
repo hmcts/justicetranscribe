@@ -6,17 +6,12 @@ import * as Sentry from "@sentry/nextjs";
 import { AudioProcessingStatus } from "@/components/audio/processing/processing-loader";
 import { getDuration } from "@/components/audio/processing/processing-status";
 import { audioBackupDB } from "@/lib/indexeddb-backup";
-import { apiClient } from "@/lib/api-client";
 import { UploadErrorDetails } from "./types";
+import { fetchUploadUrl, UploadUrlData } from "./upload-utils";
 
 interface UseAudioUploadOptions {
   initialRecordingMode: "mic" | "screen";
   setIsProcessingTranscription: (isProcessing: boolean) => void;
-}
-
-interface UploadUrlData {
-  upload_url: string;
-  user_upload_s3_file_key: string;
 }
 
 export default function useAudioUpload({
@@ -40,85 +35,21 @@ export default function useAudioUpload({
     duration: null,
   });
 
-  // Detect the supported MIME type for recording
-  const detectSupportedMimeType = useCallback((): string => {
-    const mimeTypes = [
-      "video/mp4", // iOS primary format
-      "audio/mp4", // Desktop MP4 format
-      "audio/webm", // WebM fallback
-    ];
-
-    const supportedMimeType = mimeTypes.find((mimeType) =>
-      MediaRecorder.isTypeSupported(mimeType)
-    );
-
-    // Default fallback
-    return supportedMimeType || "audio/webm";
-  }, []);
-
-  // Fetch upload URL with retry logic
-  const fetchUploadUrl = useCallback(async (): Promise<boolean> => {
-    const maxRetries = 3;
-    const retryDelay = 1000;
-
-    /* eslint-disable no-await-in-loop */
-    for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
-      try {
-        const mimeType = detectSupportedMimeType();
-        const fileExtension = mimeType.includes("mp4") ? "mp4" : "webm";
-
-        const urlResult = await apiClient.getUploadUrl(fileExtension);
-
-        if (urlResult.error) {
-          // eslint-disable-next-line no-console
-          console.error(
-            `Failed to fetch upload URL (attempt ${attempt}/${maxRetries}):`,
-            urlResult.error
-          );
-          if (attempt < maxRetries) {
-            await new Promise<void>((resolve) => {
-              setTimeout(resolve, retryDelay);
-            });
-            // eslint-disable-next-line no-continue
-            continue;
-          }
-          return false;
-        }
-
-        if (urlResult.data) {
-          setUploadUrlData(urlResult.data);
-          setErrorDetails((prev) => ({
-            ...prev,
-            userUploadKey: urlResult.data!.user_upload_s3_file_key,
-          }));
-          return true;
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error(
-          `Error fetching upload URL (attempt ${attempt}/${maxRetries}):`,
-          error
-        );
-        if (attempt < maxRetries) {
-          await new Promise<void>((resolve) => {
-            setTimeout(resolve, retryDelay);
-          });
-        }
-      }
-    }
-    /* eslint-enable no-await-in-loop */
-
-    return false;
-  }, [detectSupportedMimeType]);
-
   // Fetch upload URL when component mounts
   useEffect(() => {
     const initializeUploadUrl = async () => {
       setIsUploadUrlReady(false);
-      const success = await fetchUploadUrl();
-      setIsUploadUrlReady(success);
+      const result = await fetchUploadUrl();
 
-      if (!success) {
+      if (result.success && result.data) {
+        setUploadUrlData(result.data);
+        setErrorDetails((prev) => ({
+          ...prev,
+          userUploadKey: result.data!.user_upload_s3_file_key,
+        }));
+        setIsUploadUrlReady(true);
+      } else {
+        setIsUploadUrlReady(false);
         setUploadError(
           "Failed to initialize upload. Please refresh the page or check your connection."
         );
@@ -130,7 +61,7 @@ export default function useAudioUpload({
     };
 
     initializeUploadUrl();
-  }, [fetchUploadUrl]);
+  }, []);
 
   const uploadFile = useCallback(
     async (blob: Blob, uploadUrl: string): Promise<void> => {
