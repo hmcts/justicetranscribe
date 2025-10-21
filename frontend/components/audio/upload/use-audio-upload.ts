@@ -5,8 +5,6 @@ import posthog from "posthog-js";
 import * as Sentry from "@sentry/nextjs";
 import { AudioProcessingStatus } from "@/components/audio/processing/processing-loader";
 import { getDuration } from "@/components/audio/processing/processing-status";
-// CHUNKED UPLOAD: Commented out imports
-// import { uploadChunksFromBackup, uploadBlobAsChunks } from "@/lib/azure-upload";
 import { audioBackupDB } from "@/lib/indexeddb-backup";
 import { apiClient } from "@/lib/api-client";
 import { UploadErrorDetails } from "./types";
@@ -174,26 +172,6 @@ export default function useAudioUpload({
     []
   );
 
-  // CHUNKED UPLOAD: Commented out for readability
-  // const uploadChunksAsFallback = useCallback(
-  //   async (backupId: string, mimeType: string): Promise<string> => {
-  //     try {
-  //       const result = await uploadChunksFromBackup(
-  //         backupId,
-  //         mimeType,
-  //         (progress) => {
-  //           setProcessingStatus({ state: "uploading", progress });
-  //         }
-  //       );
-  //       return result.fileKey;
-  //     } catch (error) {
-  //       console.error("❌ Chunked upload fallback failed:", error);
-  //       throw error;
-  //     }
-  //   },
-  //   []
-  // );
-
   const startTranscription = useCallback(
     async (blob: Blob, backupIdToDelete?: string | null) => {
       const maxRetries = 2;
@@ -251,75 +229,7 @@ export default function useAudioUpload({
           setUploadError(null);
         }
 
-        // CHUNKED UPLOAD: Force chunked mode commented out
-        // const isLocalDev = process.env.NODE_ENV === "development";
-        // const forceChunked =
-        //   isLocalDev && process.env.NEXT_PUBLIC_FORCE_CHUNKED_UPLOAD === "true";
-
         await uploadFile(blob, upload_url);
-
-        // CHUNKED UPLOAD FALLBACK: Commented out for readability
-        // try {
-        //   if (forceChunked) {
-        //     throw new Error("Forced chunked upload (test mode)");
-        //   }
-        //   await uploadFile(blob, upload_url);
-        // } catch (uploadErrorResult) {
-        //   console.warn(
-        //     "Single file upload failed, attempting chunked upload fallback:",
-        //     uploadErrorResult
-        //   );
-        //   try {
-        //     if (currentBackupId) {
-        //       finalFileKey = await uploadChunksAsFallback(
-        //         currentBackupId,
-        //         blob.type
-        //       );
-        //     } else {
-        //       console.log(
-        //         "No backup ID available, splitting blob for chunked upload"
-        //       );
-        //       const result = await uploadBlobAsChunks({
-        //         blob,
-        //         mimeType: blob.type,
-        //         onProgress: (progress: number) => {
-        //           setProcessingStatus({ state: "uploading", progress });
-        //         },
-        //       });
-        //       finalFileKey = result.fileKey;
-        //     }
-        //     currentUserUploadKey = finalFileKey;
-        //     setErrorDetails((prev) => ({
-        //       ...prev,
-        //       userUploadKey: finalFileKey,
-        //     }));
-        //   } catch (chunkedError) {
-        //     console.error(
-        //       "❌ Both single and chunked upload failed:",
-        //       chunkedError
-        //     );
-        //     const uploadErrorMessage =
-        //       uploadErrorResult instanceof Error
-        //         ? uploadErrorResult.message
-        //         : String(uploadErrorResult);
-        //     const chunkedErrorMessage =
-        //       chunkedError instanceof Error
-        //         ? chunkedError.message
-        //         : String(chunkedError);
-        //     throw new Error(
-        //       `Upload failed: Single upload (${uploadErrorMessage}) and chunked fallback (${chunkedErrorMessage})`
-        //     );
-        //   }
-        // }
-
-        // const transcriptionJobResult =
-        //   await apiClient.startTranscriptionJob(finalFileKey);
-
-        // if (transcriptionJobResult.error) {
-        //   const errorMsg = `Transcription job start failed: ${JSON.stringify(transcriptionJobResult.error)}`;
-        //   console.error(errorMsg);
-        //   throw new Error(errorMsg);
-        // }
 
         setProcessingStatus("transcribing");
 
