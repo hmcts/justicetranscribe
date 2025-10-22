@@ -341,7 +341,14 @@ async def cleanup_files(temp_path: Path | None) -> None:
 
 def get_url_for_transcription(transcription_id: UUID) -> str:
     # https://justice-transcribe.ai.cabinetoffice.gov.uk/?id=027fecb0-6d4f-4ecb-b742-161adb5bad22
-    app_url = get_settings().APP_URL
-    if not app_url.startswith("https://"):
-        app_url = f"https://{app_url.removeprefix('http://')}"
+    settings = get_settings()
+
+    # Use hardcoded URL for production environment
+    if settings.ENVIRONMENT == "prod":
+        app_url = "https://transcription.service.justice.gov.uk"
+    else:
+        app_url = settings.APP_URL
+        if not app_url.startswith("https://"):
+            app_url = f"https://{app_url.removeprefix('http://')}"
+
     return f"{app_url}/?id={transcription_id}"
