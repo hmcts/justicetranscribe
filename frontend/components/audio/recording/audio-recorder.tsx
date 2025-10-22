@@ -30,11 +30,13 @@ import RecordingControl from "./recording-control";
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
   onRecordingStart: () => void;
+  disabled: boolean;
 }
 
 function AudioRecorderComponent({
   onRecordingStop,
   onRecordingStart,
+  disabled = false,
 }: MicRecorderProps) {
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -370,6 +372,7 @@ function AudioRecorderComponent({
                     setSelectedDeviceId(value);
                   }}
                   value={selectedDeviceId}
+                  disabled={disabled}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select microphone" />
@@ -393,6 +396,7 @@ function AudioRecorderComponent({
                     onClick={startRecording}
                     className="mt-2 h-12 w-full"
                     size="lg"
+                    disabled={disabled}
                   >
                     <Mic className="mr-2 size-4" />
                     Start recording
