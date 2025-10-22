@@ -243,7 +243,7 @@ async def get_upload_url(
     presigned_url = generate_blob_upload_url(
         container_name=get_settings().AZURE_STORAGE_CONTAINER_NAME,
         blob_name=user_upload_blob_path,
-        expiry_hours=4,
+        expiry_hours=24,
     )
     # throw error for testing:
     # raise HTTPException(status_code=500, detail="Test error")

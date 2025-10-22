@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Mic, Loader2, Moon } from "lucide-react";
+import { Mic, Loader2, BellOff } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
@@ -19,16 +19,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import RecordingControl from "@/components/audio/recording/recording-control";
-import { audioBackupDB, IndexedDBBackup } from "@/lib/indexeddb-backup";
 import {
-  hasReachedMaxDuration,
-  shouldShowWarning,
-  getRemainingTime,
-  formatRemainingTime,
-} from "@/lib/recording-config";
-import useIsMobile from "@/hooks/use-mobile";
+  audioBackupDB,
+  AudioBackup,
+  IndexedDBBackup,
+} from "@/lib/indexeddb-backup";
 import { AudioDevice, MicrophonePermission } from "./microphone-permission";
+import RecordingControl from "./recording-control";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
@@ -46,23 +43,21 @@ function AudioRecorderComponent({
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
+
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [showProcessingRecording, setShowProcessingRecording] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-  const [showTimeWarning, setShowTimeWarning] = useState(false);
-  const [remainingMinutes, setRemainingMinutes] = useState<string>("");
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const chunkIndexRef = useRef<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const backupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentBackupIdRef = useRef<string | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
-  const visibilityListenerRef = useRef<(() => void) | null>(null);
 
   const handlePermissionGranted = (devices: AudioDevice[]) => {
     setAudioDevices(devices);
@@ -77,19 +72,15 @@ function AudioRecorderComponent({
         const lock = await navigator.wakeLock.request("screen");
         setWakeLock(lock);
 
-        // Create and store the listener so we can remove it later
-        const visibilityHandler = async () => {
+        document.addEventListener("visibilitychange", async () => {
           if (document.visibilityState === "visible" && !wakeLock) {
             const newLock = await navigator.wakeLock.request("screen");
             setWakeLock(newLock);
           }
-        };
-
-        visibilityListenerRef.current = visibilityHandler;
-        document.addEventListener("visibilitychange", visibilityHandler);
+        });
       }
     } catch (err) {
-      // Wake Lock error handled silently
+      console.log("Wake Lock error:", err);
     }
   };
 
@@ -99,17 +90,8 @@ function AudioRecorderComponent({
         await wakeLock.release();
         setWakeLock(null);
       } catch (err) {
-        // Wake Lock release error handled silently
+        console.log("Wake Lock release error:", err);
       }
-    }
-
-    // Remove the visibility change event listener to prevent memory leak
-    if (visibilityListenerRef.current) {
-      document.removeEventListener(
-        "visibilitychange",
-        visibilityListenerRef.current
-      );
-      visibilityListenerRef.current = null;
     }
   }, [wakeLock]);
 
@@ -120,12 +102,6 @@ function AudioRecorderComponent({
   }, [releaseWakeLock]);
 
   const clearAudio = () => {
-    // Properly revoke object URL to free memory
-    if (audioUrlRef.current) {
-      URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
-    }
-
     setRecordedAudio(null);
     if (audioRef.current) {
       audioRef.current.src = "";
@@ -133,36 +109,49 @@ function AudioRecorderComponent({
     onRecordingStop(null, null);
   };
 
-  // STREAMING: Stream chunks directly to IndexedDB instead of periodic backups
-  const streamChunkToIndexedDB = useCallback(async (chunkData: Blob) => {
-    if (!currentBackupIdRef.current) {
-      currentBackupIdRef.current = IndexedDBBackup.generateBackupId();
+  const createPeriodicBackup = useCallback(async () => {
+    if (!mediaRecorderRef.current || mediaChunksRef.current.length === 0) {
+      return;
     }
 
     try {
-      await audioBackupDB.appendChunk(
-        currentBackupIdRef.current,
-        chunkIndexRef.current,
-        chunkData
-      );
-      // Only increment index after successful storage to avoid gaps
-      chunkIndexRef.current += 1;
-    } catch (err) {
-      console.error("❌ Failed to stream chunk to IndexedDB:", err);
-      // Try to initialize IndexedDB if it failed
-      try {
-        await audioBackupDB.init();
-        await audioBackupDB.appendChunk(
-          currentBackupIdRef.current,
-          chunkIndexRef.current,
-          chunkData
-        );
-        // Only increment index after successful retry
-        chunkIndexRef.current += 1;
-      } catch (retryErr) {
-        console.error("❌ Failed to store chunk even after retry:", retryErr);
-        // Index not incremented - next chunk will overwrite this slot
+      const selectedMimeType = mediaRecorderRef.current.mimeType;
+      const currentChunks = [...mediaChunksRef.current];
+      const audioBlob = new Blob(currentChunks, { type: selectedMimeType });
+
+      if (!currentBackupIdRef.current) {
+        currentBackupIdRef.current = IndexedDBBackup.generateBackupId();
       }
+
+      const backup: AudioBackup = {
+        id: currentBackupIdRef.current,
+        blob: audioBlob,
+        fileName: `recording_${new Date().toISOString()}.${selectedMimeType.includes("mp4") ? "mp4" : "webm"}`,
+        timestamp: Date.now(),
+        mimeType: selectedMimeType,
+        recordingDuration: recordingTime,
+      };
+
+      await audioBackupDB.saveAudioBackup(backup);
+    } catch (err) {
+      console.error("Failed to create periodic backup:", err);
+    }
+  }, [recordingTime]);
+
+  const startPeriodicBackup = useCallback(() => {
+    if (backupIntervalRef.current) {
+      clearInterval(backupIntervalRef.current);
+    }
+
+    backupIntervalRef.current = setInterval(() => {
+      createPeriodicBackup();
+    }, 15000); // Backup every 15 seconds
+  }, [createPeriodicBackup]);
+
+  const stopPeriodicBackup = useCallback(() => {
+    if (backupIntervalRef.current) {
+      clearInterval(backupIntervalRef.current);
+      backupIntervalRef.current = null;
     }
   }, []);
 
@@ -206,68 +195,52 @@ function AudioRecorderComponent({
       const options = { mimeType: selectedMimeType };
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
-      chunkIndexRef.current = 0; // Reset chunk index for new recording
+      mediaChunksRef.current = [];
 
-      // STREAMING: Stream each chunk directly to IndexedDB as it arrives
-      mediaRecorder.ondataavailable = async (event) => {
+      mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          await streamChunkToIndexedDB(event.data);
+          mediaChunksRef.current.push(event.data);
         }
       };
 
-      mediaRecorder.onstop = async () => {
-        // STREAMING: Reconstruct final blob from streamed chunks
-        if (currentBackupIdRef.current && chunkIndexRef.current > 0) {
-          try {
-            const audioBlob = await audioBackupDB.reconstructBlob(
-              currentBackupIdRef.current,
-              selectedMimeType
-            );
-            onRecordingStop(audioBlob, currentBackupIdRef.current);
+      mediaRecorder.onstop = () => {
+        if (mediaChunksRef.current.length > 0) {
+          const audioBlob = new Blob(mediaChunksRef.current, {
+            type: selectedMimeType, // Use the selected MIME type
+          });
+          onRecordingStop(audioBlob, currentBackupIdRef.current);
 
-            posthog.capture("in_person_recording_completed", {
-              duration_seconds: recordingTime,
-              file_size_bytes: audioBlob.size,
-            });
-          } catch (err) {
-            console.error("Failed to reconstruct final blob:", err);
-            onRecordingStop(null, currentBackupIdRef.current);
-          }
-        } else {
-          onRecordingStop(null, currentBackupIdRef.current);
+          posthog.capture("in_person_recording_completed", {
+            duration_seconds: recordingTime,
+            file_size_bytes: audioBlob.size,
+          });
         }
 
-        // Clean up media resources and reset refs
+        // Clean up
+        stopPeriodicBackup();
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
         }
-
+        streamRef.current = null;
         mediaRecorderRef.current = null;
-        setMediaStream(null);
         setIsRecording(false);
         setRecordingTime(0);
-
         if (timerRef.current) {
           clearInterval(timerRef.current);
-          timerRef.current = null;
         }
-
         currentBackupIdRef.current = null;
-        chunkIndexRef.current = 0; // Reset chunk index
         releaseWakeLock();
       };
 
       await requestWakeLock();
-
-      // DEBUG: Check IndexedDB status before starting recording
-      // await audioBackupDB.debugIndexedDB();
-
       mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
       onRecordingStart();
 
-      // STREAMING: No need for delayed backup start - chunks stream immediately
+      // Start backup after initial recording data is available
+      setTimeout(() => {
+        startPeriodicBackup();
+      }, 5000); // Wait 5 seconds before starting backups
 
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
@@ -283,6 +256,7 @@ function AudioRecorderComponent({
 
   const stopRecording = () => {
     setShowProcessingRecording(true);
+    stopPeriodicBackup();
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
@@ -297,44 +271,21 @@ function AudioRecorderComponent({
     if (mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
+      stopPeriodicBackup();
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     } else if (mediaRecorderRef.current.state === "paused") {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
-      // STREAMING: Resume timer but streaming continues automatically
+      startPeriodicBackup();
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     }
   };
 
-  // Monitor recording time and trigger auto-stop when limit is reached
-  useEffect(() => {
-    if (!isRecording || isPaused) {
-      return;
-    }
-
-    // Check if we should show the warning
-    if (shouldShowWarning(recordingTime)) {
-      const remaining = getRemainingTime(recordingTime);
-      setRemainingMinutes(formatRemainingTime(remaining));
-      setShowTimeWarning(true);
-    } else {
-      setShowTimeWarning(false);
-      setRemainingMinutes("");
-    }
-
-    // Check if we've reached the maximum duration
-    if (hasReachedMaxDuration(recordingTime)) {
-      // eslint-disable-next-line no-console
-      console.log(
-        "Maximum recording duration reached. Auto-stopping recording."
-      );
-      stopRecording();
-    }
-  }, [recordingTime, isRecording, isPaused]);
+  const audioSource = recordedAudio ? URL.createObjectURL(recordedAudio) : "";
 
   useEffect(() => {
     if (recordedAudio || isRecording) {
@@ -343,29 +294,15 @@ function AudioRecorderComponent({
   }, [isRecording, setIsRecording, recordedAudio]);
 
   useEffect(() => {
-    // Clean up previous URL before creating a new one
-    if (audioUrlRef.current) {
-      URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
-    }
-
-    // Create new URL only when we have audio to play
-    if (recordedAudio && audioRef.current) {
-      const audioSource = URL.createObjectURL(recordedAudio);
-      audioUrlRef.current = audioSource;
+    if (audioRef.current && audioSource) {
       audioRef.current.src = audioSource;
     }
-
-    // Cleanup function to revoke URL when component unmounts or recordedAudio changes
     return () => {
-      if (audioUrlRef.current) {
-        URL.revokeObjectURL(audioUrlRef.current);
-        audioUrlRef.current = null;
+      if (audioSource) {
+        URL.revokeObjectURL(audioSource);
       }
     };
-  }, [recordedAudio]);
-
-  const isMobile = useIsMobile();
+  }, [audioSource]);
 
   return (
     <div className="space-y-4">
@@ -384,47 +321,16 @@ function AudioRecorderComponent({
                 </h1>
               </div>
 
-              {isMobile && (
-                <>
-                  {/* Do Not Disturb Reminder */}
-                  <div
-                    role="status"
-                    aria-label="Reminder to enable Do Not Disturb mode"
-                    className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3"
-                    style={{
-                      borderColor: "#D8C8FF",
-                      backgroundColor: "#F4F1FF",
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="mt-0.5 rounded-full p-2"
-                        style={{ backgroundColor: "#CABDFF" }}
-                      >
-                        <Moon
-                          className="size-5"
-                          style={{ color: "#1F1247" }}
-                          aria-hidden="true"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h3
-                          className="text-sm font-semibold"
-                          style={{ color: "#1F1247" }}
-                        >
-                          Silence notifications
-                        </h3>
-                        <p
-                          className="mt-0.5 text-sm"
-                          style={{ color: "#362952" }}
-                        >
-                          Turn on Do Not Disturb while recording.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
+              {/* Do Not Disturb Notification - One line below header */}
+              <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
+                <div className="flex items-center justify-center gap-2">
+                  <BellOff className="size-3.5 text-amber-600 dark:text-amber-400" />
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    💡 Turn on Do Not Disturb mode to prevent interruptions
+                    during recording
+                  </p>
+                </div>
+              </div>
             </>
           )}
 
@@ -453,8 +359,6 @@ function AudioRecorderComponent({
                   recordingTime,
                 }}
                 elapsedTime={recordingTime}
-                showTimeWarning={showTimeWarning}
-                remainingTime={remainingMinutes}
               />
             </div>
           ) : (
@@ -468,6 +372,7 @@ function AudioRecorderComponent({
                     setSelectedDeviceId(value);
                   }}
                   value={selectedDeviceId}
+                  disabled={disabled}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select microphone" />
@@ -494,7 +399,7 @@ function AudioRecorderComponent({
                     disabled={disabled}
                   >
                     <Mic className="mr-2 size-4" />
-                    {disabled ? "Initializing..." : "Start recording"}
+                    Start recording
                   </Button>
                 </div>
               </div>
