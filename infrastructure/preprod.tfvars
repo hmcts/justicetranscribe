@@ -5,6 +5,10 @@ backend_docker_image_tag = "preprod"
 # Database configuration - PASSWORD NOW AUTO-GENERATED
 # postgres_admin_password = "CHANGE_ME_SECURE_PASSWORD_123!" # REMOVED - now auto-generated
 
+# Database tier - Upgraded to production-grade tier
+# GP_Standard_D2s_v3 = 199 user connections (2 vCPU, 8GB RAM)
+postgres_sku_name = "GP_Standard_D2s_v3"
+
 # Optional: Allow specific IP addresses to connect directly to the database
 # Uncomment and add your IPs if you need direct database access
 # postgres_allowed_ips = ["203.0.113.1", "198.51.100.0"]
