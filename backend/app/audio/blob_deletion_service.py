@@ -6,9 +6,9 @@ once transcription has been successfully completed and stored in PostgreSQL.
 """
 
 import asyncio
-from datetime import UTC, datetime
 from uuid import UUID
 
+import sentry_sdk
 from sqlalchemy import select
 
 from app.audio.azure_utils import AsyncAzureBlobManager
@@ -119,7 +119,6 @@ class BlobDeletionService:
                     logger.info(
                         f"Successfully deleted blob {blob_path} on attempt {attempt}"
                     )
-                    await self._mark_cleanup_complete(transcription_job_id)
                     return True
                 else:
                     logger.warning(
@@ -141,83 +140,11 @@ class BlobDeletionService:
         # All retry attempts failed
         error_msg = f"Failed to delete blob {blob_path} after {self.max_retry_attempts} attempts"
         logger.error(error_msg)
-        # sentry_sdk.capture_exception(error_msg)
+        sentry_sdk.capture_exception(error_msg)
         return False
 
-    async def _mark_cleanup_complete(self, transcription_job_id: UUID) -> None:
-        """
-        Mark a transcription job as having completed cleanup successfully.
-
-        Args:
-            transcription_job_id: The UUID of the transcription job
-        """
-        try:
-            async with get_async_session() as session:
-                stmt = select(TranscriptionJob).where(
-                    TranscriptionJob.id == transcription_job_id
-                )
-                result = await session.execute(stmt)
-                transcription_job = result.scalar_one_or_none()
-
-                if transcription_job:
-                    transcription_job.needs_cleanup = False
-                    transcription_job.cleanup_failure_reason = None
-                    logger.info(
-                        f"Marked transcription job {transcription_job_id} as cleanup complete"
-                    )
-                else:
-                    logger.warning(
-                        f"Transcription job {transcription_job_id} not found for cleanup completion"
-                    )
-
-        except Exception as e:
-            logger.error(
-                f"Failed to mark cleanup complete for {transcription_job_id}: {e}"
-            )
-
-    async def _mark_cleanup_failed(
-        self,
-        transcription_job_id: UUID,
-        error_message: str,
-        user_email: str,
-        blob_path: str,
-    ) -> None:
-        """
-        Mark a transcription job as having failed cleanup and flag for manual intervention.
-
-        Args:
-            transcription_job_id: The UUID of the transcription job
-            error_message: The error message describing the failure
-            user_email: The email of the user who uploaded the file
-            blob_path: The path to the blob that failed to delete
-        """
-        try:
-            async with get_async_session() as session:
-                stmt = select(TranscriptionJob).where(
-                    TranscriptionJob.id == transcription_job_id
-                )
-                result = await session.execute(stmt)
-                transcription_job = result.scalar_one_or_none()
-
-                if transcription_job:
-                    transcription_job.needs_cleanup = True
-                    full_error_msg = f"{error_message} (User: {user_email}, Blob: {blob_path}, Time: {datetime.now(UTC).isoformat()})"
-                    transcription_job.cleanup_failure_reason = full_error_msg
-                    logger.error(
-                        f"Flagged transcription job {transcription_job_id} for manual cleanup: {full_error_msg}"
-                    )
-                else:
-                    logger.warning(
-                        f"Transcription job {transcription_job_id} not found for cleanup failure marking"
-                    )
-
-        except Exception as e:
-            logger.error(
-                f"Failed to mark cleanup failed for {transcription_job_id}: {e}"
-            )
-
     async def process_transcription_cleanup(
-        self, transcription_job_id: UUID, blob_path: str, user_email: str
+        self, transcription_job_id: UUID, blob_path: str
     ) -> bool:
         """
         Complete workflow for processing transcription cleanup.
@@ -247,9 +174,7 @@ class BlobDeletionService:
             return False
 
         # Step 2: Delete the audio blob
-        deletion_success = await self.delete_audio_blob(
-            blob_path, transcription_job_id, user_email
-        )
+        deletion_success = await self.delete_audio_blob(blob_path, transcription_job_id)
 
         if deletion_success:
             logger.info(
