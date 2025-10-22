@@ -313,7 +313,7 @@ class TranscriptionPollingService:
             )
 
             # Mark blob as processed
-            await self._mark_blob_as_processed(blob_path)
+            await self._mark_blob_as_processed_and_soft_delete(blob_path)
 
             logger.info(
                 f"User {self.user_email}: Successfully processed audio file: {blob_path}"
@@ -327,9 +327,9 @@ class TranscriptionPollingService:
         else:
             return True
 
-    async def _mark_blob_as_processed(self, blob_path: str) -> None:
+    async def _mark_blob_as_processed_and_soft_delete(self, blob_path: str) -> None:
         """
-        Mark a blob as processed by setting metadata.
+        Mark a blob as processed by setting metadata, then delete it.
 
         Parameters
         ----------
@@ -337,6 +337,7 @@ class TranscriptionPollingService:
             The blob path.
         """
         try:
+            # First mark as processed
             metadata = {
                 "processed": "true",
                 "processed_at": datetime.now(UTC).isoformat(),
@@ -348,8 +349,17 @@ class TranscriptionPollingService:
                 logger.info(f"Marked blob as processed: {blob_path}")
             else:
                 logger.warning(f"Failed to mark blob as processed: {blob_path}")
+
+            delete_success = await self.azure_blob_manager.delete_blob(blob_path)
+            if delete_success:
+                logger.info(f"Successfully deleted blob: {blob_path}")
+            else:
+                logger.warning(f"Failed to delete blob: {blob_path}")
+
         except Exception as e:
-            logger.error(f"Error marking blob as processed {blob_path}: {e}")
+            logger.error(
+                f"Error marking blob as processed and deleting {blob_path}: {e}"
+            )
 
     async def _mark_blob_with_error(self, blob_path: str, error_message: str) -> None:
         """
