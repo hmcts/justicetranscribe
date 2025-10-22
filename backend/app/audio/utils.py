@@ -37,19 +37,18 @@ async def get_blob_service_client():
     # Always use the real Azure Storage connection string
     connection_string = get_settings().AZURE_STORAGE_CONNECTION_STRING
 
-    async with AsyncBlobServiceClient.from_connection_string(connection_string) as blob_service_client:
+    async with AsyncBlobServiceClient.from_connection_string(
+        connection_string
+    ) as blob_service_client:
         yield blob_service_client
-
 
 
 def is_rate_limit_error(exception):
     """Check if the exception is due to rate limiting (HTTP 429)"""
     return (
-        isinstance(exception, httpx.HTTPStatusError) and exception.response.status_code == 429  # noqa: PLR2004
+        isinstance(exception, httpx.HTTPStatusError)
+        and exception.response.status_code == 429  # noqa: PLR2004
     )
-
-
-
 
 
 def validate_current_azure_storage_config() -> dict:
@@ -78,7 +77,43 @@ def get_file_blob_path(user_email: str, file_name: str) -> str:
     return f"user-uploads/{user_email}/{file_name}"
 
 
-def generate_blob_upload_url(container_name: str, blob_name: str, expiry_hours: int = 1) -> str:
+def extract_transcription_id_from_blob_path(
+    blob_path: str, user_email: str
+) -> str | None:
+    """
+    Extract a valid transcription ID from the blob path filename.
+
+    Attempts to use the filename (without extension) as the transcription ID if it's
+    a valid UUID format. Falls back to None (auto-generation) for non-UUID filenames.
+
+    Args:
+        blob_path (str): Full path to the blob (e.g., 'user-uploads/user@example.com/uuid.mp4')
+        user_email (str): User email for logging purposes
+
+    Returns:
+        str | None: Valid UUID string to use as transcription_id, or None to trigger auto-generation
+    """
+    filename = Path(blob_path).stem  # Gets filename without extension
+
+    try:
+        UUID(filename)  # Validate UUID format
+    except ValueError:
+        # Filename is not a valid UUID, signal to auto-generate one
+        logger.warning(
+            f"User {user_email}: Filename '{filename}' is not a valid UUID, "
+            f"will auto-generate transcription_id for blob: {blob_path}"
+        )
+        return None
+    else:
+        logger.info(
+            f"User {user_email}: Using filename as transcription_id: {filename}"
+        )
+        return filename
+
+
+def generate_blob_upload_url(
+    container_name: str, blob_name: str, expiry_hours: int = 1
+) -> str:
     """
     Generate a presigned URL for uploading to Azure Blob Storage.
 
@@ -100,7 +135,9 @@ def generate_blob_upload_url(container_name: str, blob_name: str, expiry_hours: 
         raise ValueError(error_msg)
 
     # Validate that the account key is current and active
-    if not _validate_azure_account_key(settings.AZURE_STORAGE_ACCOUNT_NAME, account_key):
+    if not _validate_azure_account_key(
+        settings.AZURE_STORAGE_ACCOUNT_NAME, account_key
+    ):
         error_msg = f"Azure Storage account key is invalid for account: {settings.AZURE_STORAGE_ACCOUNT_NAME}"
         raise ValueError(error_msg)
 
@@ -150,7 +187,9 @@ def convert_to_mp3(  # noqa: C901, PLR0912
     # Always generate an output filename if not provided
     if output_file is None:
         # input_path = Path(input_file_path)
-        output_file = str(input_file_path.with_name(f"{input_file_path.stem}_converted.mp3"))
+        output_file = str(
+            input_file_path.with_name(f"{input_file_path.stem}_converted.mp3")
+        )
 
     # Validate bitrate format
     if not bitrate.endswith(("k", "K")) or not bitrate[:-1].isdigit():
@@ -167,7 +206,9 @@ def convert_to_mp3(  # noqa: C901, PLR0912
     try:
         # logger.info("Probing input file for audio streams")
         probe = ffmpeg.probe(input_file_path)
-        audio_streams = [stream for stream in probe["streams"] if stream["codec_type"] == "audio"]
+        audio_streams = [
+            stream for stream in probe["streams"] if stream["codec_type"] == "audio"
+        ]
 
         if not audio_streams:
             msg = f"No audio stream found in the input file: {input_file_path}"
@@ -231,7 +272,11 @@ def convert_input_dialogue_entries_to_dialogue_entries(
             speaker=str(entry["speaker"]),
             text=entry["text"],
             start_time=float(entry["offsetMilliseconds"]) / 1000,
-            end_time=(float(entry["offsetMilliseconds"]) + float(entry["durationMilliseconds"])) / 1000,
+            end_time=(
+                float(entry["offsetMilliseconds"])
+                + float(entry["durationMilliseconds"])
+            )
+            / 1000,
         )
         for entry in entries
     ]

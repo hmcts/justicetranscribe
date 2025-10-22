@@ -3,7 +3,6 @@ from uuid import UUID
 
 import sentry_sdk
 
-from app.audio.blob_deletion_service import BlobDeletionService
 from app.audio.speakers import process_speakers_and_dialogue_entries
 from app.audio.transcription import transcribe_audio
 from app.audio.utils import (
@@ -47,49 +46,24 @@ async def generate_and_save_meeting_title(
 
 
 async def transcribe_and_generate_llm_output(
-    user_upload_blob_storage_file_key: str, user_id: UUID, user_email: str, transcription_id: str | None = None
+    user_upload_blob_storage_file_key: str,
+    user_id: UUID,
+    user_email: str,
+    transcription_id: str | None = None,
 ):
-    """
-    Transcribe audio and generate LLM output.
-
-    IMPORTANT: Creates transcription record AFTER successful download/transcription
-    to prevent duplicate database records on retry failures.
-
-    Parameters
-    ----------
-    user_upload_blob_storage_file_key : str
-        Path to the audio blob in Azure Storage
-    user_id : UUID
-        ID of the user who uploaded the audio
-    user_email : str
-        Email of the user
-    transcription_id : str | None
-        Optional transcription ID for idempotency. If None, a new one is generated.
-    """
     # Start a Sentry transaction for the whole function
     with sentry_sdk.start_transaction(
         op="task", name="Transcribe and Generate LLM Output"
     ) as transaction:  # noqa: F841
-        transcription = None
-        transcription_job = None
+        transcription_data = Transcription(id=transcription_id)
+        transcription = save_transcription(transcription_data, user_id)
 
         try:
-            # STEP 1: Download and transcribe (with retries)
-            # This is the step most likely to fail, so we do it BEFORE creating DB records
-            logger.info("Starting transcription download and processing...")
             dialogue_entries = await transcribe_audio(user_upload_blob_storage_file_key)
             updated_dialogue_entries = await process_speakers_and_dialogue_entries(
                 dialogue_entries, user_email
             )
-
-            # STEP 2: Create transcription record AFTER successful transcription
-            # This prevents duplicate DB records on retry failures
-            logger.info("Transcription successful, creating database records...")
-            transcription_data = Transcription(id=transcription_id)
-            transcription = save_transcription(transcription_data, user_id)
-
-            # STEP 3: Save transcription job
-            transcription_job = save_transcription_job(
+            save_transcription_job(
                 TranscriptionJob(
                     transcription_id=transcription.id,
                     dialogue_entries=updated_dialogue_entries,
@@ -97,41 +71,15 @@ async def transcribe_and_generate_llm_output(
                 )
             )
 
-            # Trigger automated blob deletion after successful transcription
-            if transcription_job and transcription_job.id:
-                try:
-                    blob_deletion_service = BlobDeletionService()
-                    asyncio.create_task(  # noqa: RUF006
-                        blob_deletion_service.process_transcription_cleanup(
-                            transcription_job_id=transcription_job.id,
-                            blob_path=user_upload_blob_storage_file_key,
-                            user_email=user_email
-                        )
-                    )
-                    logger.info(f"Started automated blob deletion for job {transcription_job.id}")
-                except Exception as cleanup_error:
-                    logger.error(f"Failed to start blob deletion for job {transcription_job.id}: {cleanup_error}")
-                    # Don't fail the transcription if cleanup fails to start
-            else:
-                logger.error("Failed to save transcription job, skipping blob deletion")
-
         except Exception as e:
-            logger.error(f"Error during transcription processing: {e}")
-
-            # Only save error transcription_job if transcription was created
-            # If transcription failed before DB record creation, we don't create orphan records
-            if transcription and transcription.id:
-                save_transcription_job(
-                    TranscriptionJob(
-                        transcription_id=transcription.id,
-                        dialogue_entries=[],
-                        s3_audio_url=user_upload_blob_storage_file_key,
-                        error_message=str(e),
-                    )
+            save_transcription_job(
+                TranscriptionJob(
+                    transcription_id=transcription.id,
+                    dialogue_entries=[],
+                    s3_audio_url=user_upload_blob_storage_file_key,
+                    error_message=str(e),
                 )
-            else:
-                logger.info("Transcription record not yet created, skipping error job creation")
-
+            )
             sentry_sdk.capture_exception(e)
             raise
 
