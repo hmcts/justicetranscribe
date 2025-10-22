@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Mic, Loader2, Moon } from "lucide-react";
+import { Mic, Loader2 } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
@@ -24,9 +24,9 @@ import {
   AudioBackup,
   IndexedDBBackup,
 } from "@/lib/indexeddb-backup";
-import useIsMobile from "@/hooks/use-mobile";
 import { AudioDevice, MicrophonePermission } from "./microphone-permission";
 import RecordingControl from "./recording-control";
+import { SilenceNotificationsBanner } from "./silence-notifications-banner";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
@@ -48,7 +48,6 @@ function AudioRecorderComponent({
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [showProcessingRecording, setShowProcessingRecording] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-  const isMobile = useIsMobile();
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -324,41 +323,7 @@ function AudioRecorderComponent({
               </div>
 
               {/* Do Not Disturb Reminder */}
-              {isMobile && (
-                <div
-                  role="status"
-                  aria-label="Reminder to enable Do Not Disturb mode"
-                  className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3"
-                  style={{
-                    borderColor: "#D8C8FF",
-                    backgroundColor: "#F4F1FF",
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="mt-0.5 rounded-full p-2"
-                      style={{ backgroundColor: "#CABDFF" }}
-                    >
-                      <Moon
-                        className="size-5"
-                        style={{ color: "#1F1247" }}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h3
-                        className="text-sm font-semibold"
-                        style={{ color: "#1F1247" }}
-                      >
-                        Silence notifications
-                      </h3>
-                      <p className="mt-0.5 text-sm" style={{ color: "#362952" }}>
-                        Turn on Do Not Disturb while recording.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <SilenceNotificationsBanner />
             </>
           )}
 
