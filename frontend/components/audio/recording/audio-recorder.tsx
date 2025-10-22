@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Mic, Loader2, BellOff } from "lucide-react";
+import { Mic, Loader2 } from "lucide-react";
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
@@ -26,6 +26,7 @@ import {
 } from "@/lib/indexeddb-backup";
 import { AudioDevice, MicrophonePermission } from "./microphone-permission";
 import RecordingControl from "./recording-control";
+import { SilenceNotificationsBanner } from "./silence-notifications-banner";
 
 interface MicRecorderProps {
   onRecordingStop: (blob: Blob | null, backupId?: string | null) => void;
@@ -321,16 +322,8 @@ function AudioRecorderComponent({
                 </h1>
               </div>
 
-              {/* Do Not Disturb Notification - One line below header */}
-              <div className="rounded-lg border border-amber-200/60 bg-gradient-to-r from-amber-50/70 to-orange-50/70 px-3 py-2 dark:border-amber-800/20 dark:from-amber-950/20 dark:to-orange-950/20">
-                <div className="flex items-center justify-center gap-2">
-                  <BellOff className="size-3.5 text-amber-600 dark:text-amber-400" />
-                  <p className="text-sm text-amber-800 dark:text-amber-300">
-                    💡 Turn on Do Not Disturb mode to prevent interruptions
-                    during recording
-                  </p>
-                </div>
-              </div>
+              {/* Do Not Disturb Reminder */}
+              <SilenceNotificationsBanner />
             </>
           )}
 
