@@ -3,7 +3,6 @@ from uuid import UUID
 
 import sentry_sdk
 
-from app.audio.blob_deletion_service import BlobDeletionService
 from app.audio.speakers import process_speakers_and_dialogue_entries
 from app.audio.transcription import transcribe_audio
 from app.audio.utils import (
@@ -64,35 +63,13 @@ async def transcribe_and_generate_llm_output(
             updated_dialogue_entries = await process_speakers_and_dialogue_entries(
                 dialogue_entries, user_email
             )
-            transcription_job = save_transcription_job(
+            save_transcription_job(
                 TranscriptionJob(
                     transcription_id=transcription.id,
                     dialogue_entries=updated_dialogue_entries,
                     s3_audio_url=user_upload_blob_storage_file_key,
                 )
             )
-
-            # Trigger automated blob deletion after successful transcription
-            if transcription_job and transcription_job.id:
-                try:
-                    blob_deletion_service = BlobDeletionService()
-                    asyncio.create_task(  # noqa: RUF006
-                        blob_deletion_service.process_transcription_cleanup(
-                            transcription_job_id=transcription_job.id,
-                            blob_path=user_upload_blob_storage_file_key,
-                            user_email=user_email,
-                        )
-                    )
-                    logger.info(
-                        f"Started automated blob deletion for job {transcription_job.id}"
-                    )
-                except Exception as cleanup_error:
-                    logger.error(
-                        f"Failed to start blob deletion for job {transcription_job.id}: {cleanup_error}"
-                    )
-                    # Don't fail the transcription if cleanup fails to start
-            else:
-                logger.error("Failed to save transcription job, skipping blob deletion")
 
         except Exception as e:
             save_transcription_job(
