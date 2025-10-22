@@ -24,19 +24,12 @@ if not DATABASE_URL:
 engine = create_engine(
     DATABASE_URL,
     echo=False,
-    pool_size=20,  # Increase base pool size
-    max_overflow=40,  # Increase overflow for burst traffic
-    pool_timeout=30,  # Keep existing timeout
+    pool_size=5,  # Conservative to prevent connection exhaustion
+    max_overflow=5,  # Conservative to allow multiple instances
+    pool_timeout=30,  # Wait for available connection
     pool_recycle=3600,  # Recycle connections after 1 hour
     pool_pre_ping=True,  # Verify connections before using
 )
-
-
-# def create_db_and_tables():
-#     """Create database tables"""
-#     logger.info("Creating database tables...")
-#     SQLModel.metadata.create_all(engine)
-#     logger.info("Database tables created successfully")
 
 
 def get_session() -> Generator[Session, None, None]:
