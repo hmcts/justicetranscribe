@@ -318,6 +318,8 @@ resource "azurerm_linux_web_app" "backend_api" {
   }
 
   # Only ignore changes to sensitive environment variables
+  # Note: AZURE_AD_CLIENT_ID, AZURE_AD_TENANT_ID, and LANGFUSE_HOST are managed by Terraform
+  # from the .tfvars files and are not secrets, so they're not in the ignore list
   lifecycle {
     ignore_changes = [
       app_settings["MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"],
@@ -331,11 +333,8 @@ resource "azurerm_linux_web_app" "backend_api" {
       app_settings["SENTRY_DSN"],
       app_settings["LANGFUSE_SECRET_KEY"],
       app_settings["LANGFUSE_PUBLIC_KEY"],
-      app_settings["LANGFUSE_HOST"],
       app_settings["GOV_NOTIFY_API_KEY"],
       app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
-      app_settings["AZURE_AD_TENANT_ID"],
-      app_settings["AZURE_AD_CLIENT_ID"],
       site_config[0].application_stack[0].docker_image_name,
       site_config[0].application_stack[0].docker_registry_url,
       site_config[0].application_stack[0].docker_registry_username,
