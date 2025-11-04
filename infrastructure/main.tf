@@ -274,6 +274,10 @@ resource "azurerm_linux_web_app" "backend_api" {
     "AUTH_TENANT_ID"    = var.auth_tenant_id
     "AUTH_ISSUER_URL"   = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0"
     
+    # Azure AD configuration (required by backend settings)
+    "AZURE_AD_CLIENT_ID" = var.auth_client_id
+    "AZURE_AD_TENANT_ID" = var.auth_tenant_id
+    
     # Application configuration
     "APP_URL"                           = "https://${local.frontend_hostname}"
     
@@ -295,7 +299,7 @@ resource "azurerm_linux_web_app" "backend_api" {
     "SENTRY_DSN"                        = "placeholder-sentry-dsn"
     "LANGFUSE_SECRET_KEY"               = "placeholder-langfuse-secret-key"
     "LANGFUSE_PUBLIC_KEY"               = "placeholder-langfuse-public-key"
-    "LANGFUSE_HOST"                     = "placeholder-langfuse-host"
+    "LANGFUSE_HOST"                     = "https://langfuse-ai.justice.gov.uk"
     
     # Government Services
     "GOV_NOTIFY_API_KEY"                = "placeholder-gov-notify-api-key"
