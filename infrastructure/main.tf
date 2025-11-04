@@ -176,7 +176,6 @@ resource "azurerm_linux_web_app" "frontend" {
     
     # Frontend environment variables
     "NEXT_PUBLIC_API_URL"                        = "https://${local.backend_hostname}"
-    "EXTERNAL_API_KEY"                          = "placeholder-external-api-key"
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
     
     # Add database connection for Next.js API routes
@@ -264,9 +263,8 @@ resource "azurerm_linux_web_app" "backend_api" {
     
     # CORS allowed origins - include custom domain
     "CORS_ALLOWED_ORIGINS"               = "https://${local.frontend_hostname},${var.custom_domain_url},http://localhost:3000"    
-    # Database and external API settings
+    # Database settings
     "DATABASE_CONNECTION_STRING"         = local.database_connection_string
-    "EXTERNAL_API_KEY"                  = "placeholder-external-api-key"
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
 
      # Add authentication configuration
@@ -323,7 +321,6 @@ resource "azurerm_linux_web_app" "backend_api" {
   lifecycle {
     ignore_changes = [
       app_settings["MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"],
-      app_settings["EXTERNAL_API_KEY"],
       app_settings["AZURE_OPENAI_API_KEY"],
       app_settings["AZURE_OPENAI_ENDPOINT"],
       app_settings["AZURE_GROK_API_KEY"],
