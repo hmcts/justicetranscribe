@@ -266,11 +266,6 @@ resource "azurerm_linux_web_app" "backend_api" {
     # Database settings
     "DATABASE_CONNECTION_STRING"         = local.database_connection_string
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
-
-     # Add authentication configuration
-    "AUTH_CLIENT_ID"    = var.auth_client_id
-    "AUTH_TENANT_ID"    = var.auth_tenant_id
-    "AUTH_ISSUER_URL"   = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0"
     
     # Azure AD configuration (required by backend settings)
     "AZURE_AD_CLIENT_ID" = var.auth_client_id
