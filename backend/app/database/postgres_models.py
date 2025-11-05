@@ -91,34 +91,6 @@ class TranscriptionJob(BaseTable, table=True):
     cleanup_failure_reason: str | None = Field(default=None)
 
 
-class BlobProcessingAttempt(BaseTable, table=True):
-    """
-    Track processing attempts for audio blobs to prevent infinite retries.
-
-    This table maintains a record of how many times each blob has been attempted
-    for processing, enabling strict retry limit enforcement (max 2 attempts).
-    Used by GlobalTranscriptionPollingService to prevent infinite retry loops.
-
-    Attributes
-    ----------
-    blob_path : str
-        Full Azure blob path (unique), indexed for fast lookups
-    attempt_count : int
-        Number of processing attempts recorded, defaults to 0
-    last_error : str | None
-        Last error message encountered during processing
-    last_attempt_at : datetime
-        Timestamp of most recent processing attempt (UTC)
-    """
-
-    __tablename__ = "blob_processing_attempt"
-
-    blob_path: str = Field(index=True, unique=True)
-    attempt_count: int = Field(default=0)
-    last_error: str | None = Field(default=None)
-    last_attempt_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-
 # Database helper functions for blob deletion service
 async def get_transcription_job_by_id(session: AsyncSession, job_id: UUID) -> TranscriptionJob | None:
     """
