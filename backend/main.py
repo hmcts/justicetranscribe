@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import threading
 from contextlib import asynccontextmanager
 
 import sentry_sdk
@@ -11,8 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
-from app.audio.transcription_polling_service import TranscriptionPollingService
-from app.logger import logger
+from app.audio.transcription_polling_service import GlobalTranscriptionPollingService
 from utils.cors_utils import parse_origins
 from utils.exception_handlers import http_exception_handler, unhandled_exception_handler
 from utils.middleware import add_request_id
@@ -20,73 +18,26 @@ from utils.settings import get_settings
 
 log = logging.getLogger("uvicorn")
 
-# Global dictionary to track active per-user polling tasks
-active_polling_tasks: dict[str, asyncio.Task] = {}
-# Lock to prevent race conditions when starting polling tasks
-_polling_tasks_lock = threading.Lock()
-
-
-def ensure_user_polling_started(user_email: str) -> None:
-    """
-    Ensure that a polling service is running for the given user.
-
-    If a polling service doesn't exist for this user, creates one and starts it.
-    If one already exists, does nothing (idempotent).
-
-    Thread-safe: Uses a lock to prevent race conditions when multiple concurrent
-    requests attempt to start polling for the same user.
-
-    Parameters
-    ----------
-    user_email : str
-        The email address of the user to start polling for.
-    """
-
-    # Use lock to prevent race conditions on concurrent requests
-    with _polling_tasks_lock:
-        # Check if polling already exists for this user
-        if user_email in active_polling_tasks:
-            # Check if the task is still running
-            task = active_polling_tasks[user_email]
-            if not task.done():
-                # Task is still running, nothing to do
-                return
-            # Task has completed/failed, remove it and create a new one
-            logger.warning(
-                f"Polling task for user {user_email} was done, restarting..."
-            )
-            del active_polling_tasks[user_email]
-
-        # Create and start new polling service for this user
-        logger.info(f"Starting new polling service for user: {user_email}")
-        polling_service = TranscriptionPollingService(user_email=user_email)
-        task = asyncio.create_task(polling_service.run_polling_loop())
-        active_polling_tasks[user_email] = task
-
 
 @asynccontextmanager
 async def lifespan(app_: FastAPI):  # noqa: ARG001
     log.info("Starting up...")
 
-    # Check if transcription polling is enabled
-    log.info(
-        "Transcription polling is ENABLED - per-user polling services will start on user requests"
-    )
+    # Start global transcription polling service
+    log.info("Starting global transcription polling service...")
+    global_polling_service = GlobalTranscriptionPollingService()
+    global_polling_task = asyncio.create_task(global_polling_service.run_polling_loop())
+    log.info("Global polling service started")
 
     yield
 
-    # Cancel all active polling tasks on shutdown
-    if active_polling_tasks:
-        log.info(
-            "Shutting down %d active polling service(s)...", len(active_polling_tasks)
-        )
-        for user_email, task in active_polling_tasks.items():
-            log.info("Cancelling polling service for user: %s", user_email)
-            task.cancel()
-
-        # Wait for all tasks to complete cancellation
-        await asyncio.gather(*active_polling_tasks.values(), return_exceptions=True)
-        log.info("All polling services stopped")
+    # Cancel global polling task on shutdown
+    log.info("Shutting down global polling service...")
+    global_polling_task.cancel()
+    try:
+        await global_polling_task
+    except asyncio.CancelledError:
+        log.info("Global polling service stopped")
 
     log.info("Shutting down...")
 

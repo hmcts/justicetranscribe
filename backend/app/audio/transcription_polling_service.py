@@ -10,13 +10,19 @@ import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlmodel import Session, select
+import sentry_sdk
+from sqlmodel import select
 
 from app.audio.azure_utils import AsyncAzureBlobManager
 from app.audio.process_audio_fully import transcribe_and_generate_llm_output
 from app.audio.utils import extract_transcription_id_from_blob_path
-from app.database.postgres_database import engine
-from app.database.postgres_models import User
+from app.database.connection import get_async_session
+from app.database.postgres_models import (
+    BlobProcessingAttempt,
+    Transcription,
+    TranscriptionJob,
+    User,
+)
 from app.logger import logger
 from utils.settings import get_settings
 
@@ -49,6 +55,7 @@ class TranscriptionPollingService:
         self.user_uploads_prefix = f"user-uploads/{user_email}/"
         self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
         self.max_retry_attempts = 2  # Allow 2 total attempts (1 retry max as requested)
+        self.min_blob_path_parts = 3  # Minimum parts for valid path: "user-uploads/email/filename"
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
         self._is_first_poll = True
@@ -209,7 +216,7 @@ class TranscriptionPollingService:
 
         return None
 
-    def get_or_create_user_by_email(self, email: str) -> User | None:
+    async def get_or_create_user_by_email(self, email: str) -> User | None:
         """
         Look up user by email in the database.
 
@@ -227,9 +234,10 @@ class TranscriptionPollingService:
             The User object if found, None otherwise.
         """
         try:
-            with Session(engine) as session:
+            async with get_async_session() as session:
                 statement = select(User).where(User.email == email)
-                user = session.exec(statement).first()
+                result = await session.execute(statement)
+                user = result.scalar_one_or_none()
 
                 if user:
                     logger.info(f"Found user for email: {email}")
@@ -289,7 +297,7 @@ class TranscriptionPollingService:
                 return False
 
             # Look up user in database
-            user = self.get_or_create_user_by_email(user_email)
+            user = await self.get_or_create_user_by_email(user_email)
             if not user:
                 error_msg = f"User not found for email: {user_email}"
                 logger.error(f"User {self.user_email}: {error_msg}")
@@ -617,3 +625,814 @@ class TranscriptionPollingService:
 
             # Wait before next poll
             await asyncio.sleep(self.polling_interval_seconds)
+
+
+class GlobalTranscriptionPollingService:
+    """
+    Global service for polling Azure Blob Storage and processing audio files for all users.
+
+    Polls the entire user-uploads/ prefix every 30 seconds and processes discovered
+    blobs concurrently (up to 10 at a time). Uses TranscriptionJob existence as the
+    source of truth for whether a blob has been processed.
+    """
+
+    # Class constants
+    MAX_RETRY_ATTEMPTS = 2  # Maximum processing attempts before marking as permanently failed
+    MAX_CONCURRENT_PROCESSING = 10  # Maximum concurrent blob processing operations
+    POLLING_INTERVAL_SECONDS = 30  # Time between polling cycles
+
+    def __init__(self):
+        """
+        Initialize the global transcription polling service.
+
+        Sets up Azure blob manager, polling parameters, and concurrency limits.
+        """
+        self.settings = get_settings()
+        self.azure_blob_manager = AsyncAzureBlobManager()
+        self.user_uploads_prefix = "user-uploads/"
+        self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
+        self.min_blob_path_parts = 3  # Minimum parts for valid path: "user-uploads/email/filename"
+        self._polling_in_progress = False  # Prevent overlapping poll cycles
+        logger.info("Global transcription polling service initialized")
+
+    async def _delete_blob_and_return_true(self, blob_path: str, reason: str) -> bool:
+        """
+        Helper to delete a blob and return True (processed/skip signal).
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path to delete.
+        reason : str
+            Log message explaining why blob is being deleted.
+
+        Returns
+        -------
+        bool
+            Always returns True to signal blob should be skipped.
+        """
+        logger.warning(f"✓ {reason}: {blob_path}. Deleting immediately.")
+        await self.azure_blob_manager.delete_blob(blob_path)
+        logger.info(f"Deleted blob: {blob_path}")
+        return True
+
+    async def blob_has_been_processed(self, blob_path: str, blob_metadata: dict) -> bool:
+        """
+        Check if a blob has been processed or should be deleted.
+
+        Checks multiple signals and deletes blobs immediately when appropriate:
+        0. Blob metadata status is "permanently_failed" → Delete immediately
+        1. Blob metadata retry_count >= MAX_RETRY_ATTEMPTS (legacy from old system) → Delete immediately
+        2. TranscriptionJob exists (successful processing) → Delete immediately (orphaned blob)
+        3. Transcription record exists (failed early) → Delete immediately (prevents untitled meetings)
+        4. BlobProcessingAttempt count >= MAX_RETRY_ATTEMPTS (retry limit) → Already deleted, skip
+
+        Parameters
+        ----------
+        blob_path : str
+            The full blob path to check.
+        blob_metadata : dict
+            The blob's metadata dictionary.
+
+        Returns
+        -------
+        bool
+            True if blob should be skipped (already processed, deleted, or awaiting deletion).
+        """
+        try:
+            # Check 0: Blob metadata shows permanently_failed status
+            if blob_metadata.get("status") == "permanently_failed":
+                return await self._delete_blob_and_return_true(
+                    blob_path, "Found blob marked permanently_failed but not deleted"
+                )
+
+            # Check 1: Legacy blob with high retry count from old system
+            try:
+                metadata_retry_count = int(blob_metadata.get("retry_count", "0"))
+                if metadata_retry_count >= self.MAX_RETRY_ATTEMPTS:
+                    return await self._delete_blob_and_return_true(
+                        blob_path, f"Found legacy blob with retry_count={metadata_retry_count}"
+                    )
+            except (ValueError, TypeError):
+                pass  # Invalid retry_count format, ignore
+
+            async with get_async_session() as session:
+                # Check 2: TranscriptionJob exists - orphaned blob, delete it
+                job_statement = select(TranscriptionJob).where(
+                    TranscriptionJob.s3_audio_url == blob_path
+                )
+                result = await session.execute(job_statement)
+                if result.scalar_one_or_none() is not None:
+                    return await self._delete_blob_and_return_true(
+                        blob_path, "Found orphaned blob (TranscriptionJob exists but blob not deleted)"
+                    )
+
+                # Check 3: Transcription record exists (failed early) - delete to prevent untitled meetings
+                try:
+                    filename = Path(blob_path).stem
+                    from uuid import UUID
+                    UUID(filename)  # Validate it's a UUID
+
+                    trans_statement = select(Transcription).where(Transcription.id == filename)
+                    result = await session.execute(trans_statement)
+                    if result.scalar_one_or_none() is not None:
+                        return await self._delete_blob_and_return_true(
+                            blob_path, "Found blob with Transcription but no TranscriptionJob (failed early)"
+                        )
+                except (ValueError, AttributeError):
+                    pass  # Not a valid UUID filename, can't check by ID
+
+                # Check 4: PostgreSQL-tracked attempt count - skip if >= MAX_RETRY_ATTEMPTS
+                attempt_statement = select(BlobProcessingAttempt).where(
+                    BlobProcessingAttempt.blob_path == blob_path
+                )
+                result = await session.execute(attempt_statement)
+                attempt = result.scalar_one_or_none()
+                if attempt and attempt.attempt_count >= self.MAX_RETRY_ATTEMPTS:
+                    logger.warning(
+                        f"✓ Skipping blob (exceeded retry limit: {attempt.attempt_count} attempts): {blob_path}. "
+                        f"Last error: {attempt.last_error}"
+                    )
+                    return True
+
+        except Exception as e:
+            logger.error(f"Error checking if blob processed {blob_path}: {e}")
+
+        # Default: blob not processed, should be processed
+        return False
+
+    async def _filter_candidate_blobs(self, all_blobs: list[dict]) -> list[dict]:
+        """
+        Filter blobs by extension and metadata signals (no DB query).
+
+        Parameters
+        ----------
+        all_blobs : list[dict]
+            All blobs from Azure Storage.
+
+        Returns
+        -------
+        list[dict]
+            Blobs that pass extension and metadata checks.
+        """
+        candidate_blobs = []
+        for blob in all_blobs:
+            blob_name = blob["name"]
+            blob_metadata = blob.get("metadata", {})
+
+            # Check extension
+            if Path(blob_name).suffix.lower() not in self.supported_extensions:
+                continue
+
+            # Check metadata-only signals (no DB query needed)
+            if blob_metadata.get("status") == "permanently_failed":
+                logger.warning(f"Found orphaned permanently_failed blob: {blob_name}, deleting")
+                await self.azure_blob_manager.delete_blob(blob_name)
+                continue
+
+            # Check for legacy high-retry blobs from old system
+            try:
+                metadata_retry_count = int(blob_metadata.get("retry_count", "0"))
+                if metadata_retry_count >= self.MAX_RETRY_ATTEMPTS:
+                    logger.warning(f"Found legacy blob with retry_count={metadata_retry_count}: {blob_name}, deleting")
+                    await self.azure_blob_manager.delete_blob(blob_name)
+                    continue
+            except (ValueError, TypeError):
+                pass
+
+            candidate_blobs.append(blob)
+
+        return candidate_blobs
+
+    async def _get_processed_and_failed_paths(self, candidate_blobs: list[dict]) -> tuple[set[str], set[str]]:
+        """
+        Execute batched database queries to find processed and failed-early blobs.
+
+        Parameters
+        ----------
+        candidate_blobs : list[dict]
+            Candidate blobs to check.
+
+        Returns
+        -------
+        tuple[set[str], set[str]]
+            (processed_paths, failed_early_ids) - Sets of blob paths/IDs to skip.
+        """
+        blob_paths = [blob["name"] for blob in candidate_blobs]
+
+        async with get_async_session() as session:
+            # Query 1: Get all TranscriptionJobs for these blobs
+            job_statement = select(TranscriptionJob.s3_audio_url).where(
+                TranscriptionJob.s3_audio_url.in_(blob_paths)
+            )
+            result = await session.execute(job_statement)
+            processed_paths = set(result.scalars().all())
+
+            # Query 2: Get all Transcriptions for blob filenames
+            potential_transcription_ids = []
+            for blob in candidate_blobs:
+                try:
+                    filename = Path(blob["name"]).stem
+                    from uuid import UUID
+                    UUID(filename)  # Validate it's a UUID
+                    potential_transcription_ids.append(filename)
+                except (ValueError, TypeError):
+                    pass
+
+            failed_early_ids = set()
+            if potential_transcription_ids:
+                trans_statement = select(Transcription.id).where(
+                    Transcription.id.in_(potential_transcription_ids)
+                )
+                result = await session.execute(trans_statement)
+                failed_early_ids = {str(t) for t in result.scalars().all()}
+
+        return processed_paths, failed_early_ids
+
+    async def poll_for_unprocessed_blobs(self) -> list[dict]:
+        """
+        Poll entire user-uploads/ prefix for blobs that need processing.
+
+        Uses BATCHED database queries for efficiency at scale.
+
+        Returns blobs that:
+        - Have supported audio extension
+        - Have NOT been processed (checks TranscriptionJob, Transcription, and metadata retry count)
+
+        Returns
+        -------
+        list[dict]
+            List of unprocessed blob dictionaries with keys:
+            - name: str (blob path)
+            - metadata: dict
+            - last_modified: datetime
+            - size: int
+        """
+        try:
+            # Step 1: List all blobs
+            all_blobs = await self.azure_blob_manager.list_blobs_in_prefix(
+                prefix=self.user_uploads_prefix,
+                include_metadata=True
+            )
+            logger.info(
+                f"Listed {len(all_blobs)} blobs with prefix '{self.user_uploads_prefix}' "
+                f"in container '{self.azure_blob_manager.container_name}'"
+            )
+
+            # Step 2: Filter by extension and metadata (no DB queries)
+            candidate_blobs = await self._filter_candidate_blobs(all_blobs)
+            if not candidate_blobs:
+                return []
+
+            # Step 3: Batch DB queries to find processed/failed blobs
+            processed_paths, failed_early_ids = await self._get_processed_and_failed_paths(candidate_blobs)
+
+            # Step 4: Filter out processed/failed blobs, delete orphaned ones
+            unprocessed = []
+            for blob in candidate_blobs:
+                blob_name = blob["name"]
+
+                # Orphaned blob (successfully processed but not deleted)
+                if blob_name in processed_paths:
+                    logger.warning(f"✓ Found orphaned blob: {blob_name}. Deleting immediately.")
+                    await self.azure_blob_manager.delete_blob(blob_name)
+                    continue
+
+                # Failed-early blob (Transcription exists but no TranscriptionJob)
+                filename = Path(blob_name).stem
+                if filename in failed_early_ids:
+                    logger.warning(f"✓ Found failed-early blob: {blob_name}. Deleting to prevent untitled meeting.")
+                    await self.azure_blob_manager.delete_blob(blob_name)
+                    continue
+
+                unprocessed.append(blob)
+
+            # Return empty list or log and return unprocessed blobs
+            if not unprocessed:
+                return []
+            else:
+                logger.info(f"Global polling: Found {len(unprocessed)} unprocessed blobs")
+                return unprocessed
+
+        except Exception as e:
+            logger.error(f"Global polling: Error polling for blobs: {e}")
+            return []
+
+    def extract_user_email_from_blob_path(self, blob_path: str) -> str | None:
+        """
+        Extract user email from user-uploads/{email}/{filename} path.
+
+        Parameters
+        ----------
+        blob_path : str
+            The full blob path.
+
+        Returns
+        -------
+        str | None
+            The user email if successfully extracted, None otherwise.
+        """
+        try:
+            parts = blob_path.split("/")
+            if len(parts) >= self.min_blob_path_parts and parts[0] == "user-uploads":
+                return parts[1]
+        except Exception as e:
+            logger.error(f"Error extracting email from blob path '{blob_path}': {e}")
+        return None
+
+    async def get_user_by_email(self, email: str) -> User | None:
+        """
+        Look up user by email in the database (case-insensitive).
+
+        Parameters
+        ----------
+        email : str
+            The user's email address.
+
+        Returns
+        -------
+        User | None
+            The User object if found, None otherwise.
+        """
+        try:
+            # Normalize email to lowercase for case-insensitive lookup
+            normalized_email = email.lower()
+
+            async with get_async_session() as session:
+                statement = select(User).where(User.email == normalized_email)
+                result = await session.execute(statement)
+                user = result.scalar_one_or_none()
+
+                if not user:
+                    # Try original case as fallback (in case DB has mixed case)
+                    statement = select(User).where(User.email == email)
+                    result = await session.execute(statement)
+                    user = result.scalar_one_or_none()
+
+                    if user:
+                        logger.warning(
+                            f"Found user with original case '{email}' but not normalized case. "
+                            f"Consider normalizing emails in database."
+                        )
+
+                return user
+        except Exception as e:
+            logger.error(f"Error looking up user by email '{email}': {e}")
+            return None
+
+    async def process_single_blob(self, blob_info: dict) -> bool:
+        """
+        Process a single discovered blob.
+
+        Writes metadata for troubleshooting and tracks attempts in PostgreSQL.
+
+        Parameters
+        ----------
+        blob_info : dict
+            Dictionary containing blob information from poll_for_unprocessed_blobs.
+
+        Returns
+        -------
+        bool
+            True if processing was successful, False otherwise.
+        """
+        blob_path = blob_info["name"]
+        logger.info(f"Global polling: Processing blob: {blob_path}")
+
+        try:
+            # Extract user email
+            user_email = self.extract_user_email_from_blob_path(blob_path)
+            if not user_email:
+                error_msg = f"Could not extract user email from blob path: {blob_path}"
+                logger.error(error_msg)
+                await self._record_processing_attempt(blob_path, error_msg)
+                await self._write_metadata_for_troubleshooting(
+                    blob_path, status="error", error=error_msg
+                )
+                return False
+
+            # Look up user
+            user = await self.get_user_by_email(user_email)
+            if not user:
+                error_msg = f"User not found for email: {user_email}"
+                logger.error(error_msg)
+                await self._record_processing_attempt(blob_path, error_msg)
+                await self._write_metadata_for_troubleshooting(
+                    blob_path, status="error", error=error_msg
+                )
+                return False
+
+            # Trigger transcription
+            transcription_id = extract_transcription_id_from_blob_path(
+                blob_path, user_email
+            )
+
+            logger.info(f"Starting transcription for blob: {blob_path}")
+
+            await transcribe_and_generate_llm_output(
+                user_upload_blob_storage_file_key=blob_path,
+                user_id=user.id,
+                user_email=user.email,
+                transcription_id=transcription_id,
+            )
+
+            # Mark as processed and delete blob
+            await self._mark_processed_and_delete(blob_path)
+
+        except Exception as e:
+            error_msg = f"Error processing blob {blob_path}: {e}"
+            logger.error(error_msg)
+
+            # Record the attempt and check if we've hit the retry limit
+            attempt_count = await self._record_processing_attempt(blob_path, str(e))
+
+            if attempt_count >= self.MAX_RETRY_ATTEMPTS:
+                # Hit retry limit - delete blob immediately
+                logger.warning(
+                    f"Blob has reached retry limit ({attempt_count} attempts): {blob_path}. "
+                    f"Deleting immediately. Last error: {e!s}"
+                )
+                try:
+                    await self.azure_blob_manager.delete_blob(blob_path)
+                    logger.info(f"Deleted permanently failed blob: {blob_path}")
+
+                    # Clean up BlobProcessingAttempt record to prevent database bloat
+                    await self._delete_processing_attempt_record(blob_path)
+                except Exception as delete_error:
+                    logger.error(f"Failed to delete blob {blob_path}: {delete_error}")
+            else:
+                # Still under retry limit - write metadata for troubleshooting
+                await self._write_metadata_for_troubleshooting(
+                    blob_path, status="retrying", error=str(e)
+                )
+
+            return False
+
+        else:
+            # Success: processing completed without exceptions
+            logger.info(f"Successfully processed blob: {blob_path}")
+            return True
+
+    async def _record_processing_attempt(self, blob_path: str, error: str | None = None) -> int:
+        """
+        Record a processing attempt in PostgreSQL.
+
+        This is the source of truth for retry logic (not blob metadata).
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        error : str | None
+            Optional error message to store.
+
+        Returns
+        -------
+        int
+            The new attempt count after recording this attempt.
+
+        Raises
+        ------
+        Exception
+            Re-raises any database exceptions to signal critical failure.
+        """
+        try:
+            async with get_async_session() as session:
+                # Get or create attempt record
+                statement = select(BlobProcessingAttempt).where(
+                    BlobProcessingAttempt.blob_path == blob_path
+                )
+                result = await session.execute(statement)
+                attempt = result.scalar_one_or_none()
+
+                if not attempt:
+                    # Create new attempt record (attempt_count starts at default 0)
+                    attempt = BlobProcessingAttempt(
+                        blob_path=blob_path,
+                        last_error=error[:1000] if error else None,
+                        last_attempt_at=datetime.now(UTC),
+                    )
+                    session.add(attempt)
+                else:
+                    # Update existing record
+                    attempt.last_error = error[:1000] if error else None
+                    attempt.last_attempt_at = datetime.now(UTC)
+
+                # Increment attempt count (0→1 on first attempt, 1→2 on second, etc.)
+                attempt.attempt_count += 1
+
+                # Commit happens automatically in get_async_session context manager
+                logger.debug(
+                    f"Recorded processing attempt {attempt.attempt_count} for {blob_path}"
+                )
+
+                return attempt.attempt_count
+
+        except Exception as e:
+            logger.critical(f"Database error recording processing attempt for {blob_path}: {e}")
+            # Re-raise to trigger circuit breaker in polling loop
+            raise
+
+    async def _delete_processing_attempt_record(self, blob_path: str) -> None:
+        """
+        Delete the BlobProcessingAttempt record for a blob.
+
+        Called after successful processing or when hitting retry limit to prevent
+        database bloat from accumulating records indefinitely.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        """
+        try:
+            async with get_async_session() as session:
+                statement = select(BlobProcessingAttempt).where(
+                    BlobProcessingAttempt.blob_path == blob_path
+                )
+                result = await session.execute(statement)
+                attempt = result.scalar_one_or_none()
+
+                if attempt:
+                    session.delete(attempt)
+                    # Commit happens automatically in get_async_session context manager
+                    logger.debug(f"Deleted BlobProcessingAttempt record for {blob_path}")
+                else:
+                    logger.debug(f"No BlobProcessingAttempt record found for {blob_path}")
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to delete BlobProcessingAttempt record for {blob_path}: {e}. "
+                "This may cause minor database bloat but does not affect functionality."
+            )
+
+    async def _write_metadata_for_troubleshooting(
+        self, blob_path: str, status: str, error: str | None = None
+    ) -> None:
+        """
+        Write metadata to blob for troubleshooting purposes only.
+
+        This metadata is NOT used for control flow or retry logic.
+        PostgreSQL (BlobProcessingAttempt) is the source of truth.
+
+        Metadata persists even after soft-delete, allowing debugging via Azure Portal
+        by restoring blob to current version and inspecting metadata.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        status : str
+            The status to write (e.g., "error", "retrying").
+        error : str | None
+            Optional error message to include.
+        """
+        try:
+            current_metadata = await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
+            retry_count = int(current_metadata.get("retry_count", "0")) + 1
+
+            metadata = {
+                "status": status,
+                "retry_count": str(retry_count),
+                "last_attempt": datetime.now(UTC).isoformat(),
+            }
+
+            if error:
+                metadata["last_error"] = error[:1000]
+
+            await self.azure_blob_manager.set_blob_metadata(
+                blob_name=blob_path, metadata=metadata
+            )
+        except Exception as e:
+            logger.warning(f"Failed to write troubleshooting metadata for {blob_path}: {e}")
+
+    async def _mark_processed_and_delete(self, blob_path: str) -> None:
+        """
+        Mark blob as processed and delete it.
+
+        Writes metadata before deletion so it persists on soft-deleted blob
+        for debugging purposes (can restore and inspect via Azure Portal).
+        Also deletes the corresponding BlobProcessingAttempt record to prevent
+        database bloat.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        """
+        try:
+            # Write metadata for troubleshooting (persists after soft-delete)
+            metadata = {
+                "processed": "true",
+                "processed_at": datetime.now(UTC).isoformat(),
+            }
+            await self.azure_blob_manager.set_blob_metadata(
+                blob_name=blob_path, metadata=metadata
+            )
+
+            # Delete blob (soft delete - metadata persists for 7 days)
+            await self.azure_blob_manager.delete_blob(blob_path)
+            logger.info(f"Deleted processed blob: {blob_path}")
+
+            # Clean up BlobProcessingAttempt record to prevent database bloat
+            await self._delete_processing_attempt_record(blob_path)
+
+        except Exception as e:
+            logger.error(f"Error marking/deleting blob {blob_path}: {e}")
+
+    def _is_database_error(self, error: Exception) -> bool:
+        """
+        Check if an exception is database-related.
+
+        Parameters
+        ----------
+        error : Exception
+            The exception to check.
+
+        Returns
+        -------
+        bool
+            True if error appears to be database-related.
+        """
+        error_str = str(error).lower()
+        db_keywords = ["database", "connection", "postgres", "sqlalchemy"]
+        return any(keyword in error_str for keyword in db_keywords)
+
+    def _handle_database_failure(
+        self, error: Exception, consecutive_failures: int, max_failures: int
+    ) -> tuple[bool, int]:
+        """
+        Handle database failure and determine if polling should stop.
+
+        Parameters
+        ----------
+        error : Exception
+            The database error that occurred.
+        consecutive_failures : int
+            Current count of consecutive database failures.
+        max_failures : int
+            Maximum allowed consecutive failures.
+
+        Returns
+        -------
+        tuple[bool, int]
+            (should_stop_polling, new_failure_count)
+        """
+        new_count = consecutive_failures + 1
+        logger.critical(
+            f"🔴 PostgreSQL error in polling loop ({new_count}/{max_failures}): {error}"
+        )
+        sentry_sdk.capture_exception(error)
+
+        if new_count >= max_failures:
+            critical_msg = (
+                f"PostgreSQL unreachable after {max_failures} consecutive attempts. "
+                "STOPPING GLOBAL POLLING SERVICE. Manual restart required."
+            )
+            logger.critical(f"🛑 {critical_msg}")
+            sentry_sdk.capture_message(critical_msg, level="fatal")
+            return True, new_count
+
+        return False, new_count
+
+    async def _process_blobs_concurrently(
+        self, unprocessed_blobs: list[dict]
+    ) -> int:
+        """
+        Process multiple blobs concurrently with semaphore limit.
+
+        Parameters
+        ----------
+        unprocessed_blobs : list[dict]
+            List of blob info dictionaries to process.
+
+        Returns
+        -------
+        int
+            Number of blobs successfully processed.
+        """
+        processed_count = 0
+        semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_PROCESSING)
+
+        async def process_with_semaphore(blob_info, sem=semaphore):
+            nonlocal processed_count
+            async with sem:
+                try:
+                    success = await self.process_single_blob(blob_info)
+                    if success:
+                        processed_count += 1
+                except Exception as e:
+                    # Check if it's a database error
+                    if self._is_database_error(e):
+                        logger.critical(f"Database error during blob processing: {e}")
+                        sentry_sdk.capture_exception(e)
+                        raise
+
+                    logger.error(f"Non-database error processing blob: {e}")
+                    sentry_sdk.capture_exception(e)
+
+        # Process all blobs concurrently (limited by semaphore)
+        results = await asyncio.gather(
+            *[process_with_semaphore(blob) for blob in unprocessed_blobs],
+            return_exceptions=True
+        )
+
+        # Check for database exceptions in results - they need to propagate
+        # to trigger the circuit breaker in run_polling_loop
+        for result in results:
+            if isinstance(result, Exception) and self._is_database_error(result):
+                logger.critical(
+                    f"Database error detected in concurrent processing results: {result}"
+                )
+                raise result
+
+        return processed_count
+
+    async def run_polling_loop(self) -> None:
+        """
+        Main polling loop: scan all user uploads every 30s, process up to 10 concurrently.
+
+        This method runs indefinitely, polling for unprocessed blobs across all users
+        and processing them with a concurrency limit. Failed blobs are deleted immediately
+        upon hitting the retry limit.
+
+        Includes overlapping poll prevention, performance metrics logging, and circuit
+        breaker for PostgreSQL failures (stops polling after 3 consecutive DB errors).
+        """
+        import time
+
+        logger.info(
+            f"Starting global transcription polling service "
+            f"(interval: {self.POLLING_INTERVAL_SECONDS}s, "
+            f"max concurrent: {self.MAX_CONCURRENT_PROCESSING})"
+        )
+
+        consecutive_db_failures = 0
+        max_db_failures = 3
+
+        while True:
+            # Prevent overlapping poll cycles
+            if self._polling_in_progress:
+                logger.warning(
+                    "⚠️ Previous poll cycle still in progress, skipping this cycle. "
+                    "Consider increasing concurrency or reducing poll interval."
+                )
+                await asyncio.sleep(self.POLLING_INTERVAL_SECONDS)
+                continue
+
+            self._polling_in_progress = True
+            poll_start_time = time.time()
+            processed_count = 0
+            total_blob_count = 0
+
+            try:
+                # Find unprocessed blobs
+                unprocessed_blobs = await self.poll_for_unprocessed_blobs()
+                total_blob_count = len(unprocessed_blobs)
+
+                if unprocessed_blobs:
+                    # Process with concurrency limit
+                    processed_count = await self._process_blobs_concurrently(unprocessed_blobs)
+
+                # Success: reset failure counter
+                consecutive_db_failures = 0
+
+            except Exception as e:
+                # Check if this is a database-related error
+                if self._is_database_error(e):
+                    should_stop, consecutive_db_failures = self._handle_database_failure(
+                        e, consecutive_db_failures, max_db_failures
+                    )
+                    if should_stop:
+                        break  # Exit polling loop entirely
+                else:
+                    # Non-database error, log but continue
+                    logger.error(f"Error in global polling loop: {e}")
+                    sentry_sdk.capture_exception(e)
+                    consecutive_db_failures = 0  # Reset counter for non-DB errors
+
+            finally:
+                self._polling_in_progress = False
+                poll_duration = time.time() - poll_start_time
+
+                # Log poll cycle metrics
+                logger.info(
+                    f"📊 Poll cycle complete: "
+                    f"duration={poll_duration:.2f}s, "
+                    f"found={total_blob_count}, "
+                    f"processed={processed_count}"
+                )
+
+                # Alert if poll cycle is getting close to interval duration
+                if poll_duration > (self.POLLING_INTERVAL_SECONDS * 0.8):
+                    logger.warning(
+                        f"⚠️ Poll cycle took {poll_duration:.2f}s "
+                        f"({poll_duration/self.POLLING_INTERVAL_SECONDS*100:.0f}% of {self.POLLING_INTERVAL_SECONDS}s interval). "
+                        f"Consider scaling optimizations if this persists."
+                    )
+
+            # Wait before next poll
+            await asyncio.sleep(self.POLLING_INTERVAL_SECONDS)
+
+        # If we reach here, polling stopped due to critical failure
+        logger.critical("Global transcription polling service has been stopped.")
