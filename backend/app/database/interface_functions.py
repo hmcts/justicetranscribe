@@ -5,6 +5,7 @@ import pytz
 import sentry_sdk
 from fastapi import HTTPException
 from sqlalchemy import event
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.database.postgres_database import engine
@@ -107,7 +108,14 @@ def _extract_unique_speakers(transcription: Transcription) -> list[str]:
 
 def fetch_transcriptions_metadata(user_id: UUID, tz) -> list[TranscriptionMetadata]:
     with Session(engine) as session:
-        statement = select(Transcription).where(Transcription.user_id == user_id)
+        statement = (
+            select(Transcription)
+            .where(Transcription.user_id == user_id)
+            .options(
+                selectinload(Transcription.minute_versions),  # type: ignore[arg-type]
+                selectinload(Transcription.transcription_jobs),  # type: ignore[arg-type]
+            )
+        )
         transcriptions = session.exec(statement).all()
 
         current_time = datetime.now(UTC)
