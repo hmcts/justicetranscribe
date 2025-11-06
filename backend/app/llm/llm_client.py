@@ -1,4 +1,4 @@
-# ruff: noqa: TRY300, B904, TRY003
+# ruff: noqa: TRY003, TRY300, EM101
 import json
 import logging
 from collections.abc import Callable
@@ -91,11 +91,10 @@ def _load_vertex_credentials() -> str:
     try:
         vertex_credentials = get_settings().GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT
         return vertex_credentials
-
     except json.JSONDecodeError as e:
         raise RuntimeError(
             f"Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT: {e!s}"
-            )
+        ) from e
 
 
 async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs):
@@ -229,14 +228,14 @@ async def _completion_with_multi_fallback(*, model: str, messages: list, **kwarg
             }
         )
         if not result.choices or result.choices[0].message.content is None or result.choices[0].message.content == "":
-            print("GEMINI RETURNED NO CONTENT")  # noqa: T201
-            raise Exception("Gemini returned no content")  # noqa: EM101, TRY002
+            logger.warning("Gemini returned no content")
+            raise ValueError("Gemini returned no content")
         return result
     except Exception as e:
         if _is_content_filtering_error(e) or "Gemini returned no content" in str(e):
             try:
                 # Fall back to Azure Grok
-                print("FALLING BACK TO GROK")  # noqa: T201
+                logger.info("Falling back to Azure Grok due to Gemini content filtering")
                 result = await azure_grok_acompletion(model=LLMModel.AZURE_GROK_3, messages=messages, **kwargs)
                 # Update observation to track Grok fallback usage
                 langfuse_context.update_current_observation(
