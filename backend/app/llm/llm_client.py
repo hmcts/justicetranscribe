@@ -1,5 +1,6 @@
 # ruff: noqa: TRY300, B904, TRY003
 import json
+import logging
 from collections.abc import Callable
 from enum import Enum
 from functools import partial
@@ -13,6 +14,8 @@ from litellm import acompletion
 from pydantic import BaseModel
 
 from utils.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 with Path.open("../config/backend/app/llm/llm_client.toml", "rb") as f:
     toml_data = load(f)
@@ -96,24 +99,44 @@ def _load_vertex_credentials() -> str:
             )
 
 
-def _get_gemini_acompletion():
-    "Create a pre-configured acompletion with Vertex AI defaults"
-    safety_categories = llm_params["GEMINI_SAFETY_OVERRIDE_CATEGORIES"]
-    return partial(
-        acompletion,
-        vertex_credentials=_load_vertex_credentials(),
-        max_retries=llm_params["NUM_RETRIES"],
-        fallbacks=[LLMModel.VERTEX_GEMINI_25_FLASH, LLMModel.VERTEX_GEMINI_20_FLASH],
-        safety_settings=[
-            {"category": _cat, "threshold": "BLOCK_NONE"}
-            for _cat in safety_categories
-            ],
-        vertex_location=llm_params["VERTEX_LOCATION"],
-        timeout=llm_params["TIMEOUT"],
-        retry_strategy=llm_params["RETRY_STRATEGY"],
-    )
+async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs):
+    """
+    Gemini completion with EU region fallback.
 
-gemini_acompletion = _get_gemini_acompletion()
+    Tries multiple EU regions in order until one succeeds. This handles
+    cases where a specific region might be temporarily unavailable.
+    """
+    safety_categories = llm_params["GEMINI_SAFETY_OVERRIDE_CATEGORIES"]
+    last_exception = None
+    for region in llm_params["VERTEX_LOCATIONS"]:
+        try:
+            logger.info("Attempting Gemini completion with model %s in region: %s", model, region)
+            result = await acompletion(
+                model=model,
+                messages=messages,
+                fallbacks=[LLMModel.VERTEX_GEMINI_25_FLASH, LLMModel.VERTEX_GEMINI_20_FLASH],
+                max_retries=llm_params["NUM_RETRIES"],
+                retry_strategy=llm_params["RETRY_STRATEGY"],
+                safety_settings=[
+                    {"category": _cat, "threshold": "BLOCK_NONE"}
+                    for _cat in safety_categories
+                    ],
+                timeout=llm_params["TIMEOUT"],
+                vertex_credentials=_load_vertex_credentials(),
+                vertex_location=region,
+                **kwargs,
+            )
+            # Basic success check
+            if result and getattr(result.choices[0].message, "content", None):
+                logger.info("Successfully completed Gemini request in region: %s", region)
+                return result
+        except Exception as exc:
+            logger.warning("Gemini completion failed in region %s: %s", region, exc)
+            last_exception = exc
+            continue
+    # If none succeed, raise last error
+    logger.error("All Gemini regions failed. Last error: %s", last_exception)
+    raise last_exception
 
 
 def _get_azure_grok_acompletion():
@@ -182,7 +205,8 @@ async def _completion_with_multi_fallback(*, model: str, messages: list, **kwarg
     """
     try:
         # Try Gemini first
-        result = await gemini_acompletion(model=model, messages=messages, **kwargs)
+        result = await gemini_eu_fallback_acompletion(model=model, messages=messages, **kwargs)
+        # result = await gemini_acompletion(model=model, messages=messages, **kwargs)
         # Update observation to track successful Gemini usage
         langfuse_context.update_current_observation(
             metadata={
