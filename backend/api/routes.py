@@ -27,7 +27,7 @@ from app.database.interface_functions import (
     save_transcription_job,
     update_user,
 )
-from app.database.postgres_database import get_session
+from app.database.postgres_database import engine, get_session
 from app.database.postgres_models import (
     MinuteVersion,
     Transcription,
@@ -262,7 +262,6 @@ async def get_upload_url(
 async def generate_or_edit_minutes(
     request: GenerateMinutesRequest,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     new_minute_version_id = str(uuid.uuid4())
 
@@ -272,26 +271,36 @@ async def generate_or_edit_minutes(
 
     async def process_request():
         try:
-            # First verify the user has access to this transcription
-            get_transcription_by_id(
-                session,
-                request.transcription_id,
-                user_id,
-                tz=pytz.UTC,  # We don't need timezone conversion for this check
-            )
+            # Create a dedicated database session for this background task
+            def get_dialogue_entries():
+                with Session(engine) as session:
+                    # First verify the user has access to this transcription
+                    get_transcription_by_id(
+                        session,
+                        request.transcription_id,
+                        user_id,
+                        tz=pytz.UTC,  # We don't need timezone conversion for this check
+                    )
 
-            # Fetch transcription jobs for this transcription
-            transcription_jobs = get_transcription_jobs(session, request.transcription_id)
+                    # Fetch transcription jobs for this transcription
+                    transcription_jobs = get_transcription_jobs(
+                        session, request.transcription_id
+                    )
 
-            if not transcription_jobs:
-                raise HTTPException(
-                    status_code=404,
-                    detail="No transcription jobs found for this transcription",
-                )
+                    if not transcription_jobs:
+                        raise HTTPException(
+                            status_code=404,
+                            detail="No transcription jobs found for this transcription",
+                        )
 
-            dialogue_entries = []
-            for job in transcription_jobs:
-                dialogue_entries.extend(job.dialogue_entries)
+                    dialogue_entries = []
+                    for job in transcription_jobs:
+                        dialogue_entries.extend(job.dialogue_entries)
+
+                    return dialogue_entries
+
+            # Run database operations in a thread pool to avoid blocking
+            dialogue_entries = await asyncio.to_thread(get_dialogue_entries)
 
             if request.action_type == "generate":
                 await generate_llm_output_task(
