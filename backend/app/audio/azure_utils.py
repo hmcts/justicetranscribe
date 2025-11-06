@@ -49,7 +49,7 @@ def _validate_azure_account_key(account_name: str, account_key: str, conn_timeou
 
 
 
-def _extract_parameter_from_connection_string(
+def _extract_parameter_from_connection_string(  # noqa: C901
     connection_string: str,
     parameter_name: str
     ) -> str:
@@ -112,6 +112,10 @@ def _extract_parameter_from_connection_string(
 
     if parameter_value == "":
         msg = f"{parameter_name} parameter cannot be empty"
+        raise ValueError(msg)
+
+    if parameter_value is None:
+        msg = f"{parameter_name} parameter is invalid"
         raise ValueError(msg)
 
     return parameter_value
@@ -243,6 +247,11 @@ class AzureBlobManager:
         try:
             container = container_name or self.container_name
 
+            # Ensure container exists before attempting to upload
+            if not self._ensure_container_exists(container):
+                logger.error(f"Cannot create blob - failed to ensure container '{container}' exists")
+                return False
+
             # Create BlobClient
             blob_client = BlobClient.from_connection_string(
                 conn_str=self.connection_string,
@@ -341,6 +350,41 @@ class AzureBlobManager:
             logger.error(f"Failed to check if blob exists {container}/{blob_name}: {e}")
             return False
 
+    def _ensure_container_exists(self, container_name: str) -> bool:
+        """Ensure a container exists, creating it if necessary.
+
+        Parameters
+        ----------
+        container_name : str
+            The name of the container to ensure exists.
+
+        Returns
+        -------
+        bool
+            True if container exists or was created successfully, False otherwise.
+        """
+        try:
+            blob_service_client = BlobServiceClient.from_connection_string(self.connection_string)
+            container_client = blob_service_client.get_container_client(container_name)
+
+            # Check if container exists
+            exists = container_client.exists()
+
+            if not exists:
+                logger.info(f"Container '{container_name}' does not exist. Creating it...")
+                container_client.create_container()
+                logger.info(f"Successfully created container: {container_name}")
+
+            return True  # noqa: TRY300
+
+        except ResourceExistsError:
+            # Container was created by another process between check and create
+            logger.info(f"Container '{container_name}' already exists (created by another process)")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to ensure container exists '{container_name}': {e}")
+            return False
+
 
 class AsyncAzureBlobManager:
     """Async version of Azure Blob Storage manager.
@@ -382,6 +426,11 @@ class AsyncAzureBlobManager:
         """
         try:
             container = container_name or self.container_name
+
+            # Ensure container exists before attempting to upload
+            if not await self._ensure_container_exists(container):
+                logger.error(f"Cannot create blob - failed to ensure container '{container}' exists")
+                return False
 
             # Create async BlobServiceClient
             async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
@@ -481,6 +530,41 @@ class AsyncAzureBlobManager:
             logger.error(f"Failed to check if blob exists {container}/{blob_name}: {e}")
             return False
 
+    async def _ensure_container_exists(self, container_name: str) -> bool:
+        """Ensure a container exists, creating it if necessary (async).
+
+        Parameters
+        ----------
+        container_name : str
+            The name of the container to ensure exists.
+
+        Returns
+        -------
+        bool
+            True if container exists or was created successfully, False otherwise.
+        """
+        try:
+            async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
+                container_client = blob_service_client.get_container_client(container_name)
+
+                # Check if container exists
+                exists = await container_client.exists()
+
+                if not exists:
+                    logger.info(f"Container '{container_name}' does not exist. Creating it...")
+                    await container_client.create_container()
+                    logger.info(f"Successfully created container: {container_name}")
+
+                return True
+
+        except ResourceExistsError:
+            # Container was created by another process between check and create
+            logger.info(f"Container '{container_name}' already exists (created by another process)")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to ensure container exists '{container_name}': {e}")
+            return False
+
     async def list_blobs_in_prefix(
         self,
         prefix: str,
@@ -509,6 +593,12 @@ class AsyncAzureBlobManager:
         """
         try:
             container = container_name or self.container_name
+
+            # Ensure container exists before attempting to list blobs
+            if not await self._ensure_container_exists(container):
+                logger.error(f"Cannot list blobs - failed to ensure container '{container}' exists")
+                return []
+
             blobs = []
 
             # Create async BlobServiceClient
@@ -527,7 +617,8 @@ class AsyncAzureBlobManager:
                         blob_info["metadata"] = blob.metadata or {}
                     blobs.append(blob_info)
 
-            logger.info(f"Listed {len(blobs)} blobs with prefix '{prefix}' in container '{container}'")
+            if blobs:
+                logger.info(f"Listed {len(blobs)} blobs with prefix '{prefix}' in container '{container}'")
 
         except Exception as e:
             logger.error(f"Failed to list blobs with prefix '{prefix}' in container '{container}': {e}")
@@ -596,6 +687,11 @@ class AsyncAzureBlobManager:
         """
         try:
             container = container_name or self.container_name
+
+            # Ensure container exists before attempting to set metadata
+            if not await self._ensure_container_exists(container):
+                logger.error(f"Cannot set blob metadata - failed to ensure container '{container}' exists")
+                return False
 
             # Create async BlobServiceClient
             async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:

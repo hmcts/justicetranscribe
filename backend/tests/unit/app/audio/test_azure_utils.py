@@ -477,11 +477,19 @@ class TestAzureBlobManager:
         assert manager.account_name == "test_account"
         assert manager.container_name == "test_container"
 
+    @patch("app.audio.azure_utils.BlobServiceClient")
     @patch("app.audio.azure_utils.BlobClient")
     @patch("app.audio.azure_utils.logger")
-    def test_create_blob_from_file_success(self, mock_logger, mock_blob_client_class, blob_manager, sample_file_path):
+    def test_create_blob_from_file_success(self, mock_logger, mock_blob_client_class, mock_blob_service_client_class, blob_manager, sample_file_path):
         """Test successful blob creation."""
-        # Setup mocks
+        # Setup mocks for container existence check
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_blob_service_client_class.from_connection_string.return_value = mock_blob_service_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+        mock_container_client.exists.return_value = True
+
+        # Setup mocks for blob creation
         mock_blob_client = MagicMock()
         mock_blob_client_class.from_connection_string.return_value = mock_blob_client
 
@@ -498,11 +506,19 @@ class TestAzureBlobManager:
         mock_blob_client.upload_blob.assert_called_once()
         mock_logger.info.assert_called_once_with("Successfully created blob: test_container/test_blob.txt")
 
+    @patch("app.audio.azure_utils.BlobServiceClient")
     @patch("app.audio.azure_utils.BlobClient")
     @patch("app.audio.azure_utils.logger")
-    def test_create_blob_from_file_with_custom_container(self, mock_logger, mock_blob_client_class, blob_manager, sample_file_path):  # noqa: ARG002
+    def test_create_blob_from_file_with_custom_container(self, mock_logger, mock_blob_client_class, mock_blob_service_client_class, blob_manager, sample_file_path):  # noqa: ARG002
         """Test blob creation with custom container name."""
-        # Setup mocks
+        # Setup mocks for container existence check
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_blob_service_client_class.from_connection_string.return_value = mock_blob_service_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+        mock_container_client.exists.return_value = True
+
+        # Setup mocks for blob creation
         mock_blob_client = MagicMock()
         mock_blob_client_class.from_connection_string.return_value = mock_blob_client
 
@@ -517,12 +533,21 @@ class TestAzureBlobManager:
             blob_name="test_blob.txt"
         )
 
+    @patch("app.audio.azure_utils.BlobServiceClient")
     @patch("app.audio.azure_utils.BlobClient")
     @patch("app.audio.azure_utils.logger")
-    def test_create_blob_from_file_file_not_found(self, mock_logger, mock_blob_client_class, blob_manager):
+    def test_create_blob_from_file_file_not_found(self, mock_logger, mock_blob_client_class, mock_blob_service_client_class, blob_manager):
         """Test blob creation when file doesn't exist."""
-        # Setup mocks
-        mock_blob_client_class.from_connection_string.side_effect = FileNotFoundError("File not found")
+        # Setup mocks for container existence check
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_blob_service_client_class.from_connection_string.return_value = mock_blob_service_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+        mock_container_client.exists.return_value = True
+
+        # Setup mocks for blob creation - file not found will be caught when opening the file
+        mock_blob_client = MagicMock()
+        mock_blob_client_class.from_connection_string.return_value = mock_blob_client
 
         # Test
         result = blob_manager.create_blob_from_file(Path("nonexistent.txt"), "test_blob.txt")
@@ -531,11 +556,19 @@ class TestAzureBlobManager:
         assert result is False
         mock_logger.error.assert_called_once_with("File not found: nonexistent.txt")
 
+    @patch("app.audio.azure_utils.BlobServiceClient")
     @patch("app.audio.azure_utils.BlobClient")
     @patch("app.audio.azure_utils.logger")
-    def test_create_blob_from_file_resource_exists_error(self, mock_logger, mock_blob_client_class, blob_manager, sample_file_path):
+    def test_create_blob_from_file_resource_exists_error(self, mock_logger, mock_blob_client_class, mock_blob_service_client_class, blob_manager, sample_file_path):
         """Test blob creation when blob already exists."""
-        # Setup mocks
+        # Setup mocks for container existence check
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_blob_service_client_class.from_connection_string.return_value = mock_blob_service_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+        mock_container_client.exists.return_value = True
+
+        # Setup mocks for blob creation
         mock_blob_client = MagicMock()
         mock_blob_client_class.from_connection_string.return_value = mock_blob_client
         mock_blob_client.upload_blob.side_effect = ResourceExistsError("Blob already exists")
@@ -547,11 +580,19 @@ class TestAzureBlobManager:
         assert result is False
         mock_logger.warning.assert_called_once_with("Blob already exists: test_container/test_blob.txt")
 
+    @patch("app.audio.azure_utils.BlobServiceClient")
     @patch("app.audio.azure_utils.BlobClient")
     @patch("app.audio.azure_utils.logger")
-    def test_create_blob_from_file_general_exception(self, mock_logger, mock_blob_client_class, blob_manager, sample_file_path):
+    def test_create_blob_from_file_general_exception(self, mock_logger, mock_blob_client_class, mock_blob_service_client_class, blob_manager, sample_file_path):
         """Test blob creation with general exception."""
-        # Setup mocks
+        # Setup mocks for container existence check
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_blob_service_client_class.from_connection_string.return_value = mock_blob_service_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+        mock_container_client.exists.return_value = True
+
+        # Setup mocks for blob creation
         mock_blob_client = MagicMock()
         mock_blob_client_class.from_connection_string.return_value = mock_blob_client
         mock_blob_client.upload_blob.side_effect = Exception("General error")
@@ -759,10 +800,15 @@ class TestAsyncAzureBlobManager:
         # Setup mocks using the proper async patterns
         mock_blob_service_client = MagicMock()
         mock_blob_client = MagicMock()
+        mock_container_client = MagicMock()
 
         # Configure the async context manager
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
 
         # Configure async methods properly - upload_blob is awaited in the async code
         mock_blob_client.upload_blob = AsyncMock()  # This needs to be AsyncMock since it's awaited
@@ -772,7 +818,8 @@ class TestAsyncAzureBlobManager:
 
         # Assertions
         assert result is True, "create_blob_from_file should return True on success"
-        mock_async_blob_service_client_class.from_connection_string.assert_called_once_with("test_connection_string")
+        # from_connection_string is called twice: once for container check, once for blob upload
+        assert mock_async_blob_service_client_class.from_connection_string.call_count == 2
         mock_blob_service_client.get_blob_client.assert_called_once_with(
             container="test_container",
             blob="test_blob.txt"
@@ -781,12 +828,18 @@ class TestAsyncAzureBlobManager:
         mock_logger.info.assert_called_once_with("Successfully created blob: test_container/test_blob.txt")
 
     @patch("app.audio.azure_utils.AsyncBlobServiceClient")
-    async def test_create_blob_from_file_file_not_found(self, mock_async_blob_service_client_class, async_blob_manager, caplog):
+    async def test_create_blob_from_file_file_not_found(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager, caplog):
         """Test async blob creation when file doesn't exist."""
-        # Setup mocks
-        mock_async_blob_service_client_class.from_connection_string.side_effect = FileNotFoundError("File not found")
+        # Setup mocks for container existence check
+        mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
+        mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
 
-        # Test
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
+        # Test - FileNotFoundError will be raised when trying to open the file
         result = await async_blob_manager.create_blob_from_file(Path("nonexistent.txt"), "test_blob.txt")
 
         # Assertions
@@ -798,9 +851,15 @@ class TestAsyncAzureBlobManager:
         """Test async blob creation when blob already exists."""
         # Setup mocks
         mock_blob_service_client = MagicMock()
+        mock_container_client = MagicMock()
         mock_blob_client = MagicMock()
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
         mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
         mock_blob_client.upload_blob = AsyncMock(side_effect=ResourceExistsError("Blob already exists"))
 
         # Test
@@ -816,8 +875,14 @@ class TestAsyncAzureBlobManager:
         # Setup mocks
         mock_blob_service_client = MagicMock()
         mock_blob_client = MagicMock()
+        mock_container_client = MagicMock()
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
         mock_blob_client.upload_blob = AsyncMock(side_effect=Exception("General error"))
 
         # Test
@@ -944,6 +1009,9 @@ class TestAsyncAzureBlobManager:
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_container_client.return_value = mock_container_client
 
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
         # Mock blob items returned from list_blobs
         mock_blob1 = MagicMock()
         mock_blob1.name = "user-uploads/test@example.com/file1.mp4"
@@ -985,6 +1053,9 @@ class TestAsyncAzureBlobManager:
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_container_client.return_value = mock_container_client
 
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
         # list_blobs returns empty async iterable
         async def mock_list_blobs(*args, **kwargs):  # noqa: ARG001
             # Empty async generator
@@ -998,7 +1069,8 @@ class TestAsyncAzureBlobManager:
 
         # Assertions
         assert len(result) == 0, "Should return empty list"
-        mock_logger.info.assert_called_once_with("Listed 0 blobs with prefix 'nonexistent-prefix/' in container 'test_container'")
+        # No log message when no blobs are found (to reduce noise during polling)
+        mock_logger.info.assert_not_called()
 
     @patch("app.audio.azure_utils.AsyncBlobServiceClient")
     async def test_list_blobs_in_prefix_exception(self, mock_async_blob_service_client_class, async_blob_manager, mock_async_context_manager, caplog):
@@ -1008,6 +1080,9 @@ class TestAsyncAzureBlobManager:
         mock_container_client = MagicMock()
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
 
         # list_blobs raises exception
         async def mock_list_blobs(*args, **kwargs):  # noqa: ARG001
@@ -1106,8 +1181,14 @@ class TestAsyncAzureBlobManager:
         # Setup mocks
         mock_blob_service_client = MagicMock()
         mock_blob_client = MagicMock()
+        mock_container_client = MagicMock()
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
         mock_blob_client.set_blob_metadata = AsyncMock()
 
         # Test
@@ -1125,8 +1206,14 @@ class TestAsyncAzureBlobManager:
         # Setup mocks
         mock_blob_service_client = MagicMock()
         mock_blob_client = MagicMock()
+        mock_container_client = MagicMock()
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
         mock_blob_client.set_blob_metadata = AsyncMock(side_effect=ResourceNotFoundError("Blob not found"))
 
         # Test
@@ -1142,8 +1229,14 @@ class TestAsyncAzureBlobManager:
         # Setup mocks
         mock_blob_service_client = MagicMock()
         mock_blob_client = MagicMock()
+        mock_container_client = MagicMock()
         mock_async_blob_service_client_class.from_connection_string.return_value = mock_async_context_manager(mock_blob_service_client)
         mock_blob_service_client.get_blob_client.return_value = mock_blob_client
+        mock_blob_service_client.get_container_client.return_value = mock_container_client
+
+        # Mock container existence check
+        mock_container_client.exists = AsyncMock(return_value=True)
+
         mock_blob_client.set_blob_metadata = AsyncMock(side_effect=Exception("General error"))
 
         # Test

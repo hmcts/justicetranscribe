@@ -101,7 +101,7 @@ class TranscriptionPollingService:
 
         return False
 
-    async def poll_for_new_audio_files(self) -> list[dict]:
+    async def find_unprocessed_audio_files_to_transcribe(self) -> list[dict]:
         """
         Poll blob storage for new, unprocessed audio files across all users.
 
@@ -501,12 +501,61 @@ class TranscriptionPollingService:
         except Exception as e:
             logger.error(f"Error during startup cleanup: {e}")
 
+    async def process_files_in_parallel(self, unprocessed_files: list[dict]) -> None:
+        """
+        Process multiple audio files in parallel.
+
+        This method creates tasks for each file and processes them concurrently
+        using asyncio.gather(). Individual file failures do not prevent other
+        files from being processed.
+
+        Parameters
+        ----------
+        unprocessed_files : list[dict]
+            List of blob information dictionaries to process.
+        """
+        if not unprocessed_files:
+            return
+
+        logger.info(f"Processing {len(unprocessed_files)} file(s) in parallel...")
+
+        # Create tasks for all files
+        tasks = [
+            self.process_discovered_audio(blob_info)
+            for blob_info in unprocessed_files
+        ]
+
+        # Process in parallel, capturing exceptions
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Log results and any errors that occurred
+        success_count = 0
+        error_count = 0
+        for blob_info, result in zip(unprocessed_files, results, strict=True):
+            blob_name = blob_info.get("name", "unknown")
+            if isinstance(result, Exception):
+                logger.error(f"Error processing blob {blob_name}: {result}")
+                error_count += 1
+            elif result:
+                logger.debug(f"Successfully processed blob {blob_name}")
+                success_count += 1
+            else:
+                logger.warning(f"Processing returned False for blob {blob_name}")
+                error_count += 1
+
+        logger.info(
+            f"Parallel processing complete: {success_count} succeeded, "
+            f"{error_count} failed out of {len(unprocessed_files)} total"
+        )
+
     async def run_polling_loop(self) -> None:
         """
         Run the continuous polling loop for all users.
 
         This method runs indefinitely, polling for new audio files every
         30 seconds and processing them across all users.
+
+        Files are processed in parallel for improved throughput.
 
         On the first poll, it cleans up any blobs older than
         the service startup time.
@@ -524,18 +573,10 @@ class TranscriptionPollingService:
                     self._is_first_poll = False
 
                 # Poll for new files
-                unprocessed_files = await self.poll_for_new_audio_files()
+                unprocessed_files = await self.find_unprocessed_audio_files_to_transcribe()
 
-                # Process each file
-                for blob_info in unprocessed_files:
-                    try:
-                        await self.process_discovered_audio(blob_info)
-                    except Exception as e:
-                        logger.error(
-                            f"Error processing blob "
-                            f"{blob_info.get('name', 'unknown')}: {e}"
-                        )
-                        # Continue processing other files even if one fails
+                # Process all files in parallel
+                await self.process_files_in_parallel(unprocessed_files)
 
             except Exception as e:
                 logger.error(f"Error in polling loop: {e}")
