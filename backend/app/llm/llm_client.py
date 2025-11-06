@@ -3,7 +3,6 @@ import json
 import logging
 from collections.abc import Callable
 from enum import Enum
-from functools import partial
 from pathlib import Path
 from tomllib import load
 from typing import Any
@@ -139,37 +138,52 @@ async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs
     raise last_exception
 
 
-def _get_azure_grok_acompletion():
-    "Create a pre-configured acompletion with Azure Grok defaults"
+async def azure_grok_acompletion(*, model: str, messages: list, **kwargs):
+    """
+    Azure Grok completion with standard retry strategy.
+
+    Provides a consistent interface for Azure Grok API calls with
+    pre-configured authentication and retry parameters.
+    """
     settings = get_settings()
-    return partial(
-        acompletion,
+    logger.info("Attempting Azure Grok completion with model: %s", model)
+    result = await acompletion(
+        model=model,
+        messages=messages,
         api_base=settings.AZURE_GROK_ENDPOINT,
         api_version=llm_params["AZURE_GROK_API_VERSION"],
         api_key=settings.AZURE_GROK_API_KEY,
         num_retries=llm_params["NUM_RETRIES"],
         timeout=llm_params["TIMEOUT"],
         retry_strategy=llm_params["RETRY_STRATEGY"],
+        **kwargs,
     )
+    logger.info("Successfully completed Azure Grok request")
+    return result
 
 
-azure_grok_acompletion = _get_azure_grok_acompletion()
+async def azure_acompletion(*, model: str, messages: list, **kwargs):
+    """
+    Azure OpenAI completion with standard retry strategy.
 
-
-def _get_azure_openai_acompletion():
-    "Create a pre-configured acompletion with Azure OpenAI defaults"
+    Provides a consistent interface for Azure OpenAI API calls with
+    pre-configured authentication and retry parameters.
+    """
     settings = get_settings()
-    return partial(
-        acompletion,
+    logger.info("Attempting Azure OpenAI completion with model: %s", model)
+    result = await acompletion(
+        model=model,
+        messages=messages,
         api_base=settings.AZURE_OPENAI_ENDPOINT,
         api_version=llm_params["AZURE_OPENAI_API_VERSION"],
         api_key=settings.AZURE_OPENAI_API_KEY,
         num_retries=llm_params["NUM_RETRIES"],
         timeout=llm_params["TIMEOUT"],
         retry_strategy=llm_params["RETRY_STRATEGY"],
+        **kwargs,
     )
-
-azure_acompletion = _get_azure_openai_acompletion()
+    logger.info("Successfully completed Azure OpenAI request")
+    return result
 
 
 def _is_content_filtering_error(error: Exception) -> bool:
@@ -206,7 +220,6 @@ async def _completion_with_multi_fallback(*, model: str, messages: list, **kwarg
     try:
         # Try Gemini first
         result = await gemini_eu_fallback_acompletion(model=model, messages=messages, **kwargs)
-        # result = await gemini_acompletion(model=model, messages=messages, **kwargs)
         # Update observation to track successful Gemini usage
         langfuse_context.update_current_observation(
             metadata={
