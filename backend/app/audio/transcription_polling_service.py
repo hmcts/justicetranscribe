@@ -245,8 +245,8 @@ class TranscriptionPollingService:
                 await self._mark_blob_with_error(blob_path, error_msg)
                 return False
 
-            # Look up user in database
-            user = self.get_or_create_user_by_email(user_email)
+            # Look up user in database (run in thread to avoid blocking event loop)
+            user = await asyncio.to_thread(self.get_or_create_user_by_email, user_email)
             if not user:
                 error_msg = f"User not found for email: {user_email}"
                 logger.error(error_msg)
