@@ -84,7 +84,7 @@ class AllowlistManager:
         logger.info("Loaded %d emails from allowlist: %s", len(email_set), self.csv_path)
         return email_set
 
-    def is_user_allowlisted(self, email: str | None) -> bool:
+    def is_user_allowlisted(self, email: str | None) -> bool:  # noqa: ARG002
         """Check if an email is in the allowlist.
 
         Parameters
@@ -97,20 +97,24 @@ class AllowlistManager:
         bool
             True if the email is allowlisted, False otherwise.
         """
-        if not email:
-            return False
+        # TEMPORARY: Allowlist disabled - all users allowed
+        return True
 
-        # Load allowlist on first use
-        if self._allowed_emails is None:
-            try:
-                self._allowed_emails = self._load_allowlist()
-            except Exception:
-                logger.exception("Failed to load allowlist")
-                return False
-
-        # Normalize and check email
-        normalized_email = email.lower().strip()
-        return normalized_email in self._allowed_emails
+        # Original implementation (commented out)
+        # if not email:
+        #     return False
+        #
+        # # Load allowlist on first use
+        # if self._allowed_emails is None:
+        #     try:
+        #         self._allowed_emails = self._load_allowlist()
+        #     except Exception:
+        #         logger.exception("Failed to load allowlist")
+        #         return False
+        #
+        # # Normalize and check email
+        # normalized_email = email.lower().strip()
+        # return normalized_email in self._allowed_emails
 
     def reload(self) -> None:
         """Reload the allowlist from the CSV file."""
