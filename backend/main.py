@@ -18,25 +18,44 @@ from utils.settings import get_settings
 
 log = logging.getLogger("uvicorn")
 
+# Get settings early to check configuration
+settings = get_settings()
+
 # Global polling task that monitors all users
 global_polling_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(app_: FastAPI):  # noqa: ARG001
-    global global_polling_task
+    global global_polling_task  # noqa: PLW0603
 
     log.info("Starting up...")
 
-    # Start a single global polling service for all users
-    log.info("Starting global transcription polling service for all users...")
-    polling_service = TranscriptionPollingService()
-    global_polling_task = asyncio.create_task(polling_service.run_polling_loop())
-    log.info("Global transcription polling service started")
+    # Only start polling service if explicitly enabled for this instance
+    # By default, polling should run in the dedicated worker instance
+    enable_polling = getattr(settings, "ENABLE_POLLING_IN_API", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    if enable_polling:
+        log.info(
+            "⚠️  ENABLE_POLLING_IN_API is set to True - "
+            "Starting polling service in API server (not recommended for production)"
+        )
+        polling_service = TranscriptionPollingService()
+        global_polling_task = asyncio.create_task(polling_service.run_polling_loop())
+        log.info("Global transcription polling service started in API server")
+    else:
+        log.info(
+            "✅ Polling service disabled in API server "
+            "(handled by dedicated worker instance)"
+        )
 
     yield
 
-    # Cancel the global polling task on shutdown
+    # Cancel the global polling task on shutdown (if it was started)
     if global_polling_task:
         log.info("Shutting down global transcription polling service...")
         global_polling_task.cancel()
@@ -50,7 +69,6 @@ async def lifespan(app_: FastAPI):  # noqa: ARG001
     log.info("Shutting down...")
 
 
-settings = get_settings()
 sentry_sdk.init(
     dsn=settings.SENTRY_DSN,
     environment=settings.ENVIRONMENT,

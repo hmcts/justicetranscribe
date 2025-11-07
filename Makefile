@@ -1,5 +1,5 @@
 # Add this near the top of your Makefile
-.PHONY: setup-dev setup-prod setup-preprod install backend frontend database db-up db-down db-reset db-migrate db-upgrade test allowlist-dev allowlist-prod allowlist-both allowlist-update-dev allowlist-update-prod allowlist-merge-dev allowlist-merge-prod allowlist-upload-dev allowlist-upload-prod allowlist-dedupe-dev allowlist-dedupe-prod
+.PHONY: setup-dev setup-prod setup-preprod install backend frontend worker database db-up db-down db-reset db-migrate db-upgrade test allowlist-dev allowlist-prod allowlist-both allowlist-update-dev allowlist-update-prod allowlist-merge-dev allowlist-merge-prod allowlist-upload-dev allowlist-upload-prod allowlist-dedupe-dev allowlist-dedupe-prod
 # Complete Dev Environment Setup
 setup-dev:
 	@echo "🚀 Setting up DEV environment end-to-end..."
@@ -40,6 +40,15 @@ backend: ## Run development server
 	fi
 frontend: ## Run development server
 	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 INTERNAL_API_BASE=http://localhost:8000 ENVIRONMENT=local NODE_ENV=development npm run dev
+worker: ## Run worker process for transcription polling
+	@if [ -f .env ]; then \
+		echo "📄 Loading environment variables from .env file..."; \
+		echo "⚙️  Starting transcription polling worker..."; \
+		cd backend && ENVIRONMENT=local uv run --env-file ../.env python worker.py; \
+	else \
+		echo "⚠️  No .env file found. Make sure to create one from .env.example"; \
+		cd backend && ENVIRONMENT=local uv run python worker.py; \
+	fi
 database:
 	docker compose up database
 	make db-upgrade
