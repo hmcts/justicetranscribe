@@ -108,7 +108,10 @@ async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs
     last_exception = None
     for region in llm_params["VERTEX_LOCATIONS"]:
         try:
-            logger.info("Attempting Gemini completion with model %s in region: %s", model, region)
+            logger.info(
+                "Attempting Gemini completion",
+                extra={"model": model, "region": region}
+            )
             result = await acompletion(
                 model=model,
                 messages=messages,
@@ -126,14 +129,30 @@ async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs
             )
             # Basic success check
             if result and getattr(result.choices[0].message, "content", None):
-                logger.info("Successfully completed Gemini request in region: %s", region)
+                logger.info(
+                    "Successfully completed Gemini request in region",
+                    extra={"region": region}
+                    )
                 return result
+            else:
+                logger.warning(
+                    "Gemini completion contained no content",
+                    extra={"completion result": result}
+                    )
+                raise ValueError("Gemini completion contained no content")
+
         except Exception as exc:
-            logger.warning("Gemini completion failed in region %s: %s", region, exc)
+            logger.warning(
+                "Gemini completion failed in region",
+                extra={"region": region, "error": str(exc)}
+            )
             last_exception = exc
             continue
     # If none succeed, raise last error
-    logger.error("All Gemini regions failed. Last error: %s", last_exception)
+    logger.error(
+        "All Gemini regions failed",
+        extra={"last_error": str(last_exception)}
+    )
     raise last_exception
 
 
@@ -145,7 +164,7 @@ async def azure_grok_acompletion(*, model: str, messages: list, **kwargs):
     pre-configured authentication and retry parameters.
     """
     settings = get_settings()
-    logger.info("Attempting Azure Grok completion with model: %s", model)
+    logger.info("Attempting Azure Grok completion", extra={"model": model})
     result = await acompletion(
         model=model,
         messages=messages,
@@ -169,7 +188,7 @@ async def azure_acompletion(*, model: str, messages: list, **kwargs):
     pre-configured authentication and retry parameters.
     """
     settings = get_settings()
-    logger.info("Attempting Azure OpenAI completion with model: %s", model)
+    logger.info("Attempting Azure OpenAI completion", extra={"model": model})
     result = await acompletion(
         model=model,
         messages=messages,
