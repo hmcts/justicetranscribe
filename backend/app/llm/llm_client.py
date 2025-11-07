@@ -3,7 +3,6 @@ import json
 import logging
 from collections.abc import Callable
 from enum import Enum
-from pathlib import Path
 from tomllib import load
 from typing import Any
 
@@ -11,12 +10,15 @@ from langfuse import Langfuse
 from langfuse.decorators import langfuse_context, observe
 from litellm import acompletion
 from pydantic import BaseModel
+from pyprojroot import here
 
 from utils.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-with Path.open("../config/backend/app/llm/llm_client.toml", "rb") as f:
+# Load config from file in the same directory as this module
+_config_path = here("app/llm/llm_client.toml")
+with _config_path.open("rb") as f:
     toml_data = load(f)
 
 llm_params = toml_data["llm_params"]
@@ -108,10 +110,7 @@ async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs
     last_exception = None
     for region in llm_params["VERTEX_LOCATIONS"]:
         try:
-            logger.info(
-                "Attempting Gemini completion",
-                extra={"model": model, "region": region}
-            )
+            logger.info("Attempting Gemini completion with model %s in region %s", model, region)
             result = await acompletion(
                 model=model,
                 messages=messages,
@@ -129,30 +128,18 @@ async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs
             )
             # Basic success check
             if result and result.choices and getattr(result.choices[0].message, "content", None):
-                logger.info(
-                    "Successfully completed Gemini request in region",
-                    extra={"region": region}
-                    )
+                logger.info("Successfully completed Gemini request in region %s", region)
                 return result
             else:
-                logger.warning(
-                    "Gemini completion contained no content",
-                    extra={"completion result": result}
-                    )
+                logger.warning("Gemini completion contained no content")
                 raise ValueError("Gemini completion contained no content")
 
         except Exception as exc:
-            logger.warning(
-                "Gemini completion failed in region",
-                extra={"region": region, "error": str(exc)}
-            )
+            logger.warning("Gemini completion failed in region %s: %s", region, exc)
             last_exception = exc
             continue
     # If none succeed, raise last error
-    logger.error(
-        "All Gemini regions failed",
-        extra={"last_error": str(last_exception)}
-    )
+    logger.error("All Gemini regions failed. Last error: %s", last_exception)
     raise last_exception
 
 
@@ -164,7 +151,7 @@ async def azure_grok_acompletion(*, model: str, messages: list, **kwargs):
     pre-configured authentication and retry parameters.
     """
     settings = get_settings()
-    logger.info("Attempting Azure Grok completion", extra={"model": model})
+    logger.info("Attempting Azure Grok completion with model %s", model)
     result = await acompletion(
         model=model,
         messages=messages,
@@ -188,7 +175,7 @@ async def azure_acompletion(*, model: str, messages: list, **kwargs):
     pre-configured authentication and retry parameters.
     """
     settings = get_settings()
-    logger.info("Attempting Azure OpenAI completion", extra={"model": model})
+    logger.info("Attempting Azure OpenAI completion with model %s", model)
     result = await acompletion(
         model=model,
         messages=messages,
