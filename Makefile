@@ -30,6 +30,22 @@ setup-preprod:
 install: ## Install backend dependencies
 	cd backend && uv sync --group fastapi --group dev
 	cd frontend && npm install
+dev: ## Start dev environment: Docker for backend/database, npm run dev for frontend
+	@echo "🚀 Starting development environment..."
+	@echo "📦 Starting database and backend in Docker..."
+	@docker compose -f docker-compose.dev.yml up -d
+	@echo "⏳ Waiting for services to be ready..."
+	@sleep 5
+	@echo "✅ Backend and database are running!"
+	@echo "🌐 Frontend will start on http://localhost:3000"
+	@echo "📚 Backend API: http://localhost:8000/docs"
+	@echo ""
+	@echo "Starting frontend with hot reload..."
+	@cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 INTERNAL_API_BASE=http://localhost:8000 ENVIRONMENT=local NODE_ENV=development npm run dev
+dev-down: ## Stop dev environment (Docker services only, frontend must be stopped manually with Ctrl+C)
+	@echo "🛑 Stopping development environment..."
+	@docker compose -f docker-compose.dev.yml down
+	@echo "✅ Docker services stopped. Frontend should be stopped manually (Ctrl+C)."
 backend: ## Run development server
 	cd backend && ENVIRONMENT=local uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 frontend: ## Run development server

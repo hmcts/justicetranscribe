@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Copy } from "lucide-react";
-import { htmlToText } from "html-to-text";
 import posthog from "posthog-js";
 
 export interface DownloadStyleCopyButtonProps {
@@ -17,24 +16,12 @@ export default function DownloadStyleCopyButton({
   const [showCopied, setShowCopied] = useState(false);
 
   const handleCopy = async () => {
-    try {
-      const plainText = htmlToText(textToCopy, {
-        wordwrap: false,
-        selectors: [{ selector: "a", options: { ignoreHref: true } }],
-      });
+    // Use DOM to extract plain text, which strips all formatting
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = textToCopy;
+    const plainText = tempDiv.textContent || tempDiv.innerText || "";
 
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/html": new Blob([textToCopy], { type: "text/html" }),
-          "text/plain": new Blob([plainText], { type: "text/plain" }),
-        }),
-      ]);
-    } catch (err) {
-      // Fallback for browsers that don't support ClipboardItem API
-      await navigator.clipboard.writeText(
-        htmlToText(textToCopy, { wordwrap: false })
-      );
-    }
+    await navigator.clipboard.writeText(plainText);
 
     posthog.capture(posthogEventName, {
       contentLength: textToCopy.length,
