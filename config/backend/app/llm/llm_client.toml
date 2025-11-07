@@ -8,7 +8,7 @@ NUM_RETRIES = 3
 RETRY_STRATEGY = "exponential_backoff_retry"
 TIMEOUT = 180
 VERTEX_LOCATIONS = [
-    "europe-west9", # Paris
     "europe-west1", # Belgium
     "europe-west4", # Netherlands
+    "europe-west8", # Milan
 ]
