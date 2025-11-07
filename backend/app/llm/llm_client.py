@@ -128,7 +128,7 @@ async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs
                 **kwargs,
             )
             # Basic success check
-            if result and getattr(result.choices[0].message, "content", None):
+            if result and result.choices and getattr(result.choices[0].message, "content", None):
                 logger.info(
                     "Successfully completed Gemini request in region",
                     extra={"region": region}
