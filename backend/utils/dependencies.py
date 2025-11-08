@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 
 from app.database.postgres_database import get_session
 from app.database.postgres_models import User
-from utils.allowlist import get_allowlist_cache
+from utils.allowlist import get_allowlist_manager
 from utils.email_utils import emails_match
 from utils.jwt_verification import jwt_verification_service
 from utils.settings import get_settings
@@ -199,14 +199,8 @@ async def get_allowlisted_user(
 
     # Check allowlist with fail-open approach
     try:
-        allowlist_config = settings.get_allowlist_config()
-        allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
-        is_allowlisted = await allowlist_cache.is_user_allowlisted(
-            current_user.email,
-            settings.AZURE_STORAGE_CONNECTION_STRING,
-            allowlist_config["container"],
-            allowlist_config["blob_name"]
-        )
+        allowlist_manager = get_allowlist_manager()
+        is_allowlisted = allowlist_manager.is_user_allowlisted(current_user.email)
 
         if not is_allowlisted:
             logger.warning("Access denied: User %s is not on the allowlist", current_user.email)

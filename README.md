@@ -113,9 +113,9 @@ The backend uses environment variables from `.env` files:
 
 - `DATABASE_CONNECTION_STRING`: PostgreSQL connection string
 - `ENVIRONMENT`: Set to "development" for local development
-- `AUTH_CLIENT_ID/AUTH_TENANT_ID`: Mock values for local development
+- `AZURE_AD_CLIENT_ID/AZURE_AD_TENANT_ID`: Azure AD authentication configuration
 
-See `backend/.env.example` for all available variables.
+See `.env.example` for all available variables.
 
 ## Production Setup
 

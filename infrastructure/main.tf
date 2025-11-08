@@ -178,17 +178,13 @@ resource "azurerm_linux_web_app" "frontend" {
     
     # Frontend environment variables
     "NEXT_PUBLIC_API_URL"                        = "https://${local.backend_hostname}"
-    "EXTERNAL_API_KEY"                          = "placeholder-external-api-key"
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
     
     # Add database connection for Next.js API routes
     "DATABASE_CONNECTION_STRING"                = local.database_connection_string
     "DATABASE_URL"                              = local.database_connection_string  # Alternative naming
     
-    # Allowlist Configuration (for frontend consistency)
-    "ALLOWLIST_CONTAINER"                       = "application-data"
-    "ALLOWLIST_BLOB_NAME"                       = "lookups/allowlist.csv"
-    "ALLOWLIST_CACHE_TTL_SECONDS"               = "7200"
+    # Note: Allowlist is now read from .allowlist/allowlist.csv file
     
     # Onboarding Configuration
     "FORCE_ONBOARDING_DEV"                      = "false"
@@ -270,15 +266,13 @@ resource "azurerm_linux_web_app" "backend_api" {
     # Disable polling in API server - handled by dedicated worker
     "ENABLE_POLLING_IN_API"              = "false"
     
-    # Database and external API settings
-    "DATABASE_CONNECTION_STRING"         = local.database_connection_string
-    "EXTERNAL_API_KEY"                  = "placeholder-external-api-key"
-    "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
 
-     # Add authentication configuration
-    "AUTH_CLIENT_ID"    = var.auth_client_id
-    "AUTH_TENANT_ID"    = var.auth_tenant_id
-    "AUTH_ISSUER_URL"   = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0"
+    "DATABASE_CONNECTION_STRING"         = local.database_connection_string
+    "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
+    
+    # Azure AD configuration (required by backend settings)
+    "AZURE_AD_CLIENT_ID" = var.auth_client_id
+    "AZURE_AD_TENANT_ID" = var.auth_tenant_id
     
     # Application configuration
     "APP_URL"                           = "https://${local.frontend_hostname}"
@@ -301,7 +295,7 @@ resource "azurerm_linux_web_app" "backend_api" {
     "SENTRY_DSN"                        = "placeholder-sentry-dsn"
     "LANGFUSE_SECRET_KEY"               = "placeholder-langfuse-secret-key"
     "LANGFUSE_PUBLIC_KEY"               = "placeholder-langfuse-public-key"
-    "LANGFUSE_HOST"                     = "placeholder-langfuse-host"
+    "LANGFUSE_HOST"                     = "https://langfuse-ai.justice.gov.uk"
     
     # Government Services
     "GOV_NOTIFY_API_KEY"                = "placeholder-gov-notify-api-key"
@@ -310,20 +304,18 @@ resource "azurerm_linux_web_app" "backend_api" {
     "DISABLE_AUTH_SIGNATURE_VERIFICATION" = "false"
     "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT" = "placeholder-google-credentials-json"
     
-    # Allowlist Configuration
-    "ALLOWLIST_CONTAINER"                = "application-data"
-    "ALLOWLIST_BLOB_NAME"                = "lookups/allowlist.csv"
-    "ALLOWLIST_CACHE_TTL_SECONDS"        = "7200"
+    # Note: Allowlist is now read from .allowlist/allowlist.csv file
     
     # Onboarding Configuration
     "FORCE_ONBOARDING_DEV"               = "false"
   }
 
   # Only ignore changes to sensitive environment variables
+  # Note: AZURE_AD_CLIENT_ID, AZURE_AD_TENANT_ID, and LANGFUSE_HOST are managed by Terraform
+  # from the .tfvars files and are not secrets, so they're not in the ignore list
   lifecycle {
     ignore_changes = [
       app_settings["MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"],
-      app_settings["EXTERNAL_API_KEY"],
       app_settings["AZURE_OPENAI_API_KEY"],
       app_settings["AZURE_OPENAI_ENDPOINT"],
       app_settings["AZURE_GROK_API_KEY"],
@@ -333,11 +325,8 @@ resource "azurerm_linux_web_app" "backend_api" {
       app_settings["SENTRY_DSN"],
       app_settings["LANGFUSE_SECRET_KEY"],
       app_settings["LANGFUSE_PUBLIC_KEY"],
-      app_settings["LANGFUSE_HOST"],
       app_settings["GOV_NOTIFY_API_KEY"],
       app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
-      app_settings["AZURE_AD_TENANT_ID"],
-      app_settings["AZURE_AD_CLIENT_ID"],
       site_config[0].application_stack[0].docker_image_name,
       site_config[0].application_stack[0].docker_registry_url,
       site_config[0].application_stack[0].docker_registry_username,

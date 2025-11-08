@@ -51,7 +51,7 @@ from app.minutes.types import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
-from utils.allowlist import get_allowlist_cache
+from utils.allowlist import get_allowlist_manager
 from utils.dependencies import get_allowlisted_user, get_current_user
 from utils.langfuse_models import (
     LangfuseScoreRequest,
@@ -122,14 +122,8 @@ async def get_onboarding_status(
         is_allowlisted = True
     else:
         try:
-            allowlist_config = settings.get_allowlist_config()
-            allowlist_cache = get_allowlist_cache(settings.ALLOWLIST_CACHE_TTL_SECONDS)
-            is_allowlisted = await allowlist_cache.is_user_allowlisted(
-                current_user.email,
-                settings.AZURE_STORAGE_CONNECTION_STRING,
-                allowlist_config["container"],
-                allowlist_config["blob_name"],
-            )
+            allowlist_manager = get_allowlist_manager()
+            is_allowlisted = allowlist_manager.is_user_allowlisted(current_user.email)
         except Exception as e:
             # FAIL OPEN: Allowlist check failed - log and allow access
             logger.exception(
