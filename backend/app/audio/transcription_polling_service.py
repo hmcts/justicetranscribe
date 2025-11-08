@@ -180,15 +180,17 @@ class TranscriptionPollingService:
 
         return None
 
-    def get_or_create_user_by_email(self, email: str) -> User | None:
+    def get_user_by_email(self, session: Session, email: str) -> User | None:
         """
-        Look up user by email in the database.
+        Look up user by email in the database using provided session.
 
         Note: This only looks up existing users. New users must be created
         through the authentication flow.
 
         Parameters
         ----------
+        session : Session
+            The database session to use.
         email : str
             The user's email address.
 
@@ -198,16 +200,15 @@ class TranscriptionPollingService:
             The User object if found, None otherwise.
         """
         try:
-            with Session(engine) as session:
-                statement = select(User).where(User.email == email)
-                user = session.exec(statement).first()
+            statement = select(User).where(User.email == email)
+            user = session.exec(statement).first()
 
-                if user:
-                    logger.info(f"Found user for email: {email}")
-                else:
-                    logger.warning(f"No user found for email: {email}")
+            if user:
+                logger.info(f"Found user for email: {email}")
+            else:
+                logger.warning(f"No user found for email: {email}")
 
-                return user
+            return user  # noqa: TRY300
 
         except Exception as e:
             logger.error(f"Error looking up user by email '{email}': {e}")
@@ -219,7 +220,7 @@ class TranscriptionPollingService:
 
         This method:
         1. Extracts user email from blob path
-        2. Looks up user in database
+        2. Looks up user in database (using a single session)
         3. Triggers transcription processing
         4. Marks blob as processed
 
@@ -245,8 +246,12 @@ class TranscriptionPollingService:
                 await self._mark_blob_with_error(blob_path, error_msg)
                 return False
 
-            # Look up user in database (run in thread to avoid blocking event loop)
-            user = await asyncio.to_thread(self.get_or_create_user_by_email, user_email)
+            # Look up user in database with a single session (run in thread to avoid blocking event loop)
+            def lookup_user():
+                with Session(engine) as session:
+                    return self.get_user_by_email(session, user_email)
+
+            user = await asyncio.to_thread(lookup_user)
             if not user:
                 error_msg = f"User not found for email: {user_email}"
                 logger.error(error_msg)
