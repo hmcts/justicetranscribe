@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -10,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 
 from api.routes import router as api_router
-from app.audio.transcription_polling_service import TranscriptionPollingService
 from utils.cors_utils import parse_origins
 from utils.exception_handlers import http_exception_handler, unhandled_exception_handler
 from utils.middleware import add_request_id
@@ -21,52 +19,15 @@ log = logging.getLogger("uvicorn")
 # Get settings early to check configuration
 settings = get_settings()
 
-# Global polling task that monitors all users
-global_polling_task: asyncio.Task | None = None
-
 
 @asynccontextmanager
 async def lifespan(app_: FastAPI):  # noqa: ARG001
-    global global_polling_task  # noqa: PLW0603
-
-    log.info("Starting up...")
-
-    # Only start polling service if explicitly enabled for this instance
-    # By default, polling should run in the dedicated worker instance
-    enable_polling = getattr(settings, "ENABLE_POLLING_IN_API", "false").lower() in (
-        "true",
-        "1",
-        "yes",
-    )
-
-    if enable_polling:
-        log.info(
-            "⚠️  ENABLE_POLLING_IN_API is set to True - "
-            "Starting polling service in API server (not recommended for production)"
-        )
-        polling_service = TranscriptionPollingService()
-        global_polling_task = asyncio.create_task(polling_service.run_polling_loop())
-        log.info("Global transcription polling service started in API server")
-    else:
-        log.info(
-            "✅ Polling service disabled in API server "
-            "(handled by dedicated worker instance)"
-        )
+    log.info("Starting up API server...")
+    log.info("✅ Polling service runs in dedicated worker instance")
 
     yield
 
-    # Cancel the global polling task on shutdown (if it was started)
-    if global_polling_task:
-        log.info("Shutting down global transcription polling service...")
-        global_polling_task.cancel()
-
-        # Wait for task to complete cancellation
-        try:
-            await global_polling_task
-        except asyncio.CancelledError:
-            log.info("Global transcription polling service stopped")
-
-    log.info("Shutting down...")
+    log.info("Shutting down API server...")
 
 
 sentry_sdk.init(

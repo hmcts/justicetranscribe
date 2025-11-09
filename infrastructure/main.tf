@@ -258,10 +258,6 @@ resource "azurerm_linux_web_app" "backend_api" {
     
     # CORS allowed origins - include custom domain
     "CORS_ALLOWED_ORIGINS"               = "https://${local.frontend_hostname},${var.custom_domain_url},http://localhost:3000"
-    
-    # Disable polling in API server - handled by dedicated worker
-    "ENABLE_POLLING_IN_API"              = "false"
-    
 
     "DATABASE_CONNECTION_STRING"         = local.database_connection_string
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
