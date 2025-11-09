@@ -407,6 +407,13 @@ resource "azurerm_linux_web_app" "worker" {
     # Python specific settings
     "PYTHONPATH"                         = "/app"
     
+    # Azure AD configuration (required by backend settings)
+    "AZURE_AD_CLIENT_ID" = var.auth_client_id
+    "AZURE_AD_TENANT_ID" = var.auth_tenant_id
+    
+    # Application configuration
+    "APP_URL"                           = "https://${local.frontend_hostname}"
+    
     # Database and external API settings
     "DATABASE_CONNECTION_STRING"         = local.database_connection_string
     
@@ -428,7 +435,10 @@ resource "azurerm_linux_web_app" "worker" {
     "SENTRY_DSN"                        = "placeholder-sentry-dsn"
     "LANGFUSE_SECRET_KEY"               = "placeholder-langfuse-secret-key"
     "LANGFUSE_PUBLIC_KEY"               = "placeholder-langfuse-public-key"
-    "LANGFUSE_HOST"                     = "placeholder-langfuse-host"
+    "LANGFUSE_HOST"                     = "https://langfuse-ai.justice.gov.uk"
+    
+    # Government Services
+    "GOV_NOTIFY_API_KEY"                = "placeholder-gov-notify-api-key"
     
     # Development/Testing Configuration
     "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT" = "placeholder-google-credentials-json"
@@ -450,6 +460,7 @@ resource "azurerm_linux_web_app" "worker" {
       app_settings["LANGFUSE_SECRET_KEY"],
       app_settings["LANGFUSE_PUBLIC_KEY"],
       app_settings["LANGFUSE_HOST"],
+      app_settings["GOV_NOTIFY_API_KEY"],
       app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"]
     ]
   }
