@@ -8,16 +8,16 @@ setup-dev:
 	@echo "⚡ Step 2/2: Applying changes (will show plan first)..."
 	terraform -chdir=infrastructure apply -var-file="dev.tfvars"
 	@echo "✅ DEV environment setup complete!"
-# Complete Prod Environment Setup  
-setup-prod:
-	@echo "🚀 Setting up PROD environment end-to-end..."
-	@echo "⚠️  WARNING: You are setting up PRODUCTION infrastructure!"
-	@read -p "Continue with PROD setup? [y/N]: " confirm && [ "$$confirm" = "y" ]
-	@echo "📦 Step 1/2: Initializing Terraform..."
-	terraform -chdir=infrastructure init -reconfigure -backend-config="key=prod.terraform.tfstate"
-	@echo "⚡ Step 2/2: Applying changes (will show plan first)..."
-	terraform -chdir=infrastructure apply -var-file="prod.tfvars"
-	@echo "✅ PROD environment setup complete!"
+# # Complete Prod Environment Setup  
+# setup-prod:
+# 	@echo "🚀 Setting up PROD environment end-to-end..."
+# 	@echo "⚠️  WARNING: You are setting up PRODUCTION infrastructure!"
+# 	@read -p "Continue with PROD setup? [y/N]: " confirm && [ "$$confirm" = "y" ]
+# 	@echo "📦 Step 1/2: Initializing Terraform..."
+# 	terraform -chdir=infrastructure init -reconfigure -backend-config="key=prod.terraform.tfstate"
+# 	@echo "⚡ Step 2/2: Applying changes (will show plan first)..."
+# 	terraform -chdir=infrastructure apply -var-file="prod.tfvars"
+# 	@echo "✅ PROD environment setup complete!"
 # Complete Preprod Environment Setup
 setup-preprod:
 	@echo "🚀 Setting up PREPROD environment end-to-end..."
