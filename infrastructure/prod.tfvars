@@ -6,6 +6,8 @@ auth_client_id = "5087b20c-ae0e-40dd-ad76-55adabfefb92"
 auth_tenant_id = "c6874728-71e6-41fe-a9e1-2e8c36776ad8"
 
 backend_docker_image_tag = "latest"
+worker_docker_image_name = "JusticeAIUnit/justicetranscribe-backend"  # Use same image as backend
+worker_docker_image_tag = "latest"  # Use same image tag as backend
 
 # Service Plan configuration
 frontend_service_plan_sku = "S2"  # 2 vCPU, 3.5GB RAM for frontend
