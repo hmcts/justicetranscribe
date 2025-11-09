@@ -49,6 +49,7 @@ class TranscriptionPollingService:
         self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
         self.max_retry_attempts = 2  # Allow 2 total attempts (1 retry max as requested)
         self.max_concurrent_workers = 50  # Max concurrent transcription workers
+        self.stale_in_progress_threshold_minutes = 30  # Consider in-progress stale after this many minutes
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
         self._is_first_poll = True
@@ -58,7 +59,7 @@ class TranscriptionPollingService:
             f"max concurrent workers: {self.max_concurrent_workers}"
         )
 
-    def _should_skip_blob(self, blob: dict) -> bool:
+    def _should_skip_blob(self, blob: dict) -> bool:  # noqa: PLR0911
         """
         Check if a blob should be skipped when looking for files to process.
 
@@ -84,16 +85,22 @@ class TranscriptionPollingService:
 
         # Ensure blob is in user-uploads directory
         if not blob_name.startswith(self.user_uploads_prefix):
+            logger.debug(f"Skipping blob (not in user-uploads): {blob_name}")
             return True
 
         # Check file extension
         blob_path = Path(blob_name)
         if blob_path.suffix.lower() not in self.supported_extensions:
+            logger.debug(f"Skipping blob (unsupported extension {blob_path.suffix}): {blob_name}")
             return True
 
         # Skip files uploaded before service started
         last_modified = blob.get("last_modified")
         if last_modified and last_modified < self.startup_time:
+            logger.info(
+                f"Skipping blob (uploaded before service started at {self.startup_time}): "
+                f"{blob_name} (last_modified: {last_modified})"
+            )
             return True
 
         # Check metadata for processing status
@@ -101,13 +108,38 @@ class TranscriptionPollingService:
 
         # Skip if already successfully processed
         if metadata.get("processed") == "true":
+            logger.debug(f"Skipping blob (already processed): {blob_name}")
             return True
 
         # Skip if permanently failed
         if metadata.get("status") == "permanently_failed":
-            logger.debug(f"Skipping permanently failed blob: {blob_name}")
+            logger.debug(f"Skipping blob (permanently failed): {blob_name}")
             return True
 
+        # Skip if currently being processed by a worker
+        # BUT allow processing if the in-progress marker is stale (worker likely crashed)
+        if metadata.get("status") == "in_progress":
+            started_at_str = metadata.get("started_at")
+            if started_at_str:
+                try:
+                    started_at = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+                    age_minutes = (datetime.now(UTC) - started_at).total_seconds() / 60
+
+                    # If in-progress for too long, consider it stale
+                    if age_minutes > self.stale_in_progress_threshold_minutes:
+                        logger.warning(
+                            f"Blob {blob_name} has stale in_progress marker "
+                            f"({age_minutes:.1f} minutes old) - will retry processing"
+                        )
+                        return False  # Don't skip, allow retry
+                except Exception as e:
+                    logger.error(f"Error parsing started_at timestamp for {blob_name}: {e}")
+
+            logger.debug(f"Skipping blob (currently in progress): {blob_name}")
+            return True
+
+        # This blob should be processed
+        logger.info(f"Blob eligible for processing: {blob_name} (metadata: {metadata})")
         return False
 
     async def find_unprocessed_audio_files_to_transcribe(self) -> list[dict]:
@@ -223,20 +255,23 @@ class TranscriptionPollingService:
             logger.error(f"Error looking up user by email '{email}': {e}")
             return None
 
-    async def process_discovered_audio(self, blob_info: dict) -> bool:
+    async def process_discovered_audio(self, blob_info: dict, worker_id: int = 0) -> bool:
         """
         Process a discovered audio file.
 
         This method:
-        1. Extracts user email from blob path
-        2. Looks up user in database (using a single session)
-        3. Triggers transcription processing
-        4. Marks blob as processed
+        1. Marks blob as in-progress to prevent duplicate processing
+        2. Extracts user email from blob path
+        3. Looks up user in database (using a single session)
+        4. Triggers transcription processing
+        5. Marks blob as processed and deletes it
 
         Parameters
         ----------
         blob_info : dict
             Dictionary containing blob information from poll_for_new_audio_files.
+        worker_id : int
+            ID of the worker processing this file (for tracking).
 
         Returns
         -------
@@ -245,6 +280,9 @@ class TranscriptionPollingService:
         """
         blob_path = blob_info["name"]
         logger.info(f"Processing discovered audio file: {blob_path}")
+
+        # Mark as in-progress immediately to prevent duplicate processing
+        await self._mark_blob_in_progress(blob_path, worker_id)
 
         try:
             # Extract user email from path
@@ -293,6 +331,36 @@ class TranscriptionPollingService:
             return False
         else:
             return True
+
+    async def _mark_blob_in_progress(self, blob_path: str, worker_id: int) -> None:
+        """
+        Mark a blob as currently being processed to prevent duplicate processing.
+
+        This prevents race conditions where the poller might queue the same file
+        multiple times if transcription takes longer than the polling interval.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        worker_id : int
+            ID of the worker processing this file.
+        """
+        try:
+            metadata = {
+                "status": "in_progress",
+                "worker_id": str(worker_id),
+                "started_at": datetime.now(UTC).isoformat(),
+            }
+            success = await self.azure_blob_manager.set_blob_metadata(
+                blob_name=blob_path, metadata=metadata
+            )
+            if success:
+                logger.debug(f"Marked blob as in_progress by worker {worker_id}: {blob_path}")
+            else:
+                logger.warning(f"Failed to mark blob as in_progress: {blob_path}")
+        except Exception as e:
+            logger.error(f"Error marking blob as in_progress {blob_path}: {e}")
 
     async def _mark_blob_as_processed_and_soft_delete(self, blob_path: str) -> None:
         """
@@ -590,8 +658,8 @@ class TranscriptionPollingService:
                     f"(queue size: {queue.qsize()})"
                 )
 
-                # Process the file
-                success = await self.process_discovered_audio(blob_info)
+                # Process the file (pass worker_id for in-progress tracking)
+                success = await self.process_discovered_audio(blob_info, worker_id)
 
                 if success:
                     logger.info(
