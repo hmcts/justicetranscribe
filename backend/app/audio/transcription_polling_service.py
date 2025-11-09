@@ -25,12 +25,19 @@ class TranscriptionPollingService:
     """
     Service for polling Azure Blob Storage and automatically processing audio files for all users.
 
+    Architecture:
+    - Uses a worker pool pattern with separate poller and worker tasks
+    - Poller task: Discovers new files every 30 seconds and adds to queue
+    - Worker tasks: Process files from queue with bounded concurrency (default: 50 workers)
+
     This service:
-    - Polls the entire user-uploads/ directory every 30 seconds
+    - Polls the entire user-uploads/ directory every 30 seconds (continuous)
     - Identifies unprocessed audio files across all users
     - Extracts user email from subdirectory structure (user-uploads/{email}/)
     - Triggers transcription processing for each discovered file
     - Marks files as processed using blob metadata
+    - Provides smooth resource usage without spikes
+    - Ensures true 30-second polling intervals regardless of processing time
     """
 
     def __init__(self):
@@ -41,12 +48,14 @@ class TranscriptionPollingService:
         self.user_uploads_prefix = "user-uploads/"
         self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
         self.max_retry_attempts = 2  # Allow 2 total attempts (1 retry max as requested)
+        self.max_concurrent_workers = 50  # Max concurrent transcription workers
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
         self._is_first_poll = True
         logger.info(
             f"Polling service initialized for all users - "
-            f"will only process files uploaded after {self.startup_time.isoformat()}"
+            f"will only process files uploaded after {self.startup_time.isoformat()}, "
+            f"max concurrent workers: {self.max_concurrent_workers}"
         )
 
     def _should_skip_blob(self, blob: dict) -> bool:
@@ -506,68 +515,22 @@ class TranscriptionPollingService:
         except Exception as e:
             logger.error(f"Error during startup cleanup: {e}")
 
-    async def process_files_in_parallel(self, unprocessed_files: list[dict]) -> None:
+    async def _poller(self, queue: asyncio.Queue) -> None:
         """
-        Process multiple audio files in parallel.
+        Continuously poll for new audio files and add them to the processing queue.
 
-        This method creates tasks for each file and processes them concurrently
-        using asyncio.gather(). Individual file failures do not prevent other
-        files from being processed.
+        This task runs independently from the worker pool, ensuring continuous
+        file discovery regardless of how long transcriptions take.
+
+        On the first poll, it cleans up any blobs older than the service startup time.
 
         Parameters
         ----------
-        unprocessed_files : list[dict]
-            List of blob information dictionaries to process.
-        """
-        if not unprocessed_files:
-            return
-
-        logger.info(f"Processing {len(unprocessed_files)} file(s) in parallel...")
-
-        # Create tasks for all files
-        tasks = [
-            self.process_discovered_audio(blob_info)
-            for blob_info in unprocessed_files
-        ]
-
-        # Process in parallel, capturing exceptions
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Log results and any errors that occurred
-        success_count = 0
-        error_count = 0
-        for blob_info, result in zip(unprocessed_files, results, strict=True):
-            blob_name = blob_info.get("name", "unknown")
-            if isinstance(result, Exception):
-                logger.error(f"Error processing blob {blob_name}: {result}")
-                error_count += 1
-            elif result:
-                logger.debug(f"Successfully processed blob {blob_name}")
-                success_count += 1
-            else:
-                logger.warning(f"Processing returned False for blob {blob_name}")
-                error_count += 1
-
-        logger.info(
-            f"Parallel processing complete: {success_count} succeeded, "
-            f"{error_count} failed out of {len(unprocessed_files)} total"
-        )
-
-    async def run_polling_loop(self) -> None:
-        """
-        Run the continuous polling loop for all users.
-
-        This method runs indefinitely, polling for new audio files every
-        30 seconds and processing them across all users.
-
-        Files are processed in parallel for improved throughput.
-
-        On the first poll, it cleans up any blobs older than
-        the service startup time.
+        queue : asyncio.Queue
+            Queue to add discovered files to for worker processing.
         """
         logger.info(
-            f"Starting transcription polling service for all users "
-            f"(interval: {self.polling_interval_seconds}s)"
+            f"Starting poller task (interval: {self.polling_interval_seconds}s)"
         )
 
         while True:
@@ -577,15 +540,132 @@ class TranscriptionPollingService:
                     await self._cleanup_old_blobs_on_startup()
                     self._is_first_poll = False
 
-                logger.info("Polling for new files...")
                 # Poll for new files
                 unprocessed_files = await self.find_unprocessed_audio_files_to_transcribe()
-                logger.info(f"Found {len(unprocessed_files)} new files to process")
-                # Process all files in parallel
-                await self.process_files_in_parallel(unprocessed_files)
-                logger.info("Processed all files in parallel")
-            except Exception as e:
-                logger.error(f"Error in polling loop: {e}")
 
-            # Wait before next poll
+                if unprocessed_files:
+                    logger.info(
+                        f"Poller found {len(unprocessed_files)} new file(s) to queue "
+                        f"(queue size: {queue.qsize()})"
+                    )
+                    # Add all discovered files to queue
+                    for blob_info in unprocessed_files:
+                        await queue.put(blob_info)
+                        logger.debug(f"Queued file: {blob_info['name']}")
+                else:
+                    logger.debug("Poller found no new files")
+
+            except Exception as e:
+                logger.error(f"Error in poller task: {e}")
+
+            # Wait before next poll - this ensures true 30-second intervals
             await asyncio.sleep(self.polling_interval_seconds)
+
+    async def _worker(self, queue: asyncio.Queue, worker_id: int) -> None:
+        """
+        Worker task that continuously processes files from the queue.
+
+        Each worker pulls one file at a time from the queue, processes it,
+        and then pulls the next file. This provides bounded concurrency and
+        smooth resource usage.
+
+        Parameters
+        ----------
+        queue : asyncio.Queue
+            Queue to pull files from for processing.
+        worker_id : int
+            Unique identifier for this worker (for logging).
+        """
+        logger.info(f"Starting worker {worker_id}")
+
+        while True:
+            blob_info = None
+            try:
+                # Wait for a file to process
+                blob_info = await queue.get()
+                blob_name = blob_info.get("name", "unknown")
+
+                logger.info(
+                    f"Worker {worker_id} starting to process: {blob_name} "
+                    f"(queue size: {queue.qsize()})"
+                )
+
+                # Process the file
+                success = await self.process_discovered_audio(blob_info)
+
+                if success:
+                    logger.info(
+                        f"Worker {worker_id} successfully processed: {blob_name}"
+                    )
+                else:
+                    logger.warning(
+                        f"Worker {worker_id} failed to process: {blob_name}"
+                    )
+
+            except Exception as e:
+                blob_name = blob_info.get("name", "unknown") if blob_info else "unknown"
+                logger.error(f"Worker {worker_id} encountered error processing {blob_name}: {e}")
+
+            finally:
+                # Mark task as done regardless of success/failure
+                queue.task_done()
+                logger.debug(f"Worker {worker_id} marked task as done")
+
+    async def run_polling_loop(self) -> None:
+        """
+        Run the continuous polling loop with worker pool architecture.
+
+        This method creates:
+        1. A single poller task that discovers files every 30 seconds
+        2. N worker tasks that process files from the queue concurrently
+
+        This architecture ensures:
+        - Continuous file discovery regardless of processing time
+        - Bounded concurrency (max N simultaneous transcriptions)
+        - Smooth resource usage without spikes
+        - True 30-second polling intervals
+
+        The poller and workers run independently and communicate through
+        an asyncio.Queue.
+        """
+        logger.info(
+            f"Starting transcription polling service with worker pool architecture "
+            f"(polling interval: {self.polling_interval_seconds}s, "
+            f"max workers: {self.max_concurrent_workers})"
+        )
+
+        # Create the queue for communication between poller and workers
+        queue: asyncio.Queue = asyncio.Queue()
+
+        # Create the poller task
+        poller_task = asyncio.create_task(
+            self._poller(queue),
+            name="poller"
+        )
+
+        # Create worker tasks
+        worker_tasks = [
+            asyncio.create_task(
+                self._worker(queue, worker_id),
+                name=f"worker-{worker_id}"
+            )
+            for worker_id in range(self.max_concurrent_workers)
+        ]
+
+        logger.info(
+            f"Started poller and {self.max_concurrent_workers} worker(s). "
+            "Service is now running continuously."
+        )
+
+        # Wait for all tasks to complete (they run indefinitely)
+        # If any task fails, the others will continue running
+        all_tasks = [poller_task, *worker_tasks]
+        try:
+            await asyncio.gather(*all_tasks)
+        except Exception as e:
+            logger.error(f"Critical error in polling service: {e}")
+            # Cancel all tasks on critical error
+            for task in all_tasks:
+                if not task.done():
+                    task.cancel()
+            raise
