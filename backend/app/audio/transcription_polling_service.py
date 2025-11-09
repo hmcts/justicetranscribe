@@ -577,12 +577,13 @@ class TranscriptionPollingService:
                     await self._cleanup_old_blobs_on_startup()
                     self._is_first_poll = False
 
+                logger.info("Polling for new files...")
                 # Poll for new files
                 unprocessed_files = await self.find_unprocessed_audio_files_to_transcribe()
-
+                logger.info(f"Found {len(unprocessed_files)} new files to process")
                 # Process all files in parallel
                 await self.process_files_in_parallel(unprocessed_files)
-
+                logger.info("Processed all files in parallel")
             except Exception as e:
                 logger.error(f"Error in polling loop: {e}")
 
