@@ -95,18 +95,6 @@ variable "backend_docker_image_tag" {
   default     = "latest"
 }
 
-variable "worker_docker_image_name" {
-  description = "The name of the worker docker image"
-  type        = string
-  default     = "JusticeAIUnit/justicetranscribe-worker"
-}
-
-variable "worker_docker_image_tag" {
-  description = "The tag of the worker docker image"
-  type        = string
-  default     = "latest"
-}
-
 # Database configuration
 variable "postgres_admin_username" {
   description = "The administrator username for the PostgreSQL server"

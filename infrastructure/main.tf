@@ -196,11 +196,7 @@ resource "azurerm_linux_web_app" "frontend" {
   # Add this lifecycle rule to ignore changes to app_settings
   lifecycle {
     ignore_changes = [
-      app_settings,
-      site_config[0].application_stack[0].docker_image_name,
-      site_config[0].application_stack[0].docker_registry_url,
-      site_config[0].application_stack[0].docker_registry_username,
-      site_config[0].application_stack[0].docker_registry_password
+      app_settings
     ]
   }
 
@@ -326,11 +322,7 @@ resource "azurerm_linux_web_app" "backend_api" {
       app_settings["LANGFUSE_SECRET_KEY"],
       app_settings["LANGFUSE_PUBLIC_KEY"],
       app_settings["GOV_NOTIFY_API_KEY"],
-      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
-      site_config[0].application_stack[0].docker_image_name,
-      site_config[0].application_stack[0].docker_registry_url,
-      site_config[0].application_stack[0].docker_registry_username,
-      site_config[0].application_stack[0].docker_registry_password
+      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"]
     ]
   }
 
@@ -458,17 +450,13 @@ resource "azurerm_linux_web_app" "worker" {
       app_settings["LANGFUSE_SECRET_KEY"],
       app_settings["LANGFUSE_PUBLIC_KEY"],
       app_settings["LANGFUSE_HOST"],
-      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
-      site_config[0].application_stack[0].docker_image_name,
-      site_config[0].application_stack[0].docker_registry_url,
-      site_config[0].application_stack[0].docker_registry_username,
-      site_config[0].application_stack[0].docker_registry_password
+      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"]
     ]
   }
 
   site_config {
     application_stack {
-      docker_image_name        = "${lower(var.worker_docker_image_name)}:${var.worker_docker_image_tag}"
+      docker_image_name        = "${lower(var.backend_docker_image_name)}:${var.backend_docker_image_tag}"
       docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
       docker_registry_username = azurerm_container_registry.acr.admin_username
       docker_registry_password = azurerm_container_registry.acr.admin_password
