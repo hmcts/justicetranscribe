@@ -339,6 +339,9 @@ class TranscriptionPollingService:
         This prevents race conditions where the poller might queue the same file
         multiple times if transcription takes longer than the polling interval.
 
+        IMPORTANT: Preserves existing metadata (especially retry_count) to avoid
+        breaking retry limiting logic.
+
         Parameters
         ----------
         blob_path : str
@@ -347,7 +350,14 @@ class TranscriptionPollingService:
             ID of the worker processing this file.
         """
         try:
+            # Get current metadata to preserve retry_count and other fields
+            current_metadata = (
+                await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
+            )
+
+            # Update metadata while preserving existing fields
             metadata = {
+                **current_metadata,  # Preserve existing metadata
                 "status": "in_progress",
                 "worker_id": str(worker_id),
                 "started_at": datetime.now(UTC).isoformat(),
@@ -356,7 +366,10 @@ class TranscriptionPollingService:
                 blob_name=blob_path, metadata=metadata
             )
             if success:
-                logger.debug(f"Marked blob as in_progress by worker {worker_id}: {blob_path}")
+                logger.debug(
+                    f"Marked blob as in_progress by worker {worker_id}: {blob_path} "
+                    f"(preserved retry_count: {current_metadata.get('retry_count', '0')})"
+                )
             else:
                 logger.warning(f"Failed to mark blob as in_progress: {blob_path}")
         except Exception as e:
