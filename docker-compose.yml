@@ -51,7 +51,6 @@ services:
       - DATABASE_CONNECTION_STRING=postgresql://psqladmin:localpass@database:5432/justicetranscribe_db
       - ENVIRONMENT=local
       - NODE_ENV=production
-      - ENABLE_POLLING_IN_API=false # Polling handled by dedicated worker
     depends_on:
       # config-validator:
       #   condition: service_completed_successfully

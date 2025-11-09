@@ -25,12 +25,19 @@ class TranscriptionPollingService:
     """
     Service for polling Azure Blob Storage and automatically processing audio files for all users.
 
+    Architecture:
+    - Uses a worker pool pattern with separate poller and worker tasks
+    - Poller task: Discovers new files every 30 seconds and adds to queue
+    - Worker tasks: Process files from queue with bounded concurrency (default: 50 workers)
+
     This service:
-    - Polls the entire user-uploads/ directory every 30 seconds
+    - Polls the entire user-uploads/ directory every 30 seconds (continuous)
     - Identifies unprocessed audio files across all users
     - Extracts user email from subdirectory structure (user-uploads/{email}/)
     - Triggers transcription processing for each discovered file
     - Marks files as processed using blob metadata
+    - Provides smooth resource usage without spikes
+    - Ensures true 30-second polling intervals regardless of processing time
     """
 
     def __init__(self):
@@ -41,15 +48,18 @@ class TranscriptionPollingService:
         self.user_uploads_prefix = "user-uploads/"
         self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
         self.max_retry_attempts = 2  # Allow 2 total attempts (1 retry max as requested)
+        self.max_concurrent_workers = 50  # Max concurrent transcription workers
+        self.stale_in_progress_threshold_minutes = 30  # Consider in-progress stale after this many minutes
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
         self._is_first_poll = True
         logger.info(
             f"Polling service initialized for all users - "
-            f"will only process files uploaded after {self.startup_time.isoformat()}"
+            f"will only process files uploaded after {self.startup_time.isoformat()}, "
+            f"max concurrent workers: {self.max_concurrent_workers}"
         )
 
-    def _should_skip_blob(self, blob: dict) -> bool:
+    def _should_skip_blob(self, blob: dict) -> bool:  # noqa: PLR0911
         """
         Check if a blob should be skipped when looking for files to process.
 
@@ -75,16 +85,22 @@ class TranscriptionPollingService:
 
         # Ensure blob is in user-uploads directory
         if not blob_name.startswith(self.user_uploads_prefix):
+            logger.debug(f"Skipping blob (not in user-uploads): {blob_name}")
             return True
 
         # Check file extension
         blob_path = Path(blob_name)
         if blob_path.suffix.lower() not in self.supported_extensions:
+            logger.debug(f"Skipping blob (unsupported extension {blob_path.suffix}): {blob_name}")
             return True
 
         # Skip files uploaded before service started
         last_modified = blob.get("last_modified")
         if last_modified and last_modified < self.startup_time:
+            logger.info(
+                f"Skipping blob (uploaded before service started at {self.startup_time}): "
+                f"{blob_name} (last_modified: {last_modified})"
+            )
             return True
 
         # Check metadata for processing status
@@ -92,13 +108,38 @@ class TranscriptionPollingService:
 
         # Skip if already successfully processed
         if metadata.get("processed") == "true":
+            logger.debug(f"Skipping blob (already processed): {blob_name}")
             return True
 
         # Skip if permanently failed
         if metadata.get("status") == "permanently_failed":
-            logger.debug(f"Skipping permanently failed blob: {blob_name}")
+            logger.debug(f"Skipping blob (permanently failed): {blob_name}")
             return True
 
+        # Skip if currently being processed by a worker
+        # BUT allow processing if the in-progress marker is stale (worker likely crashed)
+        if metadata.get("status") == "in_progress":
+            started_at_str = metadata.get("started_at")
+            if started_at_str:
+                try:
+                    started_at = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+                    age_minutes = (datetime.now(UTC) - started_at).total_seconds() / 60
+
+                    # If in-progress for too long, consider it stale
+                    if age_minutes > self.stale_in_progress_threshold_minutes:
+                        logger.warning(
+                            f"Blob {blob_name} has stale in_progress marker "
+                            f"({age_minutes:.1f} minutes old) - will retry processing"
+                        )
+                        return False  # Don't skip, allow retry
+                except Exception as e:
+                    logger.error(f"Error parsing started_at timestamp for {blob_name}: {e}")
+
+            logger.debug(f"Skipping blob (currently in progress): {blob_name}")
+            return True
+
+        # This blob should be processed
+        logger.info(f"Blob eligible for processing: {blob_name} (metadata: {metadata})")
         return False
 
     async def find_unprocessed_audio_files_to_transcribe(self) -> list[dict]:
@@ -214,20 +255,23 @@ class TranscriptionPollingService:
             logger.error(f"Error looking up user by email '{email}': {e}")
             return None
 
-    async def process_discovered_audio(self, blob_info: dict) -> bool:
+    async def process_discovered_audio(self, blob_info: dict, worker_id: int = 0) -> bool:
         """
         Process a discovered audio file.
 
         This method:
-        1. Extracts user email from blob path
-        2. Looks up user in database (using a single session)
-        3. Triggers transcription processing
-        4. Marks blob as processed
+        1. Marks blob as in-progress to prevent duplicate processing
+        2. Extracts user email from blob path
+        3. Looks up user in database (using a single session)
+        4. Triggers transcription processing
+        5. Marks blob as processed and deletes it
 
         Parameters
         ----------
         blob_info : dict
             Dictionary containing blob information from poll_for_new_audio_files.
+        worker_id : int
+            ID of the worker processing this file (for tracking).
 
         Returns
         -------
@@ -236,6 +280,9 @@ class TranscriptionPollingService:
         """
         blob_path = blob_info["name"]
         logger.info(f"Processing discovered audio file: {blob_path}")
+
+        # Mark as in-progress immediately to prevent duplicate processing
+        await self._mark_blob_in_progress(blob_path, worker_id)
 
         try:
             # Extract user email from path
@@ -284,6 +331,49 @@ class TranscriptionPollingService:
             return False
         else:
             return True
+
+    async def _mark_blob_in_progress(self, blob_path: str, worker_id: int) -> None:
+        """
+        Mark a blob as currently being processed to prevent duplicate processing.
+
+        This prevents race conditions where the poller might queue the same file
+        multiple times if transcription takes longer than the polling interval.
+
+        IMPORTANT: Preserves existing metadata (especially retry_count) to avoid
+        breaking retry limiting logic.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+        worker_id : int
+            ID of the worker processing this file.
+        """
+        try:
+            # Get current metadata to preserve retry_count and other fields
+            current_metadata = (
+                await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
+            )
+
+            # Update metadata while preserving existing fields
+            metadata = {
+                **current_metadata,  # Preserve existing metadata
+                "status": "in_progress",
+                "worker_id": str(worker_id),
+                "started_at": datetime.now(UTC).isoformat(),
+            }
+            success = await self.azure_blob_manager.set_blob_metadata(
+                blob_name=blob_path, metadata=metadata
+            )
+            if success:
+                logger.debug(
+                    f"Marked blob as in_progress by worker {worker_id}: {blob_path} "
+                    f"(preserved retry_count: {current_metadata.get('retry_count', '0')})"
+                )
+            else:
+                logger.warning(f"Failed to mark blob as in_progress: {blob_path}")
+        except Exception as e:
+            logger.error(f"Error marking blob as in_progress {blob_path}: {e}")
 
     async def _mark_blob_as_processed_and_soft_delete(self, blob_path: str) -> None:
         """
@@ -506,68 +596,22 @@ class TranscriptionPollingService:
         except Exception as e:
             logger.error(f"Error during startup cleanup: {e}")
 
-    async def process_files_in_parallel(self, unprocessed_files: list[dict]) -> None:
+    async def _poller(self, queue: asyncio.Queue) -> None:
         """
-        Process multiple audio files in parallel.
+        Continuously poll for new audio files and add them to the processing queue.
 
-        This method creates tasks for each file and processes them concurrently
-        using asyncio.gather(). Individual file failures do not prevent other
-        files from being processed.
+        This task runs independently from the worker pool, ensuring continuous
+        file discovery regardless of how long transcriptions take.
+
+        On the first poll, it cleans up any blobs older than the service startup time.
 
         Parameters
         ----------
-        unprocessed_files : list[dict]
-            List of blob information dictionaries to process.
-        """
-        if not unprocessed_files:
-            return
-
-        logger.info(f"Processing {len(unprocessed_files)} file(s) in parallel...")
-
-        # Create tasks for all files
-        tasks = [
-            self.process_discovered_audio(blob_info)
-            for blob_info in unprocessed_files
-        ]
-
-        # Process in parallel, capturing exceptions
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Log results and any errors that occurred
-        success_count = 0
-        error_count = 0
-        for blob_info, result in zip(unprocessed_files, results, strict=True):
-            blob_name = blob_info.get("name", "unknown")
-            if isinstance(result, Exception):
-                logger.error(f"Error processing blob {blob_name}: {result}")
-                error_count += 1
-            elif result:
-                logger.debug(f"Successfully processed blob {blob_name}")
-                success_count += 1
-            else:
-                logger.warning(f"Processing returned False for blob {blob_name}")
-                error_count += 1
-
-        logger.info(
-            f"Parallel processing complete: {success_count} succeeded, "
-            f"{error_count} failed out of {len(unprocessed_files)} total"
-        )
-
-    async def run_polling_loop(self) -> None:
-        """
-        Run the continuous polling loop for all users.
-
-        This method runs indefinitely, polling for new audio files every
-        30 seconds and processing them across all users.
-
-        Files are processed in parallel for improved throughput.
-
-        On the first poll, it cleans up any blobs older than
-        the service startup time.
+        queue : asyncio.Queue
+            Queue to add discovered files to for worker processing.
         """
         logger.info(
-            f"Starting transcription polling service for all users "
-            f"(interval: {self.polling_interval_seconds}s)"
+            f"Starting poller task (interval: {self.polling_interval_seconds}s)"
         )
 
         while True:
@@ -577,15 +621,132 @@ class TranscriptionPollingService:
                     await self._cleanup_old_blobs_on_startup()
                     self._is_first_poll = False
 
-                logger.info("Polling for new files...")
                 # Poll for new files
                 unprocessed_files = await self.find_unprocessed_audio_files_to_transcribe()
-                logger.info(f"Found {len(unprocessed_files)} new files to process")
-                # Process all files in parallel
-                await self.process_files_in_parallel(unprocessed_files)
-                logger.info("Processed all files in parallel")
-            except Exception as e:
-                logger.error(f"Error in polling loop: {e}")
 
-            # Wait before next poll
+                if unprocessed_files:
+                    logger.info(
+                        f"Poller found {len(unprocessed_files)} new file(s) to queue "
+                        f"(queue size: {queue.qsize()})"
+                    )
+                    # Add all discovered files to queue
+                    for blob_info in unprocessed_files:
+                        await queue.put(blob_info)
+                        logger.debug(f"Queued file: {blob_info['name']}")
+                else:
+                    logger.debug("Poller found no new files")
+
+            except Exception as e:
+                logger.error(f"Error in poller task: {e}")
+
+            # Wait before next poll - this ensures true 30-second intervals
             await asyncio.sleep(self.polling_interval_seconds)
+
+    async def _worker(self, queue: asyncio.Queue, worker_id: int) -> None:
+        """
+        Worker task that continuously processes files from the queue.
+
+        Each worker pulls one file at a time from the queue, processes it,
+        and then pulls the next file. This provides bounded concurrency and
+        smooth resource usage.
+
+        Parameters
+        ----------
+        queue : asyncio.Queue
+            Queue to pull files from for processing.
+        worker_id : int
+            Unique identifier for this worker (for logging).
+        """
+        logger.info(f"Starting worker {worker_id}")
+
+        while True:
+            blob_info = None
+            try:
+                # Wait for a file to process
+                blob_info = await queue.get()
+                blob_name = blob_info.get("name", "unknown")
+
+                logger.info(
+                    f"Worker {worker_id} starting to process: {blob_name} "
+                    f"(queue size: {queue.qsize()})"
+                )
+
+                # Process the file (pass worker_id for in-progress tracking)
+                success = await self.process_discovered_audio(blob_info, worker_id)
+
+                if success:
+                    logger.info(
+                        f"Worker {worker_id} successfully processed: {blob_name}"
+                    )
+                else:
+                    logger.warning(
+                        f"Worker {worker_id} failed to process: {blob_name}"
+                    )
+
+            except Exception as e:
+                blob_name = blob_info.get("name", "unknown") if blob_info else "unknown"
+                logger.error(f"Worker {worker_id} encountered error processing {blob_name}: {e}")
+
+            finally:
+                # Mark task as done regardless of success/failure
+                queue.task_done()
+                logger.debug(f"Worker {worker_id} marked task as done")
+
+    async def run_polling_loop(self) -> None:
+        """
+        Run the continuous polling loop with worker pool architecture.
+
+        This method creates:
+        1. A single poller task that discovers files every 30 seconds
+        2. N worker tasks that process files from the queue concurrently
+
+        This architecture ensures:
+        - Continuous file discovery regardless of processing time
+        - Bounded concurrency (max N simultaneous transcriptions)
+        - Smooth resource usage without spikes
+        - True 30-second polling intervals
+
+        The poller and workers run independently and communicate through
+        an asyncio.Queue.
+        """
+        logger.info(
+            f"Starting transcription polling service with worker pool architecture "
+            f"(polling interval: {self.polling_interval_seconds}s, "
+            f"max workers: {self.max_concurrent_workers})"
+        )
+
+        # Create the queue for communication between poller and workers
+        queue: asyncio.Queue = asyncio.Queue()
+
+        # Create the poller task
+        poller_task = asyncio.create_task(
+            self._poller(queue),
+            name="poller"
+        )
+
+        # Create worker tasks
+        worker_tasks = [
+            asyncio.create_task(
+                self._worker(queue, worker_id),
+                name=f"worker-{worker_id}"
+            )
+            for worker_id in range(self.max_concurrent_workers)
+        ]
+
+        logger.info(
+            f"Started poller and {self.max_concurrent_workers} worker(s). "
+            "Service is now running continuously."
+        )
+
+        # Wait for all tasks to complete (they run indefinitely)
+        # If any task fails, the others will continue running
+        all_tasks = [poller_task, *worker_tasks]
+        try:
+            await asyncio.gather(*all_tasks)
+        except Exception as e:
+            logger.error(f"Critical error in polling service: {e}")
+            # Cancel all tasks on critical error
+            for task in all_tasks:
+                if not task.done():
+                    task.cancel()
+            raise

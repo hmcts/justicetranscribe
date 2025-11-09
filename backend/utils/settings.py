@@ -39,10 +39,6 @@ class Settings(BaseSettings):
     SENTRY_DSN: str
     # CORS configuration from infrastructure
     CORS_ALLOWED_ORIGINS: str | None = None
-    # Transcription polling service configuration
-    # When False (default), polling runs only in dedicated worker instance
-    # When True, polling runs in API server (not recommended for production)
-    ENABLE_POLLING_IN_API: str = "false"
 
     @field_validator("LANGFUSE_HOST")
     @classmethod
