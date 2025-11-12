@@ -62,9 +62,6 @@ from utils.settings import get_settings
 router = APIRouter()
 
 
-# Azure Blob Storage configuration is handled through get_settings()
-
-
 UK_TIMEZONE = pytz.timezone("Europe/London")
 
 
