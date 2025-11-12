@@ -215,9 +215,15 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
       try {
         const versions = await getMinuteVersions(currentTranscription.id);
         if (versions.length > 0) {
-          const minuteVersion =
-            versions
-              .filter((version) => !version.is_generating)
+          const completedVersions = versions.filter((version) => !version.is_generating);
+          
+          // Prioritize CRISSA template if it exists
+          const crissaVersion = completedVersions.find(
+            (version) => version.template.name === "Crissa"
+          );
+          
+          const minuteVersion = crissaVersion || 
+            completedVersions
               .sort((a, b) => {
                 const dateA = new Date(a.created_datetime || "").getTime();
                 const dateB = new Date(b.created_datetime || "").getTime();
