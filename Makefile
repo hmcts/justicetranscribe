@@ -1,5 +1,5 @@
 # Add this near the top of your Makefile
-.PHONY: setup-dev setup-prod setup-preprod install backend frontend database db-up db-down db-reset db-migrate db-upgrade test allowlist-dev allowlist-prod allowlist-both allowlist-update-dev allowlist-update-prod allowlist-merge-dev allowlist-merge-prod allowlist-upload-dev allowlist-upload-prod allowlist-dedupe-dev allowlist-dedupe-prod
+.PHONY: setup-dev setup-prod setup-preprod install backend frontend worker database db-up db-down db-reset db-migrate db-upgrade test allowlist-dev allowlist-prod allowlist-both allowlist-update-dev allowlist-update-prod allowlist-merge-dev allowlist-merge-prod allowlist-upload-dev allowlist-upload-prod allowlist-dedupe-dev allowlist-dedupe-prod
 # Complete Dev Environment Setup
 setup-dev:
 	@echo "🚀 Setting up DEV environment end-to-end..."
@@ -8,16 +8,16 @@ setup-dev:
 	@echo "⚡ Step 2/2: Applying changes (will show plan first)..."
 	terraform -chdir=infrastructure apply -var-file="dev.tfvars"
 	@echo "✅ DEV environment setup complete!"
-# Complete Prod Environment Setup  
-setup-prod:
-	@echo "🚀 Setting up PROD environment end-to-end..."
-	@echo "⚠️  WARNING: You are setting up PRODUCTION infrastructure!"
-	@read -p "Continue with PROD setup? [y/N]: " confirm && [ "$$confirm" = "y" ]
-	@echo "📦 Step 1/2: Initializing Terraform..."
-	terraform -chdir=infrastructure init -reconfigure -backend-config="key=prod.terraform.tfstate"
-	@echo "⚡ Step 2/2: Applying changes (will show plan first)..."
-	terraform -chdir=infrastructure apply -var-file="prod.tfvars"
-	@echo "✅ PROD environment setup complete!"
+# # Complete Prod Environment Setup  
+# setup-prod:
+# 	@echo "🚀 Setting up PROD environment end-to-end..."
+# 	@echo "⚠️  WARNING: You are setting up PRODUCTION infrastructure!"
+# 	@read -p "Continue with PROD setup? [y/N]: " confirm && [ "$$confirm" = "y" ]
+# 	@echo "📦 Step 1/2: Initializing Terraform..."
+# 	terraform -chdir=infrastructure init -reconfigure -backend-config="key=prod.terraform.tfstate"
+# 	@echo "⚡ Step 2/2: Applying changes (will show plan first)..."
+# 	terraform -chdir=infrastructure apply -var-file="prod.tfvars"
+# 	@echo "✅ PROD environment setup complete!"
 # Complete Preprod Environment Setup
 setup-preprod:
 	@echo "🚀 Setting up PREPROD environment end-to-end..."
@@ -30,10 +30,35 @@ setup-preprod:
 install: ## Install backend dependencies
 	cd backend && uv sync --group fastapi --group dev
 	cd frontend && npm install
+dev: ## Start dev environment: Docker for backend/database, npm run dev for frontend
+	@echo "🚀 Starting development environment..."
+	@echo "📦 Starting database and backend in Docker..."
+	@docker compose -f docker-compose.dev.yml up -d
+	@echo "⏳ Waiting for services to be ready..."
+	@sleep 5
+	@echo "✅ Backend and database are running!"
+	@echo "🌐 Frontend will start on http://localhost:3000"
+	@echo "📚 Backend API: http://localhost:8000/docs"
+	@echo ""
+	@echo "Starting frontend with hot reload..."
+	@cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 INTERNAL_API_BASE=http://localhost:8000 ENVIRONMENT=local NODE_ENV=development npm run dev
+dev-down: ## Stop dev environment (Docker services only, frontend must be stopped manually with Ctrl+C)
+	@echo "🛑 Stopping development environment..."
+	@docker compose -f docker-compose.dev.yml down
+	@echo "✅ Docker services stopped. Frontend should be stopped manually (Ctrl+C)."
 backend: ## Run development server
 	cd backend && ENVIRONMENT=local uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 frontend: ## Run development server
 	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 INTERNAL_API_BASE=http://localhost:8000 ENVIRONMENT=local NODE_ENV=development npm run dev
+worker: ## Run worker process for transcription polling
+	@if [ -f .env ]; then \
+		echo "📄 Loading environment variables from .env file..."; \
+		echo "⚙️  Starting transcription polling worker..."; \
+		cd backend && ENVIRONMENT=local uv run --env-file ../.env python worker.py; \
+	else \
+		echo "⚠️  No .env file found. Make sure to create one from .env.example"; \
+		cd backend && ENVIRONMENT=local uv run python worker.py; \
+	fi
 database:
 	docker compose up database
 	make db-upgrade

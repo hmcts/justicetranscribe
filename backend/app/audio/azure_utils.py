@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from azure.core.exceptions import ClientAuthenticationError, ResourceExistsError, ResourceNotFoundError
-from azure.storage.blob import BlobClient, BlobServiceClient
+from azure.storage.blob import BlobServiceClient
 from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 
 from app.logger import logger
@@ -49,7 +49,7 @@ def _validate_azure_account_key(account_name: str, account_key: str, conn_timeou
 
 
 
-def _extract_parameter_from_connection_string(
+def _extract_parameter_from_connection_string(  # noqa: C901
     connection_string: str,
     parameter_name: str
     ) -> str:
@@ -112,6 +112,10 @@ def _extract_parameter_from_connection_string(
 
     if parameter_value == "":
         msg = f"{parameter_name} parameter cannot be empty"
+        raise ValueError(msg)
+
+    if parameter_value is None:
+        msg = f"{parameter_name} parameter is invalid"
         raise ValueError(msg)
 
     return parameter_value
@@ -202,148 +206,8 @@ def validate_azure_storage_config(
 # Blob Management Functions
 # =============================================================================
 
-class AzureBlobManager:
-    """Manages Azure Blob Storage operations for audio files.
-
-    This class provides both synchronous and asynchronous methods for
-    creating, deleting, and checking the existence of blobs in Azure Storage.
-    """
-
-    def __init__(self, connection_string: str | None = None):
-        """Initialize the blob manager with connection string.
-
-        Parameters
-        ----------
-        connection_string : str, optional
-            Azure Storage connection string. If None, uses settings from
-            get_settings().AZURE_STORAGE_CONNECTION_STRING.
-        """
-        self.connection_string = connection_string or get_settings().AZURE_STORAGE_CONNECTION_STRING
-        self.account_name = get_settings().AZURE_STORAGE_ACCOUNT_NAME
-        self.container_name = get_settings().AZURE_STORAGE_CONTAINER_NAME
-
-    def create_blob_from_file(self, file_path: Path, blob_name: str,
-                             container_name: str | None = None) -> bool:
-        """Create a blob from a local file.
-
-        Parameters
-        ----------
-        file_path : Path
-            Path to the local file to upload.
-        blob_name : str
-            Name of the blob in Azure Storage.
-        container_name : str, optional
-            Container name. If None, uses the default container from settings.
-
-        Returns
-        -------
-        bool
-            True if successful, False otherwise.
-        """
-        try:
-            container = container_name or self.container_name
-
-            # Create BlobClient
-            blob_client = BlobClient.from_connection_string(
-                conn_str=self.connection_string,
-                container_name=container,
-                blob_name=blob_name
-            )
-
-            # Upload the file
-            with file_path.open("rb") as data:
-                blob_client.upload_blob(data, overwrite=True)
-
-            logger.info(f"Successfully created blob: {container}/{blob_name}")
-        except FileNotFoundError:
-            logger.error(f"File not found: {file_path}")
-            return False
-        except ResourceExistsError:
-            logger.warning(f"Blob already exists: {container}/{blob_name}")
-            return False
-        except Exception as e:
-            logger.error(f"Failed to create blob {container}/{blob_name}: {e}")
-            return False
-        else:
-            return True
-
-    def delete_blob(self, blob_name: str, container_name: str | None = None,
-                   delete_snapshots: str = "include") -> bool:
-        """Delete a blob from Azure Storage.
-
-        Parameters
-        ----------
-        blob_name : str
-            Name of the blob to delete.
-        container_name : str, optional
-            Container name. If None, uses the default container from settings.
-        delete_snapshots : str, optional
-            How to handle snapshots. Options: "include", "only", None.
-            Default is "include".
-
-        Returns
-        -------
-        bool
-            True if successful, False otherwise.
-        """
-        try:
-            container = container_name or self.container_name
-
-            # Create BlobClient
-            blob_client = BlobClient.from_connection_string(
-                conn_str=self.connection_string,
-                container_name=container,
-                blob_name=blob_name
-            )
-
-            # Delete the blob
-            blob_client.delete_blob(delete_snapshots=delete_snapshots)
-
-            logger.info(f"Successfully deleted blob: {container}/{blob_name}")
-        except ResourceNotFoundError:
-            logger.warning(f"Blob not found: {container}/{blob_name}")
-            return False
-        except Exception as e:
-            logger.error(f"Failed to delete blob {container}/{blob_name}: {e}")
-            return False
-        else:
-            return True
-
-    def blob_exists(self, blob_name: str, container_name: str | None = None) -> bool:
-        """Check if a blob exists in Azure Storage.
-
-        Parameters
-        ----------
-        blob_name : str
-            Name of the blob to check.
-        container_name : str, optional
-            Container name. If None, uses the default container from settings.
-
-        Returns
-        -------
-        bool
-            True if blob exists, False otherwise.
-        """
-        try:
-            container = container_name or self.container_name
-
-            # Create BlobClient
-            blob_client = BlobClient.from_connection_string(
-                conn_str=self.connection_string,
-                container_name=container,
-                blob_name=blob_name
-            )
-
-            # Check if blob exists
-            return blob_client.exists()
-
-        except Exception as e:
-            logger.error(f"Failed to check if blob exists {container}/{blob_name}: {e}")
-            return False
-
-
 class AsyncAzureBlobManager:
-    """Async version of Azure Blob Storage manager.
+    """Manages Azure Blob Storage operations for audio files.
 
     This class provides asynchronous methods for creating, deleting, and
     checking the existence of blobs in Azure Storage.
@@ -382,6 +246,11 @@ class AsyncAzureBlobManager:
         """
         try:
             container = container_name or self.container_name
+
+            # Ensure container exists before attempting to upload
+            if not await self._ensure_container_exists(container):
+                logger.error(f"Cannot create blob - failed to ensure container '{container}' exists")
+                return False
 
             # Create async BlobServiceClient
             async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
@@ -481,6 +350,41 @@ class AsyncAzureBlobManager:
             logger.error(f"Failed to check if blob exists {container}/{blob_name}: {e}")
             return False
 
+    async def _ensure_container_exists(self, container_name: str) -> bool:
+        """Ensure a container exists, creating it if necessary (async).
+
+        Parameters
+        ----------
+        container_name : str
+            The name of the container to ensure exists.
+
+        Returns
+        -------
+        bool
+            True if container exists or was created successfully, False otherwise.
+        """
+        try:
+            async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:
+                container_client = blob_service_client.get_container_client(container_name)
+
+                # Check if container exists
+                exists = await container_client.exists()
+
+                if not exists:
+                    logger.info(f"Container '{container_name}' does not exist. Creating it...")
+                    await container_client.create_container()
+                    logger.info(f"Successfully created container: {container_name}")
+
+                return True
+
+        except ResourceExistsError:
+            # Container was created by another process between check and create
+            logger.info(f"Container '{container_name}' already exists (created by another process)")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to ensure container exists '{container_name}': {e}")
+            return False
+
     async def list_blobs_in_prefix(
         self,
         prefix: str,
@@ -509,6 +413,12 @@ class AsyncAzureBlobManager:
         """
         try:
             container = container_name or self.container_name
+
+            # Ensure container exists before attempting to list blobs
+            if not await self._ensure_container_exists(container):
+                logger.error(f"Cannot list blobs - failed to ensure container '{container}' exists")
+                return []
+
             blobs = []
 
             # Create async BlobServiceClient
@@ -527,7 +437,8 @@ class AsyncAzureBlobManager:
                         blob_info["metadata"] = blob.metadata or {}
                     blobs.append(blob_info)
 
-            logger.info(f"Listed {len(blobs)} blobs with prefix '{prefix}' in container '{container}'")
+            if blobs:
+                logger.info(f"Listed {len(blobs)} blobs with prefix '{prefix}' in container '{container}'")
 
         except Exception as e:
             logger.error(f"Failed to list blobs with prefix '{prefix}' in container '{container}': {e}")
@@ -596,6 +507,11 @@ class AsyncAzureBlobManager:
         """
         try:
             container = container_name or self.container_name
+
+            # Ensure container exists before attempting to set metadata
+            if not await self._ensure_container_exists(container):
+                logger.error(f"Cannot set blob metadata - failed to ensure container '{container}' exists")
+                return False
 
             # Create async BlobServiceClient
             async with AsyncBlobServiceClient.from_connection_string(self.connection_string) as blob_service_client:

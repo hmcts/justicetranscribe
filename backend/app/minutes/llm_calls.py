@@ -1,16 +1,19 @@
 # flake8: noqa: E501
 
+import asyncio
 from uuid import UUID, uuid4
 
 import sentry_sdk
 from fastapi import HTTPException
 from langfuse.decorators import langfuse_context, observe
+from sqlmodel import Session
 from uwotm8 import convert_american_to_british_spelling
 
 from app.database.interface_functions import (
     get_minute_version_by_id,
     save_minute_version,
 )
+from app.database.postgres_database import engine
 from app.database.postgres_models import (
     DialogueEntry,
     MinuteVersion,
@@ -132,6 +135,7 @@ async def generate_llm_output_task(
     user_email: str,
     minute_version_id: UUID | None = None,
 ) -> str:
+    """Generate LLM output and save to database using dedicated sessions."""
     # Start a Sentry transaction for the whole function
     with sentry_sdk.start_transaction(op="task", name="Generate LLM Output Task") as transaction:  # noqa: F841
         # if length of dialogue entries is 0, return empty string
@@ -142,7 +146,7 @@ async def generate_llm_output_task(
         if minute_version_id is None:
             minute_version_id = uuid4()  # Generate a UUID if none provided
 
-        # save initial version with is_generating=True
+        # save initial version with is_generating=True (in thread with session)
         initial_minute_version = MinuteVersion(
             id=minute_version_id,
             transcription_id=transcription_id,
@@ -151,7 +155,12 @@ async def generate_llm_output_task(
             trace_id=langfuse_context.get_current_trace_id(),
             is_generating=True,
         )
-        save_minute_version(initial_minute_version)
+
+        def save_initial():
+            with Session(engine) as session:
+                save_minute_version(session, initial_minute_version)
+
+        await asyncio.to_thread(save_initial)
 
         try:
             # Generate content based on template
@@ -166,12 +175,17 @@ async def generate_llm_output_task(
             # Update the existing minute_version instead of creating a new one
             initial_minute_version.html_content = llm_output
             initial_minute_version.is_generating = False
-            save_minute_version(initial_minute_version)
+
+            def save_complete():
+                with Session(engine) as session:
+                    save_minute_version(session, initial_minute_version)
+
+            await asyncio.to_thread(save_complete)
 
             return llm_output  # noqa: TRY300
 
         except Exception as e:
-            # Save error state
+            # Save error state (in thread with session)
             error_minute_version = MinuteVersion(
                 id=minute_version_id,
                 transcription_id=transcription_id,
@@ -181,7 +195,12 @@ async def generate_llm_output_task(
                 is_generating=False,
                 error_message=str(e),
             )
-            save_minute_version(error_minute_version)
+
+            def save_error():
+                with Session(engine) as session:
+                    save_minute_version(session, error_minute_version)
+
+            await asyncio.to_thread(save_error)
             raise
 
 
@@ -193,12 +212,18 @@ async def ai_edit_task(
     transcription_id: UUID,
     user_email: str,
 ) -> str:
+    """AI edit task using dedicated database sessions."""
     with sentry_sdk.start_transaction(op="task", name="AI Edit Task") as transaction:  # noqa: F841
         # if length of dialogue entries is 0, return empty string
         if len(dialogue_entries) == 0:
             raise HTTPException(status_code=400, detail="No dialogue entries found")
 
-        current_minutes = get_minute_version_by_id(current_minute_version_id, transcription_id)
+        # Get current minutes (in thread with session)
+        def get_current():
+            with Session(engine) as session:
+                return get_minute_version_by_id(session, current_minute_version_id, transcription_id)
+
+        current_minutes = await asyncio.to_thread(get_current)
 
         new_minute_version = MinuteVersion(
             id=new_minute_version_id,
@@ -208,7 +233,13 @@ async def ai_edit_task(
             trace_id=current_minutes.trace_id,
             is_generating=True,
         )
-        save_minute_version(new_minute_version)
+
+        def save_initial():
+            with Session(engine) as session:
+                save_minute_version(session, new_minute_version)
+
+        await asyncio.to_thread(save_initial)
+
         try:
             llm_output = await edit_minutes_with_ai(
                 current_minutes,
@@ -220,7 +251,12 @@ async def ai_edit_task(
 
             new_minute_version.html_content = llm_output
             new_minute_version.is_generating = False
-            save_minute_version(new_minute_version)
+
+            def save_complete():
+                with Session(engine) as session:
+                    save_minute_version(session, new_minute_version)
+
+            await asyncio.to_thread(save_complete)
 
             return llm_output  # noqa: TRY300
 
@@ -232,5 +268,10 @@ async def ai_edit_task(
                 is_generating=False,
                 error_message=str(e),
             )
-            save_minute_version(error_minute_version)
+
+            def save_error():
+                with Session(engine) as session:
+                    save_minute_version(session, error_minute_version)
+
+            await asyncio.to_thread(save_error)
             raise

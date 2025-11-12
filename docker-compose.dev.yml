@@ -1,0 +1,87 @@
+version: "3.8"
+
+# Development mode: Frontend runs locally with npm run dev
+# Backend and database run in Docker
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up
+#   OR use: make dev
+
+services:
+  database:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: justicetranscribe_db
+      POSTGRES_USER: psqladmin
+      POSTGRES_PASSWORD: localpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U psqladmin -d justicetranscribe_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  config-validator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env # Load all variables from .env
+    environment:
+      - ENVIRONMENT=local
+    command: ["uv", "run", "python", "build_utils/validate_config.py"]
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:80"
+    env_file:
+      - .env # Load all variables from .env
+    environment:
+      - DATABASE_CONNECTION_STRING=postgresql://psqladmin:localpass@database:5432/justicetranscribe_db
+      - ENVIRONMENT=local
+      - NODE_ENV=production
+    depends_on:
+      config-validator:
+        condition: service_completed_successfully
+      database:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - database
+    networks:
+      - app-network
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
