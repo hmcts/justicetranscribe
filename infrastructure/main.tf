@@ -472,8 +472,10 @@ resource "azurerm_linux_web_app" "worker" {
     # Override the default CMD to run the worker script
     app_command_line = "/app/start_worker.sh"
 
-    # No health check needed for worker (it's a long-running background process)
-    # Workers don't serve HTTP traffic
+    # Health check configuration - worker now includes HTTP endpoint for Azure probes
+    health_check_path                = "/health"
+    health_check_eviction_time_in_min = 2
+
     always_on = true  # Keep the worker always running
   }
 
