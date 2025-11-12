@@ -97,15 +97,15 @@ class TranscriptionPollingService:
             return True
 
         # Skip files uploaded before service started
-        last_modified = blob.get("last_modified")
-        if last_modified and last_modified < self.startup_time:
-            logger.info(
-                f"Skipping blob (uploaded before service started at {self.startup_time}): "
-                f"{blob_name} (last_modified: {last_modified})"
-            )
-            # delete the blob
-            await self._safe_delete_blob(blob_name, "uploaded before service started")
-            return True
+        # last_modified = blob.get("last_modified")
+        # if last_modified and last_modified < self.startup_time:
+        #     logger.info(
+        #         f"Skipping blob (uploaded before service started at {self.startup_time}): "
+        #         f"{blob_name} (last_modified: {last_modified})"
+        #     )
+        #     # delete the blob
+        #     await self._safe_delete_blob(blob_name, "uploaded before service started")
+        #     return True
 
         # Check metadata for processing status
         metadata = blob.get("metadata", {})
