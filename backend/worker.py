@@ -82,8 +82,7 @@ async def main():
         # The worker handles the actual transcription processing
         await asyncio.gather(
             run_health_server(),
-            run_polling_worker(),
-            return_exceptions=True
+            run_polling_worker()
         )
     except KeyboardInterrupt:
         log.info("⚠️  Received shutdown signal, stopping worker...")
