@@ -102,7 +102,7 @@ output "auth_callback_url" {
 # Instructions for manual secret setup
 output "deployment_summary" {
   description = "Summary of deployed services and URLs"
-  value       = <<EOF
+  value = <<EOF
 Successfully deployed:
 
 🌐 Frontend App: https://${azurerm_linux_web_app.frontend.default_hostname}

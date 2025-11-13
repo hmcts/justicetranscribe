@@ -69,12 +69,7 @@ jobs:
       - name: Terraform Apply
         if: github.event_name == 'push'
         working-directory: ./infrastructure
-        run: |
-          # Temporary: Replace worker to change service plan (VNet integration prevents in-place change)
-          # TODO: Remove -replace flag after all environments (dev/preprod/prod) have been deployed once
-          terraform apply -auto-approve \
-            -replace="azurerm_linux_web_app.worker" \
-            -var-file="${{ steps.set-env.outputs.tfvars_file }}"
+        run: terraform apply -auto-approve -var-file="${{ steps.set-env.outputs.tfvars_file }}"
 
       - name: Get Terraform Outputs
         id: terraform
