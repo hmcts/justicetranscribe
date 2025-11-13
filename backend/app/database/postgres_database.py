@@ -22,13 +22,14 @@ if not DATABASE_URL:
 
 # Create engine with connection pool configuration
 # Configured for GP_Standard_D2s_v3: 199 user connections (214 total - 15 reserved)
-# Configuration: 20 pool + 30 overflow = 50 connections per instance
-# This allows 4 backend instances (~200 connections) with headroom for admin/monitoring
+# Configuration: 15 pool + 15 overflow = 30 connections per backend instance
+# Worker instance uses 50 connections (25 concurrent workers + overhead)
+# This allows scaling to 4 backend instances: 4×30 + 50 = 170 connections (85% utilization)
 engine = create_engine(
     DATABASE_URL,
     echo=False,
-    pool_size=20,  # Base connections for steady state
-    max_overflow=30,  # Additional connections for burst traffic
+    pool_size=15,  # Base connections for steady state (reduced for API server)
+    max_overflow=15,  # Additional connections for burst traffic
     pool_timeout=30,  # Wait for available connection
     pool_recycle=3600,  # Recycle connections after 1 hour
     pool_pre_ping=True,  # Verify connections before using
