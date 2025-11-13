@@ -5,7 +5,6 @@ from uuid import UUID
 import pytz
 import sentry_sdk
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
 from starlette.responses import JSONResponse
 
 from app.audio.utils import (
@@ -27,7 +26,6 @@ from app.database.interface_functions import (
     save_transcription_job,
     update_user,
 )
-from app.database.postgres_database import engine, get_session
 from app.database.postgres_models import (
     MinuteVersion,
     Transcription,
@@ -60,6 +58,9 @@ from utils.langfuse_models import (
 from utils.settings import get_settings
 
 router = APIRouter()
+
+
+# Azure Blob Storage configuration is handled through get_settings()
 
 
 UK_TIMEZONE = pytz.timezone("Europe/London")
@@ -157,14 +158,13 @@ async def get_onboarding_status(
 @router.post("/user/complete-onboarding")
 async def complete_onboarding(
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Mark user's onboarding as complete"""
 
     # Don't update in dev override mode to preserve testing ability
     settings = get_settings()
     if not (settings.FORCE_ONBOARDING_DEV and settings.ENVIRONMENT in ["local", "dev"]):
-        updated_user = mark_user_onboarding_complete(session, current_user.id)
+        updated_user = mark_user_onboarding_complete(current_user.id)
         return {
             "success": True,
             "message": "Onboarding marked as complete",
@@ -181,7 +181,6 @@ async def complete_onboarding(
 @router.post("/user/reset-onboarding")
 async def reset_onboarding(
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Reset user's onboarding status (dev only)"""
 
@@ -194,7 +193,7 @@ async def reset_onboarding(
         )
 
     # Reset onboarding status
-    updated_user = update_user(session, current_user.id, has_completed_onboarding=False)
+    updated_user = update_user(current_user.id, has_completed_onboarding=False)
 
     return {
         "success": True,
@@ -262,36 +261,25 @@ async def generate_or_edit_minutes(
 
     async def process_request():
         try:
-            # Create a dedicated database session for this background task
-            def get_dialogue_entries():
-                with Session(engine) as session:
-                    # First verify the user has access to this transcription
-                    get_transcription_by_id(
-                        session,
-                        request.transcription_id,
-                        user_id,
-                        tz=pytz.UTC,  # We don't need timezone conversion for this check
-                    )
+            # First verify the user has access to this transcription
+            get_transcription_by_id(
+                request.transcription_id,
+                user_id,
+                tz=pytz.UTC,  # We don't need timezone conversion for this check
+            )
 
-                    # Fetch transcription jobs for this transcription
-                    transcription_jobs = get_transcription_jobs(
-                        session, request.transcription_id
-                    )
+            # Fetch transcription jobs for this transcription
+            transcription_jobs = get_transcription_jobs(request.transcription_id)
 
-                    if not transcription_jobs:
-                        raise HTTPException(
-                            status_code=404,
-                            detail="No transcription jobs found for this transcription",
-                        )
+            if not transcription_jobs:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No transcription jobs found for this transcription",
+                )
 
-                    dialogue_entries = []
-                    for job in transcription_jobs:
-                        dialogue_entries.extend(job.dialogue_entries)
-
-                    return dialogue_entries
-
-            # Run database operations in a thread pool to avoid blocking
-            dialogue_entries = await asyncio.to_thread(get_dialogue_entries)
+            dialogue_entries = []
+            for job in transcription_jobs:
+                dialogue_entries.extend(job.dialogue_entries)
 
             if request.action_type == "generate":
                 await generate_llm_output_task(
@@ -341,7 +329,6 @@ async def get_templates(
 @router.get("/transcriptions-metadata", response_model=list[TranscriptionMetadata])
 async def get_transcriptions_metadata(
     current_user: User = Depends(get_current_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
     timezone: str = "Europe/London",  # Optional parameter with UK default
 ):
     """Get metadata for all transcriptions (auth only, allowlist checked in frontend)."""
@@ -353,14 +340,13 @@ async def get_transcriptions_metadata(
     except pytz.exceptions.UnknownTimeZoneError:
         tz = UK_TIMEZONE
 
-    return fetch_transcriptions_metadata(session, current_user.id, tz)
+    return fetch_transcriptions_metadata(current_user.id, tz)
 
 
 @router.get("/transcriptions/{transcription_id}", response_model=Transcription)
 async def get_transcription(
     transcription_id: UUID,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
     timezone: str = "Europe/London",  # Optional parameter with UK default
 ):
     """Get a specific transcription by ID."""
@@ -369,29 +355,27 @@ async def get_transcription(
     except pytz.exceptions.UnknownTimeZoneError:
         tz = UK_TIMEZONE
 
-    return get_transcription_by_id(session, transcription_id, current_user.id, tz)
+    return get_transcription_by_id(transcription_id, current_user.id, tz)
 
 
 @router.post("/transcriptions", response_model=Transcription)
 async def save_transcription_route(
     transcription_data: Transcription,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Save or update a transcription."""
     logger.info("saving transcription for user %s", current_user.id)
 
-    return save_transcription(session, transcription_data, current_user.id)
+    return save_transcription(transcription_data, current_user.id)
 
 
 @router.delete("/transcriptions/{transcription_id}", status_code=204)
 async def delete_transcription(
     transcription_id: UUID,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Delete a specific transcription by ID."""
-    delete_transcription_by_id(session, transcription_id, current_user.id)
+    delete_transcription_by_id(transcription_id, current_user.id)
 
 
 @router.get(
@@ -402,18 +386,17 @@ async def get_minute_version_by_id_route(
     transcription_id: UUID,
     minute_version_id: UUID,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Get a specific minute version by its ID for a given transcription."""
     # Verify user has access to the associated transcription
     transcription = get_transcription_by_id(
-        session, transcription_id, current_user.id, UK_TIMEZONE
+        transcription_id, current_user.id, UK_TIMEZONE
     )
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
     # Get the specific minute version, ensuring it belongs to the transcription
-    minute_version = get_minute_version_by_id(session, minute_version_id, transcription_id)
+    minute_version = get_minute_version_by_id(minute_version_id, transcription_id)
     return minute_version
 
 
@@ -424,17 +407,16 @@ async def get_minute_version_by_id_route(
 async def get_minute_versions_route(
     transcription_id: UUID,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Get all minute versions for a specific transcription."""
     # Verify user has access to this transcription
     transcription = get_transcription_by_id(
-        session, transcription_id, current_user.id, UK_TIMEZONE
+        transcription_id, current_user.id, UK_TIMEZONE
     )
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
-    return get_minute_versions(session, transcription_id)
+    return get_minute_versions(transcription_id)
 
 
 @router.post(
@@ -444,11 +426,10 @@ async def save_minute_version_route(
     transcription_id: UUID,
     minute_data: MinuteVersion,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Create or update a minute version for a transcription."""
     transcription = get_transcription_by_id(
-        session, transcription_id, current_user.id, UK_TIMEZONE
+        transcription_id, current_user.id, UK_TIMEZONE
     )
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
@@ -456,11 +437,11 @@ async def save_minute_version_route(
     minute_data.transcription_id = transcription_id
 
     # Save the minute version first
-    saved_minute = save_minute_version(session, minute_data)
+    saved_minute = save_minute_version(minute_data)
 
     # Then handle the additional logging if needed
     old_html_content = get_minute_version_by_id(
-        session, minute_data.id, transcription_id
+        minute_data.id, transcription_id
     ).html_content
 
     # Only log the event if content has changed
@@ -480,18 +461,16 @@ async def save_transcription_job_route(
     transcription_id: UUID,
     job_data: TranscriptionJob,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ) -> TranscriptionJob:
     """Create a new transcription job for a transcription."""
     # Verify user has access to this transcription
     transcription = get_transcription_by_id(
-        session, transcription_id, current_user.id, UK_TIMEZONE
+        transcription_id, current_user.id, UK_TIMEZONE
     )
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
     return save_transcription_job(
-        session,
         job=job_data,
     )
 
@@ -502,56 +481,51 @@ async def save_transcription_job_route(
 async def get_transcription_jobs_route(
     transcription_id: UUID,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ) -> list[TranscriptionJob]:
     """Get all transcription jobs for a specific transcription."""
     # Verify user has access to this transcription
     transcription = get_transcription_by_id(
-        session, transcription_id, current_user.id, UK_TIMEZONE
+        transcription_id, current_user.id, UK_TIMEZONE
     )
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
-    return get_transcription_jobs(session, transcription_id)
+    return get_transcription_jobs(transcription_id)
 
 
 @router.get("/user", response_model=User)
 async def get_current_user_route(
     current_user: User = Depends(get_current_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Get the current user's details (auth only, no allowlist check)."""
-    return get_user_by_id(session, current_user.id)
+    return get_user_by_id(current_user.id)
 
 
 # Add missing routes that frontend expects
 @router.get("/users/me", response_model=User)
 async def get_current_user_me_route(
     current_user: User = Depends(get_current_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Get the current user's details (auth only, no allowlist check)."""
-    return get_user_by_id(session, current_user.id)
+    return get_user_by_id(current_user.id)
 
 
 @router.get("/user/profile", response_model=User)
 async def get_user_profile_route(
     current_user: User = Depends(get_current_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Get the current user's profile (auth only, no allowlist check)."""
-    return get_user_by_id(session, current_user.id)
+    return get_user_by_id(current_user.id)
 
 
 @router.post("/user", response_model=User)  # changed from .patch to .post
 async def update_current_user_route(
     request: UpdateUserRequest,
     current_user: User = Depends(get_current_user),  # noqa: B008
-    session: Session = Depends(get_session),  # noqa: B008
 ):
     """Update the current user's details (auth only, used during onboarding)."""
     update_fields = request.model_dump(exclude_unset=True)
-    return update_user(session, current_user.id, **update_fields)
+    return update_user(current_user.id, **update_fields)
 
 
 @router.post("/langfuse/trace")

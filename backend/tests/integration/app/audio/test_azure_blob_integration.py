@@ -10,11 +10,10 @@ import pytest
 import pytest_asyncio
 
 # Import the actual functions we want to test
-from app.audio.azure_utils import AsyncAzureBlobManager
+from app.audio.azure_utils import AsyncAzureBlobManager, AzureBlobManager
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 class TestAzureBlobOperations:
     """Integration tests for Azure Blob Storage operations."""
 
@@ -44,18 +43,18 @@ class TestAzureBlobOperations:
             "connection_start": self.connection_string[:20] + "..."
         }
 
-    async def test_connection_and_container_access(self, connection_string):
-        """Test basic connection to Azure Storage using AsyncAzureBlobManager."""
+    def test_connection_and_container_access(self, connection_string):
+        """Test basic connection to Azure Storage using AzureBlobManager."""
         try:
             # Test connection by creating a manager instance (this validates the connection string)
-            manager = AsyncAzureBlobManager(connection_string=connection_string)
+            manager = AzureBlobManager(connection_string=connection_string)
             # Try a simple operation that requires authentication
             # We'll just check if we can create a manager without errors
             assert manager.connection_string == connection_string
             assert manager.container_name is not None
             assert manager.account_name is not None
         except Exception as e:
-            pytest.fail(f"Failed to create AsyncAzureBlobManager with connection string: {e}")
+            pytest.fail(f"Failed to create AzureBlobManager with connection string: {e}")
 
     @pytest.fixture(scope="class")
     def shared_test_blob_name(self):
@@ -77,49 +76,51 @@ class TestAzureBlobOperations:
         """Test file content."""
         return f"Integration Test File\nContent created at: {datetime.now(tz=UTC).isoformat()}"
 
-    async def test_create_blob(self, temp_file, shared_test_blob_name, connection_string):
+    def test_create_blob(self, temp_file, shared_test_blob_name, connection_string):
         """Test creating a blob and verifying it exists - does NOT delete it."""
         # Create blob path with subdirectory
         blob_path = f"{self.test_subdirectory}/{shared_test_blob_name}"
 
-        manager = AsyncAzureBlobManager(connection_string=connection_string)
-        success = await manager.create_blob_from_file(
+
+
+        manager = AzureBlobManager(connection_string=connection_string)
+        success = manager.create_blob_from_file(
             file_path=temp_file,
             blob_name=blob_path,
             container_name=self.container_name
         )
-        assert success, "Failed to create blob using AsyncAzureBlobManager"
+        assert success, "Failed to create blob using AzureBlobManager"
 
-        # Verify it exists using AsyncAzureBlobManager (tests production code)
-        manager = AsyncAzureBlobManager(connection_string=connection_string)
-        exists = await manager.blob_exists(
+        # Verify it exists using AzureBlobManager (tests production code)
+        manager = AzureBlobManager(connection_string=connection_string)
+        exists = manager.blob_exists(
             blob_name=blob_path,
             container_name=self.container_name
         )
         assert exists, "Blob should exist after creation"
 
-    async def test_delete_blob(self, shared_test_blob_name, connection_string):
+    def test_delete_blob(self, shared_test_blob_name, connection_string):
         """Test deleting a blob and verifying it's gone - assumes blob already exists."""
         # Create blob path with subdirectory
         blob_path = f"{self.test_subdirectory}/{shared_test_blob_name}"
 
         # First verify the blob exists (should have been created by previous test)
-        manager = AsyncAzureBlobManager(connection_string=connection_string)
-        exists_before = await manager.blob_exists(
+        manager = AzureBlobManager(connection_string=connection_string)
+        exists_before = manager.blob_exists(
             blob_name=blob_path,
             container_name=self.container_name
         )
         assert exists_before, f"Blob should exist before deletion: {blob_path}"
 
-        # Delete the blob using AsyncAzureBlobManager (tests production code)
-        deleted = await manager.delete_blob(
+        # Delete the blob using AzureBlobManager (tests production code)
+        deleted = manager.delete_blob(
             blob_name=blob_path,
             container_name=self.container_name
         )
-        assert deleted, "Failed to delete blob using AsyncAzureBlobManager"
+        assert deleted, "Failed to delete blob using AzureBlobManager"
 
         # Verify it no longer exists
-        exists_after = await manager.blob_exists(
+        exists_after = manager.blob_exists(
             blob_name=blob_path,
             container_name=self.container_name
         )
@@ -167,13 +168,14 @@ class TestAsyncAzureBlobPollingOperations:
             temp_file_path.unlink()
 
     @pytest_asyncio.fixture
-    async def test_blob_with_cleanup(self, temp_file, async_manager):
+    async def test_blob_with_cleanup(self, connection_string, temp_file, async_manager):
         """Create a test blob and automatically clean it up after the test."""
         timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S_%f")
         blob_path = f"{self.test_subdirectory}/test-blob-{timestamp}.mp4"
 
         # Create the blob
-        success = await async_manager.create_blob_from_file(
+        sync_manager = AzureBlobManager(connection_string=connection_string)
+        success = sync_manager.create_blob_from_file(
             file_path=temp_file,
             blob_name=blob_path,
             container_name=self.container_name
@@ -190,7 +192,7 @@ class TestAsyncAzureBlobPollingOperations:
             )
 
     @pytest_asyncio.fixture
-    async def multiple_test_blobs_with_cleanup(self, temp_file, async_manager):
+    async def multiple_test_blobs_with_cleanup(self, connection_string, temp_file, async_manager):
         """Create multiple test blobs and automatically clean them up after the test."""
         timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S_%f")
         blob_paths = [
@@ -200,8 +202,9 @@ class TestAsyncAzureBlobPollingOperations:
         ]
 
         # Create the blobs
+        sync_manager = AzureBlobManager(connection_string=connection_string)
         for blob_path in blob_paths:
-            success = await async_manager.create_blob_from_file(
+            success = sync_manager.create_blob_from_file(
                 file_path=temp_file,
                 blob_name=blob_path,
                 container_name=self.container_name

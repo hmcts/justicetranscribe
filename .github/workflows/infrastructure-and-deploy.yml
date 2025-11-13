@@ -17,7 +17,6 @@ jobs:
       acr_login_server: ${{ steps.terraform.outputs.acr_login_server }}
       frontend_service_name: ${{ steps.terraform.outputs.frontend_service_name }}
       backend_service_name: ${{ steps.terraform.outputs.backend_service_name }}
-      worker_service_name: ${{ steps.terraform.outputs.worker_service_name }}
       backend_hostname: ${{ steps.terraform.outputs.backend_hostname }}
       environment: ${{ steps.set-env.outputs.environment }}
       client_id_secret: ${{ steps.set-env.outputs.client_id_secret }}
@@ -78,7 +77,6 @@ jobs:
           echo "acr_login_server=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
           echo "frontend_service_name=$(terraform output -raw frontend_service_name)" >> $GITHUB_OUTPUT
           echo "backend_service_name=$(terraform output -raw backend_service_name)" >> $GITHUB_OUTPUT
-          echo "worker_service_name=$(terraform output -raw worker_service_name)" >> $GITHUB_OUTPUT
           echo "backend_hostname=$(terraform output -raw backend_hostname)" >> $GITHUB_OUTPUT
 
   build-and-deploy:
@@ -169,10 +167,4 @@ jobs:
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ needs.terraform.outputs.backend_service_name }}
-          images: ${{ fromJSON(steps.backend-meta.outputs.json).tags[0] }}
-
-      - name: Deploy worker to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ${{ needs.terraform.outputs.worker_service_name }}
           images: ${{ fromJSON(steps.backend-meta.outputs.json).tags[0] }}

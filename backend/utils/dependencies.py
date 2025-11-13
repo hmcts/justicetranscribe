@@ -161,6 +161,18 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
     else:
         logger.info("Found existing user: %s", email)
 
+    # Auto-start polling service for this user if enabled
+    try:
+        # Import here to avoid circular dependencies
+        from main import ensure_user_polling_started
+        ensure_user_polling_started(user.email)
+    except ImportError:
+        # ensure_user_polling_started not available (e.g., during tests)
+        pass
+    except Exception as e:
+        # Don't fail the request if polling service can't be started
+        logger.warning("Failed to start polling service for user %s: %s", user.email, e)
+
     return user
 
 

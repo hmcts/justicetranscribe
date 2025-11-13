@@ -27,17 +27,17 @@ services:
       timeout: 5s
       retries: 5
 
-  # config-validator:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   env_file:
-  #     - .env # Load all variables from .env
-  #   environment:
-  #     - ENVIRONMENT=local
-  #   command: ["uv", "run", "python", "build_utils/validate_config.py"]
-  #   networks:
-  #     - app-network
+  config-validator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env # Load all variables from .env
+    environment:
+      - ENVIRONMENT=local
+    command: ["uv", "run", "python", "build_utils/validate_config.py"]
+    networks:
+      - app-network
 
   backend:
     build:
@@ -52,8 +52,8 @@ services:
       - ENVIRONMENT=local
       - NODE_ENV=production
     depends_on:
-      # config-validator:
-      #   condition: service_completed_successfully
+      config-validator:
+        condition: service_completed_successfully
       database:
         condition: service_healthy
     networks:
@@ -61,33 +61,6 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/docs"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8001:80" # Expose health check port
-    env_file:
-      - .env # Load all variables from .env
-    environment:
-      - DATABASE_CONNECTION_STRING=postgresql://psqladmin:localpass@database:5432/justicetranscribe_db
-      - ENVIRONMENT=local
-    command: ["/app/start_worker.sh"]
-    depends_on:
-      # config-validator:
-      #   condition: service_completed_successfully
-      database:
-        condition: service_healthy
-    networks:
-      - app-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -113,8 +86,8 @@ services:
     environment:
       - NODE_ENV=production
     depends_on:
-      # config-validator:
-      #   condition: service_completed_successfully
+      config-validator:
+        condition: service_completed_successfully
       backend:
         condition: service_healthy
     networks:

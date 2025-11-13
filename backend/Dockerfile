@@ -18,11 +18,9 @@ RUN uv sync --frozen --no-cache --group fastapi --no-group dev
 # Make the unified validation script executable
 RUN chmod +x /app/build_utils/validate_config.py
 
-# Copy and make the startup scripts executable
+# Copy and make the startup script executable
 COPY start.sh /app/start.sh
-COPY start_worker.sh /app/start_worker.sh
-RUN chmod +x /app/start.sh /app/start_worker.sh
+RUN chmod +x /app/start.sh
 
 # Run the startup script (which handles migrations + server startup)
-# For worker, override CMD in docker-compose or Azure with /app/start_worker.sh
 CMD ["/app/start.sh"]

@@ -28,17 +28,6 @@ output "backend_api_docs_url" {
   value       = "https://${azurerm_linux_web_app.backend_api.default_hostname}/docs"
 }
 
-# Worker outputs
-output "worker_app_name" {
-  description = "Name of the worker app service"
-  value       = azurerm_linux_web_app.worker.name
-}
-
-output "worker_app_url" {
-  description = "URL of the worker application (for monitoring/logs)"
-  value       = "https://${azurerm_linux_web_app.worker.default_hostname}"
-}
-
 # Add these outputs for the GitHub workflow
 output "acr_login_server" {
   value = azurerm_container_registry.acr.login_server
@@ -59,11 +48,6 @@ output "frontend_service_name" {
 output "backend_service_name" {
   description = "Name of the backend app service"
   value       = azurerm_linux_web_app.backend_api.name
-}
-
-output "worker_service_name" {
-  description = "Name of the worker app service"
-  value       = azurerm_linux_web_app.worker.name
 }
 
 output "acr_admin_username" {
@@ -108,7 +92,6 @@ Successfully deployed:
 🌐 Frontend App: https://${azurerm_linux_web_app.frontend.default_hostname}
 🔌 Backend API: https://${azurerm_linux_web_app.backend_api.default_hostname}
 📚 API Documentation: https://${azurerm_linux_web_app.backend_api.default_hostname}/docs
-⚙️  Worker Service: https://${azurerm_linux_web_app.worker.default_hostname}
 🗄️ PostgreSQL Database: ${azurerm_postgresql_flexible_server.main.fqdn}
 
 
