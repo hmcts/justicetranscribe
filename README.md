@@ -40,19 +40,8 @@ JusticeAIUnit (sam.lhuillier@justice.gov.uk)
 4. **Access your applications:**
    - **Backend API**: http://localhost:8000
    - **API Documentation**: http://localhost:8000/docs
-   - **Worker**: Runs in background (check logs with `docker-compose logs worker`)
    - **Database Admin**: http://localhost:8080 (if using Adminer)
    - **Frontend**: http://localhost:3000 (when using full docker-compose)
-
-### Architecture
-
-The application consists of three main services:
-
-- **Backend API** (`backend`): FastAPI server handling HTTP requests
-- **Worker** (`worker`): Background service that polls Azure Blob Storage for new audio files and triggers transcription processing
-- **Frontend** (`frontend`): Next.js application serving the user interface
-
-The worker service runs independently from the API server, providing better resource isolation and scalability. See [WORKER_MIGRATION.md](WORKER_MIGRATION.md) for detailed architecture information.
 
 ### Development Workflow
 
@@ -66,12 +55,6 @@ make install        # Install backend and frontend dependencies
 
 ```bash
 make backend        # Start backend development server with auto-reload
-```
-
-**Worker Development:**
-
-```bash
-make worker         # Start transcription polling worker (runs in background)
 ```
 
 **Frontend Development:**

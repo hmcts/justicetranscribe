@@ -31,12 +31,10 @@ locals {
   environment_prefix = "${var.prefix}-${var.environment}"
   frontend_app_name  = "${var.prefix}-${var.environment}-frontend"
   backend_api_name   = "${var.prefix}-${var.environment}-backend-api"
-  worker_app_name    = "${var.prefix}-${var.environment}-worker"
   
   # Calculate URLs without creating circular dependencies
   frontend_hostname = "${local.frontend_app_name}.azurewebsites.net"
   backend_hostname  = "${local.backend_api_name}.azurewebsites.net"
-  worker_hostname   = "${local.worker_app_name}.azurewebsites.net"
 }
 
 resource "azurerm_resource_group" "main" {
@@ -196,7 +194,11 @@ resource "azurerm_linux_web_app" "frontend" {
   # Add this lifecycle rule to ignore changes to app_settings
   lifecycle {
     ignore_changes = [
-      app_settings
+      app_settings,
+      site_config[0].application_stack[0].docker_image_name,
+      site_config[0].application_stack[0].docker_registry_url,
+      site_config[0].application_stack[0].docker_registry_username,
+      site_config[0].application_stack[0].docker_registry_password
     ]
   }
 
@@ -257,8 +259,8 @@ resource "azurerm_linux_web_app" "backend_api" {
     "PYTHONPATH"                         = "/app"
     
     # CORS allowed origins - include custom domain
-    "CORS_ALLOWED_ORIGINS"               = "https://${local.frontend_hostname},${var.custom_domain_url},http://localhost:3000"
-
+    "CORS_ALLOWED_ORIGINS"               = "https://${local.frontend_hostname},${var.custom_domain_url},http://localhost:3000"    
+    # Database settings
     "DATABASE_CONNECTION_STRING"         = local.database_connection_string
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
     
@@ -318,7 +320,11 @@ resource "azurerm_linux_web_app" "backend_api" {
       app_settings["LANGFUSE_SECRET_KEY"],
       app_settings["LANGFUSE_PUBLIC_KEY"],
       app_settings["GOV_NOTIFY_API_KEY"],
-      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"]
+      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"],
+      site_config[0].application_stack[0].docker_image_name,
+      site_config[0].application_stack[0].docker_registry_url,
+      site_config[0].application_stack[0].docker_registry_username,
+      site_config[0].application_stack[0].docker_registry_password
     ]
   }
 
@@ -386,116 +392,6 @@ resource "azurerm_linux_web_app" "backend_api" {
     Environment = var.environment
     Project     = var.prefix
     Component   = "backend-api"
-  }
-}
-
-# Worker App Service for transcription polling
-resource "azurerm_linux_web_app" "worker" {
-  name                = local.worker_app_name
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  service_plan_id     = azurerm_service_plan.backend.id
-
-  app_settings = {
-    "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
-    "ENVIRONMENT"                         = var.environment
-    
-    # Python specific settings
-    "PYTHONPATH"                         = "/app"
-    
-    # Azure AD configuration (required by backend settings)
-    "AZURE_AD_CLIENT_ID" = var.auth_client_id
-    "AZURE_AD_TENANT_ID" = var.auth_tenant_id
-    
-    # Application configuration
-    "APP_URL"                           = "https://${local.frontend_hostname}"
-    
-    # Database and external API settings
-    "DATABASE_CONNECTION_STRING"         = local.database_connection_string
-    
-    # Azure Storage Configuration (replacing AWS S3)
-    "AZURE_STORAGE_ACCOUNT_NAME"        = azurerm_storage_account.main.name
-    "AZURE_STORAGE_CONNECTION_STRING"   = azurerm_storage_account.main.primary_connection_string
-    "AZURE_STORAGE_CONTAINER_NAME"      = azurerm_storage_container.data.name
-    "AZURE_STORAGE_TRANSCRIPTION_CONTAINER" = azurerm_storage_container.transcription.name
-    
-    # Azure AI Services
-    "AZURE_OPENAI_API_KEY"              = "placeholder-azure-openai-api-key"
-    "AZURE_OPENAI_ENDPOINT"             = "placeholder-azure-openai-endpoint"
-    "AZURE_GROK_API_KEY"                = "placeholder-azure-grok-api-key"
-    "AZURE_GROK_ENDPOINT"               = "placeholder-azure-grok-endpoint"
-    "AZURE_SPEECH_KEY"                  = "placeholder-azure-speech-key"
-    "AZURE_SPEECH_REGION"               = "placeholder-azure-speech-region"
-    
-    # Monitoring and Observability
-    "SENTRY_DSN"                        = "placeholder-sentry-dsn"
-    "LANGFUSE_SECRET_KEY"               = "placeholder-langfuse-secret-key"
-    "LANGFUSE_PUBLIC_KEY"               = "placeholder-langfuse-public-key"
-    "LANGFUSE_HOST"                     = "https://langfuse-ai.justice.gov.uk"
-    
-    # Government Services
-    "GOV_NOTIFY_API_KEY"                = "placeholder-gov-notify-api-key"
-    
-    # Development/Testing Configuration
-    "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT" = "placeholder-google-credentials-json"
-    
-    # Worker-specific: Run worker script instead of API server
-    "SCM_DO_BUILD_DURING_DEPLOYMENT"    = "false"
-  }
-
-  # Only ignore changes to sensitive environment variables
-  lifecycle {
-    ignore_changes = [
-      app_settings["AZURE_OPENAI_API_KEY"],
-      app_settings["AZURE_OPENAI_ENDPOINT"],
-      app_settings["AZURE_GROK_API_KEY"],
-      app_settings["AZURE_GROK_ENDPOINT"],
-      app_settings["AZURE_SPEECH_KEY"],
-      app_settings["AZURE_SPEECH_REGION"],
-      app_settings["SENTRY_DSN"],
-      app_settings["LANGFUSE_SECRET_KEY"],
-      app_settings["LANGFUSE_PUBLIC_KEY"],
-      app_settings["LANGFUSE_HOST"],
-      app_settings["GOV_NOTIFY_API_KEY"],
-      app_settings["GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT"]
-    ]
-  }
-
-  site_config {
-    application_stack {
-      docker_image_name        = "${lower(var.backend_docker_image_name)}:${var.backend_docker_image_tag}"
-      docker_registry_url      = "https://${azurerm_container_registry.acr.login_server}"
-      docker_registry_username = azurerm_container_registry.acr.admin_username
-      docker_registry_password = azurerm_container_registry.acr.admin_password
-    }
-
-    # Override the default CMD to run the worker script
-    app_command_line = "/app/start_worker.sh"
-
-    # Health check configuration - worker now includes HTTP endpoint for Azure probes
-    health_check_path                = "/health"
-    health_check_eviction_time_in_min = 2
-
-    always_on = true  # Keep the worker always running
-  }
-
-  # Enable logging
-  logs {
-    detailed_error_messages = true
-    failed_request_tracing  = true
-    
-    application_logs {
-      file_system_level = "Information"
-    }
-  }
-
-  # Add VNet integration for secure database and storage access
-  virtual_network_subnet_id = azurerm_subnet.app_services.id
-
-  tags = {
-    Environment = var.environment
-    Project     = var.prefix
-    Component   = "worker"
   }
 }
 
