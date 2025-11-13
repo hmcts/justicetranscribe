@@ -1,4 +1,4 @@
-environment      = "preprod"
+environment = "preprod"
 docker_image_tag = "latest"
 
 # Authentication configuration (always enabled)
@@ -8,9 +8,8 @@ auth_tenant_id = "c6874728-71e6-41fe-a9e1-2e8c36776ad8"
 backend_docker_image_tag = "preprod"
 
 # Service Plan configuration - prod-level for realistic testing
-frontend_service_plan_sku = "S2" # 2 vCPU, 3.5GB RAM for frontend
-backend_service_plan_sku  = "S3" # 4 vCPU, 7GB RAM for backend API
-worker_service_plan_sku   = "S3" # 4 vCPU, 7GB RAM for worker (separate plan prevents resource contention)
+frontend_service_plan_sku = "S2"  # 2 vCPU, 3.5GB RAM for frontend
+backend_service_plan_sku = "S3"   # 4 vCPU, 7GB RAM for backend
 
 # Database configuration - PASSWORD NOW AUTO-GENERATED
 # postgres_admin_password = "CHANGE_ME_SECURE_PASSWORD_123!" # REMOVED - now auto-generated

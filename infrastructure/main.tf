@@ -32,7 +32,7 @@ locals {
   frontend_app_name  = "${var.prefix}-${var.environment}-frontend"
   backend_api_name   = "${var.prefix}-${var.environment}-backend-api"
   worker_app_name    = "${var.prefix}-${var.environment}-worker"
-
+  
   # Calculate URLs without creating circular dependencies
   frontend_hostname = "${local.frontend_app_name}.azurewebsites.net"
   backend_hostname  = "${local.backend_api_name}.azurewebsites.net"
@@ -72,7 +72,7 @@ resource "azurerm_subnet" "app_services" {
   delegation {
     name = "app-service-delegation"
     service_delegation {
-      name = "Microsoft.Web/serverFarms"
+      name    = "Microsoft.Web/serverFarms"
       actions = [
         "Microsoft.Network/virtualNetworks/subnets/action",
       ]
@@ -90,7 +90,7 @@ resource "azurerm_subnet" "database" {
   delegation {
     name = "postgresql-delegation"
     service_delegation {
-      name = "Microsoft.DBforPostgreSQL/flexibleServers"
+      name    = "Microsoft.DBforPostgreSQL/flexibleServers"
       actions = [
         "Microsoft.Network/virtualNetworks/subnets/join/action",
       ]
@@ -138,7 +138,7 @@ resource "azurerm_service_plan" "frontend" {
   }
 }
 
-# Backend Service Plan - optimized for API requests
+# Backend Service Plan - optimized for transcription processing
 resource "azurerm_service_plan" "backend" {
   name                = "${local.environment_prefix}-backend-sp"
   location            = azurerm_resource_group.main.location
@@ -150,21 +150,6 @@ resource "azurerm_service_plan" "backend" {
     Environment = var.environment
     Project     = var.prefix
     Component   = "backend"
-  }
-}
-
-# Worker Service Plan - dedicated for transcription processing to avoid resource contention
-resource "azurerm_service_plan" "worker" {
-  name                = "${local.environment_prefix}-worker-sp"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  os_type             = "Linux"
-  sku_name            = var.worker_service_plan_sku
-
-  tags = {
-    Environment = var.environment
-    Project     = var.prefix
-    Component   = "worker"
   }
 }
 
@@ -190,19 +175,19 @@ resource "azurerm_linux_web_app" "frontend" {
   app_settings = {
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
     "ENVIRONMENT"                         = var.environment
-
+    
     # Frontend environment variables
-    "NEXT_PUBLIC_API_URL"                      = "https://${local.backend_hostname}"
+    "NEXT_PUBLIC_API_URL"                        = "https://${local.backend_hostname}"
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
-
+    
     # Add database connection for Next.js API routes
-    "DATABASE_CONNECTION_STRING" = local.database_connection_string
-    "DATABASE_URL"               = local.database_connection_string # Alternative naming
-
+    "DATABASE_CONNECTION_STRING"                = local.database_connection_string
+    "DATABASE_URL"                              = local.database_connection_string  # Alternative naming
+    
     # Note: Allowlist is now read from .allowlist/allowlist.csv file
-
+    
     # Onboarding Configuration
-    "FORCE_ONBOARDING_DEV" = "false"
+    "FORCE_ONBOARDING_DEV"                      = "false"
   }
 
   # VNet integration allows secure database access
@@ -221,20 +206,20 @@ resource "azurerm_linux_web_app" "frontend" {
     require_authentication = true
     unauthenticated_action = "RedirectToLoginPage"
     default_provider       = "azureactivedirectory"
-
+    
     active_directory_v2 {
-      client_id                  = var.auth_client_id
-      tenant_auth_endpoint       = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0/"
-      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+      client_id                    = var.auth_client_id
+      tenant_auth_endpoint         = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0/"
+       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
     }
-
+    
     login {
-      token_store_enabled          = true
-      token_refresh_extension_time = 168 # 7 days (168 hours)
+      token_store_enabled           = true
+      token_refresh_extension_time  = 168    # 7 days (168 hours)
       allowed_external_redirect_urls = [
         "https://${local.frontend_hostname}",
         "https://${local.frontend_hostname}/",
-        var.custom_domain_url,
+         var.custom_domain_url,
         "${var.custom_domain_url}/"
       ]
     }
@@ -267,54 +252,54 @@ resource "azurerm_linux_web_app" "backend_api" {
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
     "ENVIRONMENT"                         = var.environment
     "WEBSITES_PORT"                       = "80"
-
+    
     # FastAPI specific settings
-    "PYTHONPATH" = "/app"
-
+    "PYTHONPATH"                         = "/app"
+    
     # CORS allowed origins - include custom domain
-    "CORS_ALLOWED_ORIGINS" = "https://${local.frontend_hostname},${var.custom_domain_url},http://localhost:3000"
+    "CORS_ALLOWED_ORIGINS"               = "https://${local.frontend_hostname},${var.custom_domain_url},http://localhost:3000"
 
-    "DATABASE_CONNECTION_STRING"               = local.database_connection_string
+    "DATABASE_CONNECTION_STRING"         = local.database_connection_string
     "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET" = "placeholder-auth-client-secret"
-
+    
     # Azure AD configuration (required by backend settings)
     "AZURE_AD_CLIENT_ID" = var.auth_client_id
     "AZURE_AD_TENANT_ID" = var.auth_tenant_id
-
+    
     # Application configuration
-    "APP_URL" = "https://${local.frontend_hostname}"
-
+    "APP_URL"                           = "https://${local.frontend_hostname}"
+    
     # Azure Storage Configuration (replacing AWS S3)
-    "AZURE_STORAGE_ACCOUNT_NAME"            = azurerm_storage_account.main.name
-    "AZURE_STORAGE_CONNECTION_STRING"       = azurerm_storage_account.main.primary_connection_string
-    "AZURE_STORAGE_CONTAINER_NAME"          = azurerm_storage_container.data.name
+    "AZURE_STORAGE_ACCOUNT_NAME"        = azurerm_storage_account.main.name
+    "AZURE_STORAGE_CONNECTION_STRING"   = azurerm_storage_account.main.primary_connection_string
+    "AZURE_STORAGE_CONTAINER_NAME"      = azurerm_storage_container.data.name
     "AZURE_STORAGE_TRANSCRIPTION_CONTAINER" = azurerm_storage_container.transcription.name
-
+    
     # Azure AI Services
-    "AZURE_OPENAI_API_KEY"  = "placeholder-azure-openai-api-key"
-    "AZURE_OPENAI_ENDPOINT" = "placeholder-azure-openai-endpoint"
-    "AZURE_GROK_API_KEY"    = "placeholder-azure-grok-api-key"
-    "AZURE_GROK_ENDPOINT"   = "placeholder-azure-grok-endpoint"
-    "AZURE_SPEECH_KEY"      = "placeholder-azure-speech-key"
-    "AZURE_SPEECH_REGION"   = "placeholder-azure-speech-region"
-
+    "AZURE_OPENAI_API_KEY"              = "placeholder-azure-openai-api-key"
+    "AZURE_OPENAI_ENDPOINT"             = "placeholder-azure-openai-endpoint"
+    "AZURE_GROK_API_KEY"                = "placeholder-azure-grok-api-key"
+    "AZURE_GROK_ENDPOINT"               = "placeholder-azure-grok-endpoint"
+    "AZURE_SPEECH_KEY"                  = "placeholder-azure-speech-key"
+    "AZURE_SPEECH_REGION"               = "placeholder-azure-speech-region"
+    
     # Monitoring and Observability
-    "SENTRY_DSN"          = "placeholder-sentry-dsn"
-    "LANGFUSE_SECRET_KEY" = "placeholder-langfuse-secret-key"
-    "LANGFUSE_PUBLIC_KEY" = "placeholder-langfuse-public-key"
-    "LANGFUSE_HOST"       = "https://langfuse-ai.justice.gov.uk"
-
+    "SENTRY_DSN"                        = "placeholder-sentry-dsn"
+    "LANGFUSE_SECRET_KEY"               = "placeholder-langfuse-secret-key"
+    "LANGFUSE_PUBLIC_KEY"               = "placeholder-langfuse-public-key"
+    "LANGFUSE_HOST"                     = "https://langfuse-ai.justice.gov.uk"
+    
     # Government Services
-    "GOV_NOTIFY_API_KEY" = "placeholder-gov-notify-api-key"
-
+    "GOV_NOTIFY_API_KEY"                = "placeholder-gov-notify-api-key"
+    
     # Development/Testing Configuration
-    "DISABLE_AUTH_SIGNATURE_VERIFICATION"        = "false"
+    "DISABLE_AUTH_SIGNATURE_VERIFICATION" = "false"
     "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT" = "placeholder-google-credentials-json"
-
+    
     # Note: Allowlist is now read from .allowlist/allowlist.csv file
-
+    
     # Onboarding Configuration
-    "FORCE_ONBOARDING_DEV" = "false"
+    "FORCE_ONBOARDING_DEV"               = "false"
   }
 
   # Only ignore changes to sensitive environment variables
@@ -341,18 +326,18 @@ resource "azurerm_linux_web_app" "backend_api" {
   auth_settings_v2 {
     auth_enabled           = true
     require_authentication = true
-    unauthenticated_action = "Return401" # Changed from RedirectToLoginPage
+    unauthenticated_action = "Return401"  # Changed from RedirectToLoginPage
     default_provider       = "azureactivedirectory"
-
+    
     active_directory_v2 {
-      client_id                  = var.auth_client_id
-      tenant_auth_endpoint       = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0/"
-      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+      client_id                    = var.auth_client_id
+      tenant_auth_endpoint         = "https://login.microsoftonline.com/${var.auth_tenant_id}/v2.0/"
+      client_secret_setting_name   = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
     }
-
+    
     login {
-      token_store_enabled          = true
-      token_refresh_extension_time = 168 # 7 days (168 hours)
+      token_store_enabled           = true
+      token_refresh_extension_time  = 168    # 7 days (168 hours)
       allowed_external_redirect_urls = [
         "https://${local.frontend_hostname}",
         "https://${local.frontend_hostname}/",
@@ -370,13 +355,13 @@ resource "azurerm_linux_web_app" "backend_api" {
       docker_registry_password = azurerm_container_registry.acr.admin_password
     }
 
-    # Health check configuration - increased timeout for slow startup
-    health_check_path                 = "/health"
-    health_check_eviction_time_in_min = 5
+    # Health check configuration - both parameters are required
+    health_check_path                = "/health"
+    health_check_eviction_time_in_min = 2
 
     # CORS configuration - include custom domain
     cors {
-      allowed_origins     = ["https://${local.frontend_hostname}", var.custom_domain_url]
+      allowed_origins     = ["https://${local.frontend_hostname}", var.custom_domain_url]      
       support_credentials = true
     }
   }
@@ -385,7 +370,7 @@ resource "azurerm_linux_web_app" "backend_api" {
   logs {
     detailed_error_messages = true
     failed_request_tracing  = true
-
+    
     http_logs {
       file_system {
         retention_in_days = 7
@@ -409,53 +394,53 @@ resource "azurerm_linux_web_app" "worker" {
   name                = local.worker_app_name
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  service_plan_id     = azurerm_service_plan.worker.id
+  service_plan_id     = azurerm_service_plan.backend.id
 
   app_settings = {
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
     "ENVIRONMENT"                         = var.environment
-
+    
     # Python specific settings
-    "PYTHONPATH" = "/app"
-
+    "PYTHONPATH"                         = "/app"
+    
     # Azure AD configuration (required by backend settings)
     "AZURE_AD_CLIENT_ID" = var.auth_client_id
     "AZURE_AD_TENANT_ID" = var.auth_tenant_id
-
+    
     # Application configuration
-    "APP_URL" = "https://${local.frontend_hostname}"
-
+    "APP_URL"                           = "https://${local.frontend_hostname}"
+    
     # Database and external API settings
-    "DATABASE_CONNECTION_STRING" = local.database_connection_string
-
+    "DATABASE_CONNECTION_STRING"         = local.database_connection_string
+    
     # Azure Storage Configuration (replacing AWS S3)
-    "AZURE_STORAGE_ACCOUNT_NAME"            = azurerm_storage_account.main.name
-    "AZURE_STORAGE_CONNECTION_STRING"       = azurerm_storage_account.main.primary_connection_string
-    "AZURE_STORAGE_CONTAINER_NAME"          = azurerm_storage_container.data.name
+    "AZURE_STORAGE_ACCOUNT_NAME"        = azurerm_storage_account.main.name
+    "AZURE_STORAGE_CONNECTION_STRING"   = azurerm_storage_account.main.primary_connection_string
+    "AZURE_STORAGE_CONTAINER_NAME"      = azurerm_storage_container.data.name
     "AZURE_STORAGE_TRANSCRIPTION_CONTAINER" = azurerm_storage_container.transcription.name
-
+    
     # Azure AI Services
-    "AZURE_OPENAI_API_KEY"  = "placeholder-azure-openai-api-key"
-    "AZURE_OPENAI_ENDPOINT" = "placeholder-azure-openai-endpoint"
-    "AZURE_GROK_API_KEY"    = "placeholder-azure-grok-api-key"
-    "AZURE_GROK_ENDPOINT"   = "placeholder-azure-grok-endpoint"
-    "AZURE_SPEECH_KEY"      = "placeholder-azure-speech-key"
-    "AZURE_SPEECH_REGION"   = "placeholder-azure-speech-region"
-
+    "AZURE_OPENAI_API_KEY"              = "placeholder-azure-openai-api-key"
+    "AZURE_OPENAI_ENDPOINT"             = "placeholder-azure-openai-endpoint"
+    "AZURE_GROK_API_KEY"                = "placeholder-azure-grok-api-key"
+    "AZURE_GROK_ENDPOINT"               = "placeholder-azure-grok-endpoint"
+    "AZURE_SPEECH_KEY"                  = "placeholder-azure-speech-key"
+    "AZURE_SPEECH_REGION"               = "placeholder-azure-speech-region"
+    
     # Monitoring and Observability
-    "SENTRY_DSN"          = "placeholder-sentry-dsn"
-    "LANGFUSE_SECRET_KEY" = "placeholder-langfuse-secret-key"
-    "LANGFUSE_PUBLIC_KEY" = "placeholder-langfuse-public-key"
-    "LANGFUSE_HOST"       = "https://langfuse-ai.justice.gov.uk"
-
+    "SENTRY_DSN"                        = "placeholder-sentry-dsn"
+    "LANGFUSE_SECRET_KEY"               = "placeholder-langfuse-secret-key"
+    "LANGFUSE_PUBLIC_KEY"               = "placeholder-langfuse-public-key"
+    "LANGFUSE_HOST"                     = "https://langfuse-ai.justice.gov.uk"
+    
     # Government Services
-    "GOV_NOTIFY_API_KEY" = "placeholder-gov-notify-api-key"
-
+    "GOV_NOTIFY_API_KEY"                = "placeholder-gov-notify-api-key"
+    
     # Development/Testing Configuration
     "GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT" = "placeholder-google-credentials-json"
-
+    
     # Worker-specific: Run worker script instead of API server
-    "SCM_DO_BUILD_DURING_DEPLOYMENT" = "false"
+    "SCM_DO_BUILD_DURING_DEPLOYMENT"    = "false"
   }
 
   # Only ignore changes to sensitive environment variables
@@ -488,17 +473,17 @@ resource "azurerm_linux_web_app" "worker" {
     app_command_line = "/app/start_worker.sh"
 
     # Health check configuration - worker now includes HTTP endpoint for Azure probes
-    health_check_path                 = "/health"
+    health_check_path                = "/health"
     health_check_eviction_time_in_min = 2
 
-    always_on = true # Keep the worker always running
+    always_on = true  # Keep the worker always running
   }
 
   # Enable logging
   logs {
     detailed_error_messages = true
     failed_request_tracing  = true
-
+    
     application_logs {
       file_system_level = "Information"
     }
@@ -550,13 +535,13 @@ resource "random_password" "postgres_password" {
   upper   = true
   lower   = true
   numeric = true
-
+  
   # Ensure password contains at least one of each character type
   min_special = 4
   min_upper   = 4
   min_lower   = 4
   min_numeric = 4
-
+  
   # Exclude characters that can cause issues in connection strings
   override_special = "!#%&*+-/=?^_`|~"
 }
@@ -576,8 +561,8 @@ resource "azurerm_postgresql_flexible_server" "main" {
   geo_redundant_backup_enabled = false
 
   # VNet Integration - more secure
-  delegated_subnet_id           = azurerm_subnet.database.id
-  private_dns_zone_id           = azurerm_private_dns_zone.postgres.id
+  delegated_subnet_id    = azurerm_subnet.database.id
+  private_dns_zone_id    = azurerm_private_dns_zone.postgres.id
   public_network_access_enabled = false
 
   # Ensure the private DNS zone link is created first
@@ -587,7 +572,7 @@ resource "azurerm_postgresql_flexible_server" "main" {
     active_directory_auth_enabled = true
     password_auth_enabled         = true
   }
-
+  
   tags = {
     Environment = var.environment
     Project     = var.prefix
@@ -616,16 +601,16 @@ resource "azurerm_storage_account" "main" {
   account_tier             = "Standard"
   account_replication_type = var.environment == "prod" ? "GRS" : "LRS"
   account_kind             = "StorageV2"
-
+  
   # Enable blob versioning and soft delete for data protection
   blob_properties {
     versioning_enabled  = true
     change_feed_enabled = true
-
+    
     delete_retention_policy {
       days = 7
     }
-
+    
     container_delete_retention_policy {
       days = 7
     }
@@ -642,7 +627,7 @@ resource "azurerm_storage_account" "main" {
 
   # Network rules for security
   network_rules {
-    default_action = "Allow" # Can be restricted to VNet in production
+    default_action = "Allow"  # Can be restricted to VNet in production
     bypass         = ["AzureServices"]
   }
 
@@ -671,7 +656,7 @@ resource "azurerm_storage_container" "transcription" {
 locals {
   branch_to_env = {
     "main"    = "prod"
-    "dev"     = "dev"
+    "dev"     = "dev" 
     "preprod" = "preprod"
   }
 }
