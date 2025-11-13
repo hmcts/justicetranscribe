@@ -374,9 +374,6 @@ resource "azurerm_linux_web_app" "backend_api" {
     health_check_path                 = "/health"
     health_check_eviction_time_in_min = 5
 
-    # Always On - prevents Azure from unloading the app after 20 minutes of inactivity
-    always_on = true
-
     # CORS configuration - include custom domain
     cors {
       allowed_origins     = ["https://${local.frontend_hostname}", var.custom_domain_url]
