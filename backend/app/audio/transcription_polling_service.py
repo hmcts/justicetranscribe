@@ -48,7 +48,7 @@ class TranscriptionPollingService:
         self.user_uploads_prefix = "user-uploads/"
         self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
         self.max_retry_attempts = 2  # Allow 2 total attempts (1 retry max as requested)
-        self.max_concurrent_workers = 50  # Max concurrent transcription workers
+        self.max_concurrent_workers = 25  # Max concurrent transcription workers
         self.stale_in_progress_threshold_minutes = 30  # Consider in-progress stale after this many minutes
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
