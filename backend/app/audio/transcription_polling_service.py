@@ -59,7 +59,7 @@ class TranscriptionPollingService:
             f"max concurrent workers: {self.max_concurrent_workers}"
         )
 
-    async def _should_skip_blob(self, blob: dict) -> bool:  # noqa: PLR0911
+    def _should_skip_blob(self, blob: dict) -> bool:  # noqa: PLR0911
         """
         Check if a blob should be skipped when looking for files to process.
 
@@ -92,8 +92,6 @@ class TranscriptionPollingService:
         blob_path = Path(blob_name)
         if blob_path.suffix.lower() not in self.supported_extensions:
             logger.debug(f"Skipping blob (unsupported extension {blob_path.suffix}): {blob_name}")
-            # delete the blob
-            await self._safe_delete_blob(blob_name, "unsupported extension")
             return True
 
         # Skip files uploaded before service started
@@ -103,8 +101,6 @@ class TranscriptionPollingService:
                 f"Skipping blob (uploaded before service started at {self.startup_time}): "
                 f"{blob_name} (last_modified: {last_modified})"
             )
-            # delete the blob
-            await self._safe_delete_blob(blob_name, "uploaded before service started")
             return True
 
         # Check metadata for processing status
@@ -113,15 +109,11 @@ class TranscriptionPollingService:
         # Skip if already successfully processed
         if metadata.get("processed") == "true":
             logger.debug(f"Skipping blob (already processed): {blob_name}")
-            # delete the blob
-            await self._safe_delete_blob(blob_name, "already processed")
             return True
 
         # Skip if permanently failed
         if metadata.get("status") == "permanently_failed":
             logger.debug(f"Skipping blob (permanently failed): {blob_name}")
-            # delete the blob
-            await self._safe_delete_blob(blob_name, "permanently failed")
             return True
 
         # Skip if currently being processed by a worker
@@ -171,12 +163,11 @@ class TranscriptionPollingService:
             all_blobs = await self.azure_blob_manager.list_blobs_in_prefix(
                 prefix=self.user_uploads_prefix, include_metadata=True
             )
-            logger.info(f"Found {len(all_blobs)} blobs in user-uploads/ directory")
 
             # Filter for unprocessed audio files
             unprocessed = []
             for blob in all_blobs:
-                if await self._should_skip_blob(blob):
+                if self._should_skip_blob(blob):
                     continue
 
                 # Check retry count to avoid infinite loops
@@ -484,26 +475,6 @@ class TranscriptionPollingService:
             )
         except Exception as e:
             logger.error(f"Error marking blob as permanently failed {blob_path}: {e}")
-
-    async def _safe_delete_blob(self, blob_name: str, reason: str) -> None:
-        """
-        Safely delete a blob with error handling.
-
-        Parameters
-        ----------
-        blob_name : str
-            The name/path of the blob to delete.
-        reason : str
-            Reason for deletion (for logging).
-        """
-        try:
-            success = await self.azure_blob_manager.delete_blob(blob_name)
-            if success:
-                logger.debug(f"Successfully deleted blob ({reason}): {blob_name}")
-            else:
-                logger.warning(f"Failed to delete blob ({reason}): {blob_name}")
-        except Exception as e:
-            logger.error(f"Error deleting blob ({reason}) {blob_name}: {e}")
 
     def _should_delete_old_blob(self, metadata: dict) -> tuple[bool, str]:
         """
