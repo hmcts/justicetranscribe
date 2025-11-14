@@ -555,17 +555,21 @@ class TranscriptionPollingService:
                 for blob in stale_in_progress_blobs:
                     blob_name = blob["name"]
                     try:
-                        # Clear the metadata to allow reprocessing
+                        current_metadata = blob.get("metadata", {})
+                        retry_count = current_metadata.get("retry_count", "0")
+
+                        # Reset status to allow reprocessing, but keep retry history
                         metadata = {
                             "processed": "false",
                             "status": "reset_from_stale",
                             "reset_at": datetime.now(UTC).isoformat(),
+                            "retry_count": retry_count,  # ← Preserve retry count!
                         }
                         success = await self.azure_blob_manager.set_blob_metadata(
                             blob_name=blob_name, metadata=metadata
                         )
                         if success:
-                            logger.info(f"Reset stale in_progress blob: {blob_name}")
+                            logger.info(f"Reset stale in_progress blob (retry_count={retry_count}): {blob_name}")
                         else:
                             logger.warning(f"Failed to reset stale blob: {blob_name}")
                     except Exception as e:
