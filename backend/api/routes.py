@@ -146,8 +146,7 @@ async def get_onboarding_status(
     return OnboardingStatusResponse(
         has_completed_onboarding=current_user.has_completed_onboarding,
         force_onboarding_override=force_onboarding,
-        should_show_onboarding=(not current_user.has_completed_onboarding)
-        or force_onboarding,
+        should_show_onboarding=(not current_user.has_completed_onboarding) or force_onboarding,
         user_id=current_user.id,
         environment=settings.ENVIRONMENT,
         is_allowlisted=is_allowlisted,
@@ -312,9 +311,7 @@ async def generate_or_edit_minutes(
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     asyncio.create_task(process_request())  # noqa: RUF006
-    return JSONResponse(
-        content={"minute_version_id": new_minute_version_id, "status": "initiated"}
-    )
+    return JSONResponse(content={"minute_version_id": new_minute_version_id, "status": "initiated"})
 
 
 @router.get("/templates", response_model=TemplateResponse)
@@ -389,9 +386,7 @@ async def get_minute_version_by_id_route(
 ):
     """Get a specific minute version by its ID for a given transcription."""
     # Verify user has access to the associated transcription
-    transcription = get_transcription_by_id(
-        transcription_id, current_user.id, UK_TIMEZONE
-    )
+    transcription = get_transcription_by_id(transcription_id, current_user.id, UK_TIMEZONE)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
@@ -410,27 +405,21 @@ async def get_minute_versions_route(
 ):
     """Get all minute versions for a specific transcription."""
     # Verify user has access to this transcription
-    transcription = get_transcription_by_id(
-        transcription_id, current_user.id, UK_TIMEZONE
-    )
+    transcription = get_transcription_by_id(transcription_id, current_user.id, UK_TIMEZONE)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
     return get_minute_versions(transcription_id)
 
 
-@router.post(
-    "/transcriptions/{transcription_id}/minute-versions", response_model=MinuteVersion
-)
+@router.post("/transcriptions/{transcription_id}/minute-versions", response_model=MinuteVersion)
 async def save_minute_version_route(
     transcription_id: UUID,
     minute_data: MinuteVersion,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
     """Create or update a minute version for a transcription."""
-    transcription = get_transcription_by_id(
-        transcription_id, current_user.id, UK_TIMEZONE
-    )
+    transcription = get_transcription_by_id(transcription_id, current_user.id, UK_TIMEZONE)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
@@ -440,9 +429,7 @@ async def save_minute_version_route(
     saved_minute = save_minute_version(minute_data)
 
     # Then handle the additional logging if needed
-    old_html_content = get_minute_version_by_id(
-        minute_data.id, transcription_id
-    ).html_content
+    old_html_content = get_minute_version_by_id(minute_data.id, transcription_id).html_content
 
     # Only log the event if content has changed
     if old_html_content != minute_data.html_content:
@@ -464,9 +451,7 @@ async def save_transcription_job_route(
 ) -> TranscriptionJob:
     """Create a new transcription job for a transcription."""
     # Verify user has access to this transcription
-    transcription = get_transcription_by_id(
-        transcription_id, current_user.id, UK_TIMEZONE
-    )
+    transcription = get_transcription_by_id(transcription_id, current_user.id, UK_TIMEZONE)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
@@ -475,18 +460,14 @@ async def save_transcription_job_route(
     )
 
 
-@router.get(
-    "/transcriptions/{transcription_id}/jobs", response_model=list[TranscriptionJob]
-)
+@router.get("/transcriptions/{transcription_id}/jobs", response_model=list[TranscriptionJob])
 async def get_transcription_jobs_route(
     transcription_id: UUID,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ) -> list[TranscriptionJob]:
     """Get all transcription jobs for a specific transcription."""
     # Verify user has access to this transcription
-    transcription = get_transcription_by_id(
-        transcription_id, current_user.id, UK_TIMEZONE
-    )
+    transcription = get_transcription_by_id(transcription_id, current_user.id, UK_TIMEZONE)
     if not transcription:
         raise HTTPException(status_code=404, detail="Transcription not found")
 
@@ -573,9 +554,7 @@ async def submit_langfuse_score(
             user_id=current_user.email,
         )
 
-        logger.info(
-            f"Langfuse score submitted for trace {request.trace_id} by user {current_user.email}"
-        )
+        logger.info(f"Langfuse score submitted for trace {request.trace_id} by user {current_user.email}")
 
     except Exception as e:
         _e = f"Failed to submit Langfuse score: {e!s}"
