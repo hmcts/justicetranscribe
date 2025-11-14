@@ -95,9 +95,9 @@ class TranscriptionPollingService:
             return True
 
         # Skip files uploaded before service started
-        last_modified = blob.get("last_modified")
-        if last_modified and last_modified < self.startup_time:
-            return True
+        # last_modified = blob.get("last_modified")
+        # if last_modified and last_modified < self.startup_time:
+        #     return True
 
         # Check metadata for processing status
         metadata = blob.get("metadata", {})
@@ -108,9 +108,7 @@ class TranscriptionPollingService:
 
         # Skip if permanently failed
         if metadata.get("status") == "permanently_failed":
-            logger.debug(
-                f"User {self.user_email}: Skipping permanently failed blob: {blob_name}"
-            )
+            logger.debug(f"User {self.user_email}: Skipping permanently failed blob: {blob_name}")
             return True
 
         return False
@@ -158,14 +156,10 @@ class TranscriptionPollingService:
                 unprocessed.append(blob)
 
             if unprocessed:
-                logger.info(
-                    f"User {self.user_email}: Found {len(unprocessed)} unprocessed audio files"
-                )
+                logger.info(f"User {self.user_email}: Found {len(unprocessed)} unprocessed audio files")
 
         except Exception as e:
-            logger.error(
-                f"User {self.user_email}: Error polling for new audio files: {e}"
-            )
+            logger.error(f"User {self.user_email}: Error polling for new audio files: {e}")
             return []
         else:
             return unprocessed
@@ -203,9 +197,7 @@ class TranscriptionPollingService:
                 return extracted_email
 
         except Exception as e:
-            logger.error(
-                f"User {self.user_email}: Error extracting email from blob path '{blob_path}': {e}"
-            )
+            logger.error(f"User {self.user_email}: Error extracting email from blob path '{blob_path}': {e}")
 
         return None
 
@@ -264,9 +256,7 @@ class TranscriptionPollingService:
             True if processing was successful, False otherwise.
         """
         blob_path = blob_info["name"]
-        logger.info(
-            f"User {self.user_email}: Processing discovered audio file: {blob_path}"
-        )
+        logger.info(f"User {self.user_email}: Processing discovered audio file: {blob_path}")
 
         try:
             # DEFENSIVE CHECK: Verify blob path starts with user's prefix
@@ -281,9 +271,7 @@ class TranscriptionPollingService:
             # Extract user email from path (includes additional validation)
             user_email = self.extract_user_email_from_blob_path(blob_path)
             if not user_email:
-                error_msg = (
-                    f"Could not extract/validate user email from blob path: {blob_path}"
-                )
+                error_msg = f"Could not extract/validate user email from blob path: {blob_path}"
                 logger.error(f"User {self.user_email}: {error_msg}")
                 await self._mark_blob_with_error(blob_path, error_msg)
                 return False
@@ -297,13 +285,9 @@ class TranscriptionPollingService:
                 return False
 
             # Trigger transcription processing
-            transcription_id = extract_transcription_id_from_blob_path(
-                blob_path, self.user_email
-            )
+            transcription_id = extract_transcription_id_from_blob_path(blob_path, self.user_email)
 
-            logger.info(
-                f"User {self.user_email}: Starting transcription for blob: {blob_path}"
-            )
+            logger.info(f"User {self.user_email}: Starting transcription for blob: {blob_path}")
 
             await transcribe_and_generate_llm_output(
                 user_upload_blob_storage_file_key=blob_path,
@@ -315,9 +299,7 @@ class TranscriptionPollingService:
             # Mark blob as processed
             await self._mark_blob_as_processed_and_soft_delete(blob_path)
 
-            logger.info(
-                f"User {self.user_email}: Successfully processed audio file: {blob_path}"
-            )
+            logger.info(f"User {self.user_email}: Successfully processed audio file: {blob_path}")
 
         except Exception as e:
             error_msg = f"Error processing audio file {blob_path}: {e}"
@@ -342,9 +324,7 @@ class TranscriptionPollingService:
                 "processed": "true",
                 "processed_at": datetime.now(UTC).isoformat(),
             }
-            success = await self.azure_blob_manager.set_blob_metadata(
-                blob_name=blob_path, metadata=metadata
-            )
+            success = await self.azure_blob_manager.set_blob_metadata(blob_name=blob_path, metadata=metadata)
             if success:
                 logger.info(f"Marked blob as processed: {blob_path}")
             else:
@@ -357,9 +337,7 @@ class TranscriptionPollingService:
                 logger.warning(f"Failed to delete blob: {blob_path}")
 
         except Exception as e:
-            logger.error(
-                f"Error marking blob as processed and deleting {blob_path}: {e}"
-            )
+            logger.error(f"Error marking blob as processed and deleting {blob_path}: {e}")
 
     async def _mark_blob_with_error(self, blob_path: str, error_message: str) -> None:
         """
@@ -374,9 +352,7 @@ class TranscriptionPollingService:
         """
         try:
             # Get current metadata to preserve retry count
-            current_metadata = (
-                await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
-            )
+            current_metadata = await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
             current_retry_count = int(current_metadata.get("retry_count", "0"))
             new_retry_count = current_retry_count + 1
 
@@ -387,20 +363,12 @@ class TranscriptionPollingService:
                 "last_error": error_message[:1000],  # Limit error message length
                 "status": "retrying",  # Will be retried on next poll
             }
-            await self.azure_blob_manager.set_blob_metadata(
-                blob_name=blob_path, metadata=metadata
-            )
-            logger.info(
-                f"User {self.user_email}: Marked blob with error (attempt {new_retry_count}): {blob_path}"
-            )
+            await self.azure_blob_manager.set_blob_metadata(blob_name=blob_path, metadata=metadata)
+            logger.info(f"User {self.user_email}: Marked blob with error (attempt {new_retry_count}): {blob_path}")
         except Exception as e:
-            logger.error(
-                f"User {self.user_email}: Error marking blob with error {blob_path}: {e}"
-            )
+            logger.error(f"User {self.user_email}: Error marking blob with error {blob_path}: {e}")
 
-    async def _mark_blob_permanently_failed(
-        self, blob_path: str, current_metadata: dict
-    ) -> None:
+    async def _mark_blob_permanently_failed(self, blob_path: str, current_metadata: dict) -> None:
         """
         Mark a blob as permanently failed after exceeding retry limit.
 
@@ -417,22 +385,16 @@ class TranscriptionPollingService:
                 "status": "permanently_failed",
                 "retry_count": current_metadata.get("retry_count", "0"),
                 "last_attempt": datetime.now(UTC).isoformat(),
-                "last_error": current_metadata.get(
-                    "last_error", "Max retries exceeded"
-                ),
+                "last_error": current_metadata.get("last_error", "Max retries exceeded"),
                 "failed_at": datetime.now(UTC).isoformat(),
             }
-            await self.azure_blob_manager.set_blob_metadata(
-                blob_name=blob_path, metadata=metadata
-            )
+            await self.azure_blob_manager.set_blob_metadata(blob_name=blob_path, metadata=metadata)
             logger.error(
                 f"User {self.user_email}: Marked blob as permanently failed after "
                 f"{current_metadata.get('retry_count', 0)} attempts: {blob_path}"
             )
         except Exception as e:
-            logger.error(
-                f"User {self.user_email}: Error marking blob as permanently failed {blob_path}: {e}"
-            )
+            logger.error(f"User {self.user_email}: Error marking blob as permanently failed {blob_path}: {e}")
 
     def _should_delete_old_blob(self, metadata: dict) -> tuple[bool, str]:
         """
@@ -454,11 +416,7 @@ class TranscriptionPollingService:
 
         # Case 2: Legacy blob without metadata - delete for data protection
         # These are pre-migration blobs that never had metadata tracking
-        if not metadata or (
-            "processed" not in metadata
-            and "retry_count" not in metadata
-            and "status" not in metadata
-        ):
+        if not metadata or ("processed" not in metadata and "retry_count" not in metadata and "status" not in metadata):
             return True, "legacy blob without metadata"
 
         # Case 3: Blob with retry metadata - keep for processing/investigation
@@ -496,9 +454,9 @@ class TranscriptionPollingService:
             return False, None
 
         # Check if blob is old
-        last_modified = blob.get("last_modified")
-        if not (last_modified and last_modified < self.startup_time):
-            return False, None
+        # last_modified = blob.get("last_modified")
+        # if not (last_modified and last_modified < self.startup_time):
+        #     return False, None
 
         # Determine if this old blob should be deleted based on metadata
         metadata = blob.get("metadata", {})
@@ -516,9 +474,7 @@ class TranscriptionPollingService:
         Includes defensive checks to ensure only this user's blobs are deleted.
         """
         try:
-            logger.info(
-                f"User {self.user_email}: Starting cleanup of old blobs from before service startup..."
-            )
+            logger.info(f"User {self.user_email}: Starting cleanup of old blobs from before service startup...")
 
             # List all blobs with user-specific prefix
             all_blobs = await self.azure_blob_manager.list_blobs_in_prefix(
@@ -536,18 +492,12 @@ class TranscriptionPollingService:
                 blob_name = blob["name"]
                 if should_delete:
                     old_blobs.append(blob)
-                    logger.info(
-                        f"User {self.user_email}: Will clean up old blob ({reason}): {blob_name}"
-                    )
+                    logger.info(f"User {self.user_email}: Will clean up old blob ({reason}): {blob_name}")
                 else:
-                    logger.info(
-                        f"User {self.user_email}: Keeping old blob ({reason}): {blob_name}"
-                    )
+                    logger.info(f"User {self.user_email}: Keeping old blob ({reason}): {blob_name}")
 
             if old_blobs:
-                logger.info(
-                    f"User {self.user_email}: Found {len(old_blobs)} old blob(s) to clean up"
-                )
+                logger.info(f"User {self.user_email}: Found {len(old_blobs)} old blob(s) to clean up")
 
                 # Delete each old blob
                 for blob in old_blobs:
@@ -555,21 +505,13 @@ class TranscriptionPollingService:
                     try:
                         success = await self.azure_blob_manager.delete_blob(blob_name)
                         if success:
-                            logger.info(
-                                f"User {self.user_email}: Deleted old blob: {blob_name}"
-                            )
+                            logger.info(f"User {self.user_email}: Deleted old blob: {blob_name}")
                         else:
-                            logger.warning(
-                                f"User {self.user_email}: Failed to delete old blob: {blob_name}"
-                            )
+                            logger.warning(f"User {self.user_email}: Failed to delete old blob: {blob_name}")
                     except Exception as e:
-                        logger.error(
-                            f"User {self.user_email}: Error deleting old blob {blob_name}: {e}"
-                        )
+                        logger.error(f"User {self.user_email}: Error deleting old blob {blob_name}: {e}")
 
-                logger.info(
-                    f"User {self.user_email}: Cleanup complete - processed {len(old_blobs)} old blob(s)"
-                )
+                logger.info(f"User {self.user_email}: Cleanup complete - processed {len(old_blobs)} old blob(s)")
             else:
                 logger.info(f"User {self.user_email}: No old blobs found to clean up")
 
@@ -607,8 +549,7 @@ class TranscriptionPollingService:
                         await self.process_discovered_audio(blob_info)
                     except Exception as e:
                         logger.error(
-                            f"User {self.user_email}: Error processing blob "
-                            f"{blob_info.get('name', 'unknown')}: {e}"
+                            f"User {self.user_email}: Error processing blob " f"{blob_info.get('name', 'unknown')}: {e}"
                         )
                         # Continue processing other files even if one fails
 
