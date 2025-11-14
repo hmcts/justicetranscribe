@@ -582,6 +582,9 @@ class TranscriptionPollingService:
         """
         Worker coroutine that pulls blobs from the queue and processes them.
 
+        On shutdown, the worker exits immediately. Any in-progress blobs will be
+        recovered by the startup cleanup on next service start.
+
         Parameters
         ----------
         worker_id : int
@@ -595,7 +598,7 @@ class TranscriptionPollingService:
                 try:
                     blob_info = await asyncio.wait_for(self.blob_queue.get(), timeout=1.0)
                 except TimeoutError:
-                    # No item in queue, continue loop to check shutdown flag
+                    # No item in queue, loop back to check shutdown flag
                     continue
 
                 try:
@@ -658,19 +661,16 @@ class TranscriptionPollingService:
                 await asyncio.sleep(self.polling_interval_seconds)
 
         finally:
-            # Shutdown sequence
-            logger.info("Shutting down polling service...")
+            # Fast shutdown: abandon queue and cancel workers immediately
+            # Any in-progress blobs will be recovered by startup cleanup
+            logger.info("Shutting down polling service (fast shutdown)...")
             self._shutdown = True
 
-            # Wait for queue to be processed
-            logger.info("Waiting for queue to be processed...")
-            await self.blob_queue.join()
-
-            # Cancel all worker tasks
+            # Cancel all worker tasks immediately
             logger.info("Cancelling worker tasks...")
             for task in self.worker_tasks:
                 task.cancel()
 
-            # Wait for all workers to finish
+            # Wait for all workers to finish cancellation
             await asyncio.gather(*self.worker_tasks, return_exceptions=True)
             logger.info("All workers stopped")
