@@ -90,15 +90,13 @@ async def transcribe_and_generate_llm_output(
         title_task = generate_and_save_meeting_title(
             updated_dialogue_entries, transcription, user_id, user_email
         )
-        asyncio.create_task(  # noqa: RUF006
-            generate_llm_output_task(
-                updated_dialogue_entries, transcription.id, crissa_template, user_email
-            )
+        crissa_task = generate_llm_output_task(
+            updated_dialogue_entries, transcription.id, crissa_template, user_email
         )
 
         try:
-            # Only wait for general and title tasks
-            await asyncio.gather(general_task, title_task)
+            # Wait for all three tasks including CRISSA before sending email
+            await asyncio.gather(general_task, title_task, crissa_task)
         except Exception as e:
             logger.error(f"Error in parallel tasks: {e}")
             sentry_sdk.capture_exception(e)
