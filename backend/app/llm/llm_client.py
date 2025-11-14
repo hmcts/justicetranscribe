@@ -1,17 +1,27 @@
-# ruff: noqa: TRY300, B904, TRY003
+# ruff: noqa: TRY003, TRY300, EM101
 import json
+import logging
 from collections.abc import Callable
 from enum import Enum
-from functools import partial
-from pathlib import Path
+from tomllib import load
 from typing import Any
 
 from langfuse import Langfuse
 from langfuse.decorators import langfuse_context, observe
 from litellm import acompletion
 from pydantic import BaseModel
+from pyprojroot import here
 
 from utils.settings import get_settings
+
+logger = logging.getLogger(__name__)
+
+# Load config from file in the same directory as this module
+_config_path = here("app/llm/llm_client.toml")
+with _config_path.open("rb") as f:
+    toml_data = load(f)
+
+llm_params = toml_data["llm_params"]
 
 
 class LLMModel(str, Enum):
@@ -29,8 +39,10 @@ ALL_LLM_MODELS = [
     LLMModel.VERTEX_GEMINI_20_FLASH,
     LLMModel.VERTEX_GEMINI_25_FLASH,
 ]
+
 # Create langfuse client with settings
 _settings = get_settings()
+
 langfuse_client = Langfuse(
     public_key=_settings.LANGFUSE_PUBLIC_KEY,
     secret_key=_settings.LANGFUSE_SECRET_KEY,
@@ -75,82 +87,108 @@ def _ensure_langfuse_authenticated():
 
 def _load_vertex_credentials() -> str:
     """
-    Load the Google Cloud credentials by:
-    1. First attempting to read from config/justice-transcribe-d4aeca0459de.json
-    2. Falling back to environment variable if file doesn't exist
-    Returns the credentials as a JSON string.
+    Load Google Cloud credentials from env vars. Returns the credentials
+    as a JSON string.
     """
-    import pathlib
-
-    # First try to load from file
-    credentials_path = pathlib.Path("config/justice-transcribe-d4aeca0459de.json")
-    if credentials_path.exists():
-        try:
-            with Path(credentials_path).open("r") as f:
-                return f.read()
-        except Exception as e:
-            raise RuntimeError(f"Failed to read credentials file at {credentials_path}. Error: {e!s}")
-
-    # Fall back to environment variable
     try:
         vertex_credentials = get_settings().GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT
         return vertex_credentials
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"Failed to parse Google Cloud credentials from environment variable. Error: {e!s}")
+        raise RuntimeError(
+            f"Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON_OBJECT: {e!s}"
+        ) from e
 
 
-# Create a pre-configured version of acompletion with Azure Grok defaults
-def _get_azure_grok_acompletion():
+async def gemini_eu_fallback_acompletion(*, model: str, messages: list, **kwargs):
+    """
+    Gemini completion with EU region fallback.
+
+    Tries multiple EU regions in order until one succeeds. This handles
+    cases where a specific region might be temporarily unavailable.
+    """
+    safety_categories = llm_params["GEMINI_SAFETY_OVERRIDE_CATEGORIES"]
+    last_exception = None
+    for region in llm_params["VERTEX_LOCATIONS"]:
+        try:
+            logger.info("Attempting Gemini completion with model %s in region %s", model, region)
+            result = await acompletion(
+                model=model,
+                messages=messages,
+                fallbacks=[LLMModel.VERTEX_GEMINI_25_FLASH, LLMModel.VERTEX_GEMINI_20_FLASH],
+                max_retries=llm_params["NUM_RETRIES"],
+                retry_strategy=llm_params["RETRY_STRATEGY"],
+                safety_settings=[
+                    {"category": _cat, "threshold": "BLOCK_NONE"}
+                    for _cat in safety_categories
+                    ],
+                timeout=llm_params["TIMEOUT"],
+                vertex_credentials=_load_vertex_credentials(),
+                vertex_location=region,
+                **kwargs,
+            )
+            # Basic success check
+            if result and result.choices and getattr(result.choices[0].message, "content", None):
+                logger.info("Successfully completed Gemini request in region %s", region)
+                return result
+            else:
+                logger.warning("Gemini completion contained no content")
+                raise ValueError("Gemini completion contained no content")
+
+        except Exception as exc:
+            logger.warning("Gemini completion failed in region %s: %s", region, exc)
+            last_exception = exc
+            continue
+    # If none succeed, raise last error
+    logger.error("All Gemini regions failed. Last error: %s", last_exception)
+    raise last_exception
+
+
+async def azure_grok_acompletion(*, model: str, messages: list, **kwargs):
+    """
+    Azure Grok completion with standard retry strategy.
+
+    Provides a consistent interface for Azure Grok API calls with
+    pre-configured authentication and retry parameters.
+    """
     settings = get_settings()
-    return partial(
-        acompletion,
+    logger.info("Attempting Azure Grok completion with model %s", model)
+    result = await acompletion(
+        model=model,
+        messages=messages,
         api_base=settings.AZURE_GROK_ENDPOINT,
-        api_version="2024-05-01-preview",
+        api_version=llm_params["AZURE_GROK_API_VERSION"],
         api_key=settings.AZURE_GROK_API_KEY,
-        num_retries=25,
+        num_retries=llm_params["NUM_RETRIES"],
+        timeout=llm_params["TIMEOUT"],
+        retry_strategy=llm_params["RETRY_STRATEGY"],
+        **kwargs,
     )
+    logger.info("Successfully completed Azure Grok request")
+    return result
 
-azure_grok_acompletion = _get_azure_grok_acompletion()
 
+async def azure_acompletion(*, model: str, messages: list, **kwargs):
+    """
+    Azure OpenAI completion with standard retry strategy.
 
-# Create a pre-configured version of acompletion with Azure defaults
-def _get_azure_acompletion():
+    Provides a consistent interface for Azure OpenAI API calls with
+    pre-configured authentication and retry parameters.
+    """
     settings = get_settings()
-    return partial(
-        acompletion,
+    logger.info("Attempting Azure OpenAI completion with model %s", model)
+    result = await acompletion(
+        model=model,
+        messages=messages,
         api_base=settings.AZURE_OPENAI_ENDPOINT,
-        api_version="2025-03-01-preview",
+        api_version=llm_params["AZURE_OPENAI_API_VERSION"],
         api_key=settings.AZURE_OPENAI_API_KEY,
-        num_retries=25,
+        num_retries=llm_params["NUM_RETRIES"],
+        timeout=llm_params["TIMEOUT"],
+        retry_strategy=llm_params["RETRY_STRATEGY"],
+        **kwargs,
     )
-
-azure_acompletion = _get_azure_acompletion()
-
-# Create a pre-configured version of completion with Vertex AI defaults
-gemini_completion = partial(
-    acompletion,
-    vertex_credentials=_load_vertex_credentials(),
-    max_retries=25,
-    fallbacks=[LLMModel.VERTEX_GEMINI_25_FLASH, LLMModel.VERTEX_GEMINI_20_FLASH],
-    safety_settings=[
-        {
-            "category": "HARM_CATEGORY_HARASSMENT",
-            "threshold": "BLOCK_NONE",
-        },
-        {
-            "category": "HARM_CATEGORY_HATE_SPEECH",
-            "threshold": "BLOCK_NONE",
-        },
-        {
-            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            "threshold": "BLOCK_NONE",
-        },
-        {
-            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-            "threshold": "BLOCK_NONE",
-        },
-    ],
-)
+    logger.info("Successfully completed Azure OpenAI request")
+    return result
 
 
 def _is_content_filtering_error(error: Exception) -> bool:
@@ -176,7 +214,7 @@ def _is_content_filtering_error(error: Exception) -> bool:
     return any(indicator in error_str for indicator in csam_filtering_indicators)
 
 
-async def _gemini_completion_with_multi_fallback(*, model: str, messages: list, **kwargs):
+async def _completion_with_multi_fallback(*, model: str, messages: list, **kwargs):
     """
     Gemini completion with automatic multi-level fallbacks:
     1. Try Gemini first
@@ -186,7 +224,7 @@ async def _gemini_completion_with_multi_fallback(*, model: str, messages: list, 
     """
     try:
         # Try Gemini first
-        result = await gemini_completion(model=model, messages=messages, **kwargs)
+        result = await gemini_eu_fallback_acompletion(model=model, messages=messages, **kwargs)
         # Update observation to track successful Gemini usage
         langfuse_context.update_current_observation(
             metadata={
@@ -196,14 +234,14 @@ async def _gemini_completion_with_multi_fallback(*, model: str, messages: list, 
             }
         )
         if not result.choices or result.choices[0].message.content is None or result.choices[0].message.content == "":
-            print("GEMINI RETURNED NO CONTENT")  # noqa: T201
-            raise Exception("Gemini returned no content")  # noqa: EM101, TRY002
+            logger.warning("Gemini returned no content")
+            raise ValueError("Gemini returned no content")
         return result
     except Exception as e:
         if _is_content_filtering_error(e) or "Gemini returned no content" in str(e):
             try:
                 # Fall back to Azure Grok
-                print("FALLING BACK TO GROK")  # noqa: T201
+                logger.info("Falling back to Azure Grok due to Gemini content filtering")
                 result = await azure_grok_acompletion(model=LLMModel.AZURE_GROK_3, messages=messages, **kwargs)
                 # Update observation to track Grok fallback usage
                 langfuse_context.update_current_observation(
@@ -265,9 +303,9 @@ def with_structured_output(completion_func: Callable) -> Callable:
     return wrapped
 
 
-structured_azure_completion = with_structured_output(azure_acompletion)
-structured_gemini_completion = with_structured_output(_gemini_completion_with_multi_fallback)
+structured_gemini_completion = with_structured_output(_completion_with_multi_fallback)
 structured_azure_grok_completion = with_structured_output(azure_grok_acompletion)
+structured_azure_completion = with_structured_output(azure_acompletion)
 
 
 def get_backend_for_model(model: str) -> str:
@@ -288,12 +326,12 @@ async def llm_completion(*, model: str, messages: list, **kwargs):
 
     backend = get_backend_for_model(model)
 
-    if backend == "azure":
-        result = await azure_acompletion(model=model, messages=messages, **kwargs)
+    if backend == "vertex":
+        result = await _completion_with_multi_fallback(model=model, messages=messages, **kwargs)
     elif backend == "azure_grok":
         result = await azure_grok_acompletion(model=model, messages=messages, **kwargs)
-    elif backend == "vertex":
-        result = await _gemini_completion_with_multi_fallback(model=model, messages=messages, **kwargs)
+    elif backend == "azure":
+        result = await azure_acompletion(model=model, messages=messages, **kwargs)
     else:
         raise ValueError(f"Unsupported backend: {backend}")
 
@@ -306,8 +344,8 @@ def structured_output_llm_completion_builder_func(response_format):
         _ensure_langfuse_authenticated()
 
         backend = get_backend_for_model(model)
-        if backend == "azure":
-            return await structured_azure_completion(
+        if backend == "vertex":
+            return await structured_gemini_completion(
                 messages=messages,
                 response_format=response_format,
                 model=model,
@@ -320,8 +358,8 @@ def structured_output_llm_completion_builder_func(response_format):
                 model=model,
                 **kwargs,
             )
-        elif backend == "vertex":
-            return await structured_gemini_completion(
+        elif backend == "azure":
+            return await structured_azure_completion(
                 messages=messages,
                 response_format=response_format,
                 model=model,
