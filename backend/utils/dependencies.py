@@ -22,18 +22,16 @@ def is_local_development() -> bool:
     """Check if we're running in local development mode"""
     return os.getenv("ENVIRONMENT", "local").lower() in ["local"]
 
+
 def get_mock_user_data() -> dict:
     """Return mock user data for local development"""
-    return {
-        "user_id": "local-dev-user-123",
-        "name": "Local Developer",
-        "email": "developer@localhost.com"
-    }
+    return {"user_id": "local-dev-user-123", "name": "Local Developer", "email": "developer@localhost.com"}
+
 
 async def get_current_user(  # noqa: C901, PLR0912, PLR0915
     session: Session = Depends(get_session),  # noqa: B008
     x_ms_client_principal: Annotated[str | None, Header()] = None,
-    authorization: Annotated[str | None, Header()] = None
+    authorization: Annotated[str | None, Header()] = None,
 ) -> User:
     """
     Get or create the current user with defense-in-depth:
@@ -51,8 +49,7 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
         # Production mode - MUST have Easy Auth headers
         if not x_ms_client_principal:
             raise HTTPException(
-                status_code=401,
-                detail="Authentication required. Please ensure Easy Auth is properly configured."
+                status_code=401, detail="Authentication required. Please ensure Easy Auth is properly configured."
             )
 
         try:
@@ -73,8 +70,7 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
 
             if not email:
                 raise HTTPException(
-                    status_code=401,
-                    detail="Authentication failed: email claim missing from Azure AD token"
+                    status_code=401, detail="Authentication failed: email claim missing from Azure AD token"
                 )
 
             # SECONDARY: JWT signature verification (defense in depth)
@@ -96,12 +92,11 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
                             logger.error(
                                 "User ID mismatch - potential spoofing attempt: Easy Auth oid=%s, JWT oid=%s",
                                 azure_user_id,
-                                jwt_user_id
+                                jwt_user_id,
                             )
                             if jwt_verification_service.strict_mode:
                                 raise HTTPException(
-                                    status_code=401,
-                                    detail="Authentication claims mismatch between Easy Auth and JWT"
+                                    status_code=401, detail="Authentication claims mismatch between Easy Auth and JWT"
                                 )
 
                         # Log email differences for observability (expected when emails change)
@@ -109,7 +104,7 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
                             logger.info(
                                 "Email differs between Easy Auth and JWT (user identity verified): Easy Auth=%s, JWT=%s",
                                 email,
-                                jwt_email
+                                jwt_email,
                             )
 
                         logger.info("JWT signature verification passed - Additional security layer confirmed")
@@ -122,10 +117,7 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
                         raise
             else:
                 if jwt_verification_service.strict_mode:
-                    raise HTTPException(
-                        status_code=401,
-                        detail="JWT token required for strict verification mode"
-                    )
+                    raise HTTPException(status_code=401, detail="JWT token required for strict verification mode")
                 logger.info("No JWT token provided for secondary verification")
 
             # Use JWT user ID as the primary identifier if available (more reliable)
@@ -150,10 +142,7 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
 
     if not user:
         # Create new user
-        user = User(
-            email=email,
-            azure_user_id=azure_user_id
-        )
+        user = User(email=email, azure_user_id=azure_user_id)
         session.add(user)
         session.commit()
         session.refresh(user)
@@ -161,23 +150,11 @@ async def get_current_user(  # noqa: C901, PLR0912, PLR0915
     else:
         logger.info("Found existing user: %s", email)
 
-    # Auto-start polling service for this user if enabled
-    try:
-        # Import here to avoid circular dependencies
-        from main import ensure_user_polling_started
-        ensure_user_polling_started(user.email)
-    except ImportError:
-        # ensure_user_polling_started not available (e.g., during tests)
-        pass
-    except Exception as e:
-        # Don't fail the request if polling service can't be started
-        logger.warning("Failed to start polling service for user %s: %s", user.email, e)
-
     return user
 
 
 async def get_allowlisted_user(
-    current_user: User = Depends(get_current_user)  # noqa: B008
+    current_user: User = Depends(get_current_user),  # noqa: B008
 ) -> User:
     """
     Get the current user AND verify they are on the allowlist.
@@ -203,9 +180,11 @@ async def get_allowlisted_user(
     settings = get_settings()
 
     # Check for local development bypass
-    if (settings.ENVIRONMENT == "local" and
-        settings.BYPASS_ALLOWLIST_DEV and
-        current_user.email == "developer@localhost.com"):
+    if (
+        settings.ENVIRONMENT == "local"
+        and settings.BYPASS_ALLOWLIST_DEV
+        and current_user.email == "developer@localhost.com"
+    ):
         logger.info("Allowlist bypassed for local dev user: %s", current_user.email)
         return current_user
 
@@ -218,7 +197,7 @@ async def get_allowlisted_user(
             logger.warning("Access denied: User %s is not on the allowlist", current_user.email)
             raise HTTPException(
                 status_code=403,
-                detail="Access denied. Your account is not authorized to use this service. Please contact your administrator."
+                detail="Access denied. Your account is not authorized to use this service. Please contact your administrator.",
             )
 
         logger.info("Allowlist verified for user: %s", current_user.email)
@@ -230,17 +209,14 @@ async def get_allowlisted_user(
     except Exception as e:
         # FAIL OPEN: Allowlist check failed (service unavailable, parse error, etc.)
         # Log extensively and allow access
-        logger.exception(
-            "⚠️ ALLOWLIST CHECK FAILED - FAILING OPEN ⚠️ | User: %s",
-            current_user.email
-        )
+        logger.exception("⚠️ ALLOWLIST CHECK FAILED - FAILING OPEN ⚠️ | User: %s", current_user.email)
         sentry_sdk.capture_exception(
             e,
             extras={
                 "user_email": current_user.email,
                 "fail_open": True,
-                "message": "Allowlist check failed - allowing access (fail-open mode)"
-            }
+                "message": "Allowlist check failed - allowing access (fail-open mode)",
+            },
         )
         logger.warning("Allowing access for user %s due to allowlist service failure (fail-open)", current_user.email)
         return current_user

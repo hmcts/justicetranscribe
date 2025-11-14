@@ -23,38 +23,42 @@ from utils.settings import get_settings
 
 class TranscriptionPollingService:
     """
-    Service for polling Azure Blob Storage and automatically processing audio files for a specific user.
+    Global service for polling Azure Blob Storage and automatically processing audio files for all users.
 
     This service:
-    - Polls the user-specific prefix (user-uploads/{email}/) every 30 seconds
-    - Identifies unprocessed audio files for that user only
+    - Polls the entire user-uploads/ prefix every 30 seconds
+    - Identifies unprocessed audio files across all users
     - Triggers transcription processing
     - Marks files as processed using blob metadata
-    - Includes defensive checks to prevent cross-user data access
     """
 
-    def __init__(self, user_email: str):
-        """Initialize the transcription polling service for a specific user.
+    def __init__(self):
+        """Initialize the global transcription polling service.
 
         Parameters
         ----------
-        user_email : str
-            Email address of the user whose files should be processed.
-            Used to construct the blob prefix: user-uploads/{user_email}/
+        num_workers : int
+            Number of parallel worker tasks to process audio files (default: 3)
         """
         self.settings = get_settings()
         self.azure_blob_manager = AsyncAzureBlobManager()
         self.polling_interval_seconds = 30
-        self.user_email = user_email
-        self.user_uploads_prefix = f"user-uploads/{user_email}/"
+        self.user_uploads_prefix = "user-uploads/"
         self.supported_extensions = {".mp4", ".webm", ".wav", ".m4a"}
         self.max_retry_attempts = 2  # Allow 2 total attempts (1 retry max as requested)
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
         self._is_first_poll = True
+
+        # Queue for discovered blobs to be processed
+        self.blob_queue: asyncio.Queue = asyncio.Queue()
+        self.num_workers = 20
+        self.worker_tasks: list[asyncio.Task] = []
+        self._shutdown = False
+
         logger.info(
-            f"Polling service initialized for user {user_email} - "
-            f"will only process files uploaded after {self.startup_time.isoformat()}"
+            f"Global polling service initialized with {self.num_workers} workers - "
+            f"will process files for all users uploaded after {self.startup_time.isoformat()}"
         )
 
     def _should_skip_blob(self, blob: dict) -> bool:
@@ -64,8 +68,9 @@ class TranscriptionPollingService:
         Used during polling to filter out blobs that should NOT be transcribed:
         - Already successfully processed blobs
         - Permanently failed blobs (exceeded retry limit)
-        - Blobs uploaded before service started (handled by startup cleanup)
-        - Non-audio files or files belonging to other users
+        - Currently being processed blobs (in_progress status)
+        - Non-audio files
+        - Files not in the user-uploads prefix
 
         Returns True if the blob should be skipped for transcription processing.
 
@@ -81,23 +86,14 @@ class TranscriptionPollingService:
         """
         blob_name = blob["name"]
 
-        # DEFENSIVE CHECK: Ensure blob belongs to this user
+        # Ensure blob is in user-uploads prefix
         if not blob_name.startswith(self.user_uploads_prefix):
-            logger.warning(
-                f"Security check failed: Blob '{blob_name}' does not match "
-                f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
-            )
             return True
 
         # Check file extension
         blob_path = Path(blob_name)
         if blob_path.suffix.lower() not in self.supported_extensions:
             return True
-
-        # Skip files uploaded before service started
-        # last_modified = blob.get("last_modified")
-        # if last_modified and last_modified < self.startup_time:
-        #     return True
 
         # Check metadata for processing status
         metadata = blob.get("metadata", {})
@@ -108,18 +104,22 @@ class TranscriptionPollingService:
 
         # Skip if permanently failed
         if metadata.get("status") == "permanently_failed":
-            logger.debug(f"User {self.user_email}: Skipping permanently failed blob: {blob_name}")
+            logger.debug(f"Skipping permanently failed blob: {blob_name}")
             return True
+
+        # Skip if currently being processed (prevents duplicate processing)
+        if metadata.get("status") == "in_progress":
+            logger.debug(f"Skipping blob already in progress: {blob_name}")
+            return True
+
+        # Don't skip if status is "reset_from_stale" or "retrying" - these should be reprocessed
+        # Also don't skip new blobs with no metadata
 
         return False
 
     async def poll_for_new_audio_files(self) -> list[dict]:
         """
-        Poll blob storage for new, unprocessed audio files for this user only.
-
-        Only returns files uploaded after the service started to avoid
-        reprocessing old backlogged files. Includes defensive check to ensure
-        all blobs belong to the user's prefix.
+        Poll blob storage for new, unprocessed audio files across all users.
 
         Returns
         -------
@@ -131,7 +131,7 @@ class TranscriptionPollingService:
             - size: int
         """
         try:
-            # List all blobs with user-specific prefix
+            # List all blobs with user-uploads prefix (all users)
             all_blobs = await self.azure_blob_manager.list_blobs_in_prefix(
                 prefix=self.user_uploads_prefix, include_metadata=True
             )
@@ -147,7 +147,7 @@ class TranscriptionPollingService:
                 retry_count = int(metadata.get("retry_count", "0"))
                 if retry_count >= self.max_retry_attempts:
                     logger.warning(
-                        f"User {self.user_email}: Blob {blob['name']} has exceeded max retries "
+                        f"Blob {blob['name']} has exceeded max retries "
                         f"({retry_count}/{self.max_retry_attempts}), marking as permanently failed"
                     )
                     await self._mark_blob_permanently_failed(blob["name"], metadata)
@@ -156,17 +156,17 @@ class TranscriptionPollingService:
                 unprocessed.append(blob)
 
             if unprocessed:
-                logger.info(f"User {self.user_email}: Found {len(unprocessed)} unprocessed audio files")
+                logger.info(f"Found {len(unprocessed)} unprocessed audio files across all users")
 
         except Exception as e:
-            logger.error(f"User {self.user_email}: Error polling for new audio files: {e}")
+            logger.error(f"Error polling for new audio files: {e}")
             return []
         else:
             return unprocessed
 
     def extract_user_email_from_blob_path(self, blob_path: str) -> str | None:
         """
-        Extract user email from blob path and verify it matches this service's user.
+        Extract user email from blob path.
 
         Expected format: user-uploads/{email}/{filename}
 
@@ -178,26 +178,16 @@ class TranscriptionPollingService:
         Returns
         -------
         str | None
-            The user email if it matches this service's user, None otherwise.
+            The user email if extraction is successful, None otherwise.
         """
         min_parts = 3  # Minimum parts for valid path: user-uploads/{email}/{filename}
         try:
             parts = blob_path.split("/")
             if len(parts) >= min_parts and parts[0] == "user-uploads":
-                extracted_email = parts[1]
-
-                # DEFENSIVE CHECK: Verify extracted email matches this service's user
-                if extracted_email != self.user_email:
-                    logger.error(
-                        f"Security check failed: Extracted email '{extracted_email}' from blob path "
-                        f"does not match service user '{self.user_email}'"
-                    )
-                    return None
-
-                return extracted_email
+                return parts[1]
 
         except Exception as e:
-            logger.error(f"User {self.user_email}: Error extracting email from blob path '{blob_path}': {e}")
+            logger.error(f"Error extracting email from blob path '{blob_path}': {e}")
 
         return None
 
@@ -236,11 +226,11 @@ class TranscriptionPollingService:
 
     async def process_discovered_audio(self, blob_info: dict) -> bool:
         """
-        Process a discovered audio file for this user only.
+        Process a discovered audio file.
 
         This method:
-        1. Verifies blob path belongs to this user (defensive check)
-        2. Extracts user email from blob path and validates it
+        1. Marks blob as in_progress to prevent duplicate processing
+        2. Extracts user email from blob path
         3. Looks up user in database
         4. Triggers transcription processing
         5. Marks blob as processed
@@ -256,23 +246,21 @@ class TranscriptionPollingService:
             True if processing was successful, False otherwise.
         """
         blob_path = blob_info["name"]
-        logger.info(f"User {self.user_email}: Processing discovered audio file: {blob_path}")
+        logger.info(f"Processing discovered audio file: {blob_path}")
 
         try:
-            # DEFENSIVE CHECK: Verify blob path starts with user's prefix
-            if not blob_path.startswith(self.user_uploads_prefix):
-                error_msg = (
-                    f"Security violation: Blob path '{blob_path}' does not start with "
-                    f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
-                )
-                logger.error(error_msg)
+            # CRITICAL: Mark as in_progress immediately to prevent race conditions
+            # If this returns False, another worker is already processing this blob
+            marked = await self._mark_blob_in_progress(blob_path)
+            if not marked:
+                logger.warning(f"Blob already being processed by another worker, skipping: {blob_path}")
                 return False
 
-            # Extract user email from path (includes additional validation)
+            # Extract user email from path
             user_email = self.extract_user_email_from_blob_path(blob_path)
             if not user_email:
-                error_msg = f"Could not extract/validate user email from blob path: {blob_path}"
-                logger.error(f"User {self.user_email}: {error_msg}")
+                error_msg = f"Could not extract user email from blob path: {blob_path}"
+                logger.error(error_msg)
                 await self._mark_blob_with_error(blob_path, error_msg)
                 return False
 
@@ -280,14 +268,14 @@ class TranscriptionPollingService:
             user = self.get_or_create_user_by_email(user_email)
             if not user:
                 error_msg = f"User not found for email: {user_email}"
-                logger.error(f"User {self.user_email}: {error_msg}")
+                logger.error(error_msg)
                 await self._mark_blob_with_error(blob_path, error_msg)
                 return False
 
             # Trigger transcription processing
-            transcription_id = extract_transcription_id_from_blob_path(blob_path, self.user_email)
+            transcription_id = extract_transcription_id_from_blob_path(blob_path, user_email)
 
-            logger.info(f"User {self.user_email}: Starting transcription for blob: {blob_path}")
+            logger.info(f"Starting transcription for blob: {blob_path} (user: {user_email})")
 
             await transcribe_and_generate_llm_output(
                 user_upload_blob_storage_file_key=blob_path,
@@ -299,15 +287,60 @@ class TranscriptionPollingService:
             # Mark blob as processed
             await self._mark_blob_as_processed_and_soft_delete(blob_path)
 
-            logger.info(f"User {self.user_email}: Successfully processed audio file: {blob_path}")
+            logger.info(f"Successfully processed audio file: {blob_path} (user: {user_email})")
 
         except Exception as e:
             error_msg = f"Error processing audio file {blob_path}: {e}"
-            logger.error(f"User {self.user_email}: {error_msg}")
+            logger.error(error_msg)
             await self._mark_blob_with_error(blob_path, str(e))
             return False
         else:
             return True
+
+    async def _mark_blob_in_progress(self, blob_path: str) -> bool:
+        """
+        Mark a blob as currently being processed to prevent duplicate processing.
+
+        This is called at the start of processing to prevent the polling loop
+        from discovering and queuing the same blob multiple times if processing
+        takes longer than the polling interval.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+
+        Returns
+        -------
+        bool
+            True if successfully marked, False otherwise.
+        """
+        try:
+            # Get current metadata to preserve retry count
+            current_metadata = await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
+
+            # Check if already in progress (race condition)
+            if current_metadata.get("status") == "in_progress":
+                logger.warning(f"Blob already marked as in_progress: {blob_path}")
+                return False
+
+            metadata = {
+                "processed": "false",
+                "status": "in_progress",
+                "started_at": datetime.now(UTC).isoformat(),
+                "retry_count": current_metadata.get("retry_count", "0"),
+            }
+            success = await self.azure_blob_manager.set_blob_metadata(blob_name=blob_path, metadata=metadata)
+            if success:
+                logger.info(f"Marked blob as in_progress: {blob_path}")
+                return True
+            else:
+                logger.warning(f"Failed to mark blob as in_progress: {blob_path}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error marking blob as in_progress {blob_path}: {e}")
+            return False
 
     async def _mark_blob_as_processed_and_soft_delete(self, blob_path: str) -> None:
         """
@@ -364,9 +397,9 @@ class TranscriptionPollingService:
                 "status": "retrying",  # Will be retried on next poll
             }
             await self.azure_blob_manager.set_blob_metadata(blob_name=blob_path, metadata=metadata)
-            logger.info(f"User {self.user_email}: Marked blob with error (attempt {new_retry_count}): {blob_path}")
+            logger.info(f"Marked blob with error (attempt {new_retry_count}): {blob_path}")
         except Exception as e:
-            logger.error(f"User {self.user_email}: Error marking blob with error {blob_path}: {e}")
+            logger.error(f"Error marking blob with error {blob_path}: {e}")
 
     async def _mark_blob_permanently_failed(self, blob_path: str, current_metadata: dict) -> None:
         """
@@ -390,11 +423,11 @@ class TranscriptionPollingService:
             }
             await self.azure_blob_manager.set_blob_metadata(blob_name=blob_path, metadata=metadata)
             logger.error(
-                f"User {self.user_email}: Marked blob as permanently failed after "
+                f"Marked blob as permanently failed after "
                 f"{current_metadata.get('retry_count', 0)} attempts: {blob_path}"
             )
         except Exception as e:
-            logger.error(f"User {self.user_email}: Error marking blob as permanently failed {blob_path}: {e}")
+            logger.error(f"Error marking blob as permanently failed {blob_path}: {e}")
 
     def _should_delete_old_blob(self, metadata: dict) -> tuple[bool, str]:
         """
@@ -419,7 +452,12 @@ class TranscriptionPollingService:
         if not metadata or ("processed" not in metadata and "retry_count" not in metadata and "status" not in metadata):
             return True, "legacy blob without metadata"
 
-        # Case 3: Blob with retry metadata - keep for processing/investigation
+        # Case 3: Stale in_progress blobs (worker crashed or service restarted)
+        # Reset them so they can be retried
+        if metadata.get("status") == "in_progress":
+            return False, "stale in_progress - will reset"
+
+        # Case 4: Blob with retry metadata - keep for processing/investigation
         status = metadata.get("status", "unknown")
         retry_count = metadata.get("retry_count", "0")
         return False, f"has metadata (status={status}, retry_count={retry_count})"
@@ -440,23 +478,14 @@ class TranscriptionPollingService:
         """
         blob_name = blob["name"]
 
-        # Security check
+        # Ensure blob is in user-uploads prefix
         if not blob_name.startswith(self.user_uploads_prefix):
-            logger.error(
-                f"Security check failed during cleanup: Blob '{blob_name}' does not match "
-                f"user prefix '{self.user_uploads_prefix}' for user {self.user_email}"
-            )
             return False, None
 
         # Only consider audio files
         blob_path = Path(blob_name)
         if blob_path.suffix.lower() not in self.supported_extensions:
             return False, None
-
-        # Check if blob is old
-        # last_modified = blob.get("last_modified")
-        # if not (last_modified and last_modified < self.startup_time):
-        #     return False, None
 
         # Determine if this old blob should be deleted based on metadata
         metadata = blob.get("metadata", {})
@@ -465,24 +494,25 @@ class TranscriptionPollingService:
 
     async def _cleanup_old_blobs_on_startup(self) -> None:
         """
-        Clean up this user's blobs older than the service startup time.
+        Clean up old blobs from before the service startup time.
 
         This runs once on the first poll to:
-        1. Remove old recordings for this user that should have been cleaned up
-        2. Ensure we only work with new uploads from this session
-
-        Includes defensive checks to ensure only this user's blobs are deleted.
+        1. Remove old recordings that should have been cleaned up
+        2. Reset stale in_progress blobs (from crashed workers)
+        3. Ensure we only work with new uploads from this session
         """
         try:
-            logger.info(f"User {self.user_email}: Starting cleanup of old blobs from before service startup...")
+            logger.info("Starting cleanup of old blobs from before service startup...")
 
-            # List all blobs with user-specific prefix
+            # List all blobs with user-uploads prefix (all users)
             all_blobs = await self.azure_blob_manager.list_blobs_in_prefix(
                 prefix=self.user_uploads_prefix, include_metadata=True
             )
 
             # Evaluate blobs for cleanup
             old_blobs = []
+            stale_in_progress_blobs = []
+
             for blob in all_blobs:
                 should_delete, reason = self._evaluate_blob_for_cleanup(blob)
 
@@ -492,69 +522,159 @@ class TranscriptionPollingService:
                 blob_name = blob["name"]
                 if should_delete:
                     old_blobs.append(blob)
-                    logger.info(f"User {self.user_email}: Will clean up old blob ({reason}): {blob_name}")
+                    logger.info(f"Will clean up old blob ({reason}): {blob_name}")
+                elif reason == "stale in_progress - will reset":
+                    stale_in_progress_blobs.append(blob)
+                    logger.info(f"Will reset stale in_progress blob: {blob_name}")
                 else:
-                    logger.info(f"User {self.user_email}: Keeping old blob ({reason}): {blob_name}")
+                    logger.info(f"Keeping old blob ({reason}): {blob_name}")
 
+            # Delete old blobs
             if old_blobs:
-                logger.info(f"User {self.user_email}: Found {len(old_blobs)} old blob(s) to clean up")
+                logger.info(f"Found {len(old_blobs)} old blob(s) to clean up")
 
-                # Delete each old blob
                 for blob in old_blobs:
                     blob_name = blob["name"]
                     try:
                         success = await self.azure_blob_manager.delete_blob(blob_name)
                         if success:
-                            logger.info(f"User {self.user_email}: Deleted old blob: {blob_name}")
+                            logger.info(f"Deleted old blob: {blob_name}")
                         else:
-                            logger.warning(f"User {self.user_email}: Failed to delete old blob: {blob_name}")
+                            logger.warning(f"Failed to delete old blob: {blob_name}")
                     except Exception as e:
-                        logger.error(f"User {self.user_email}: Error deleting old blob {blob_name}: {e}")
+                        logger.error(f"Error deleting old blob {blob_name}: {e}")
 
-                logger.info(f"User {self.user_email}: Cleanup complete - processed {len(old_blobs)} old blob(s)")
+                logger.info(f"Cleanup complete - deleted {len(old_blobs)} old blob(s)")
             else:
-                logger.info(f"User {self.user_email}: No old blobs found to clean up")
+                logger.info("No old blobs found to clean up")
+
+            # Reset stale in_progress blobs
+            if stale_in_progress_blobs:
+                logger.info(f"Found {len(stale_in_progress_blobs)} stale in_progress blob(s) to reset")
+
+                for blob in stale_in_progress_blobs:
+                    blob_name = blob["name"]
+                    try:
+                        current_metadata = blob.get("metadata", {})
+                        retry_count = current_metadata.get("retry_count", "0")
+
+                        # Reset status to allow reprocessing, but keep retry history
+                        metadata = {
+                            "processed": "false",
+                            "status": "reset_from_stale",
+                            "reset_at": datetime.now(UTC).isoformat(),
+                            "retry_count": retry_count,  # ← Preserve retry count!
+                        }
+                        success = await self.azure_blob_manager.set_blob_metadata(
+                            blob_name=blob_name, metadata=metadata
+                        )
+                        if success:
+                            logger.info(f"Reset stale in_progress blob (retry_count={retry_count}): {blob_name}")
+                        else:
+                            logger.warning(f"Failed to reset stale blob: {blob_name}")
+                    except Exception as e:
+                        logger.error(f"Error resetting stale blob {blob_name}: {e}")
+
+                logger.info(f"Reset complete - processed {len(stale_in_progress_blobs)} stale blob(s)")
+            else:
+                logger.info("No stale in_progress blobs found to reset")
 
         except Exception as e:
-            logger.error(f"User {self.user_email}: Error during startup cleanup: {e}")
+            logger.error(f"Error during startup cleanup: {e}")
+
+    async def _worker(self, worker_id: int) -> None:
+        """
+        Worker coroutine that pulls blobs from the queue and processes them.
+
+        On shutdown, the worker exits immediately. Any in-progress blobs will be
+        recovered by the startup cleanup on next service start.
+
+        Parameters
+        ----------
+        worker_id : int
+            Unique identifier for this worker (for logging)
+        """
+        logger.info(f"Worker {worker_id} started")
+
+        while not self._shutdown:
+            try:
+                # Wait for a blob from the queue (with timeout to check shutdown flag)
+                try:
+                    blob_info = await asyncio.wait_for(self.blob_queue.get(), timeout=1.0)
+                except TimeoutError:
+                    # No item in queue, loop back to check shutdown flag
+                    continue
+
+                try:
+                    # Process the blob
+                    logger.info(f"Worker {worker_id} processing blob: {blob_info['name']}")
+                    await self.process_discovered_audio(blob_info)
+                except Exception as e:
+                    logger.error(f"Worker {worker_id} error processing blob {blob_info.get('name', 'unknown')}: {e}")
+                finally:
+                    # Mark task as done
+                    self.blob_queue.task_done()
+
+            except Exception as e:
+                logger.error(f"Worker {worker_id} encountered unexpected error: {e}")
+
+        logger.info(f"Worker {worker_id} stopped")
 
     async def run_polling_loop(self) -> None:
         """
-        Run the continuous polling loop for this user.
+        Run the continuous global polling loop with parallel workers.
 
-        This method runs indefinitely, polling for new audio files every
-        30 seconds and processing them for this user only.
-
-        On the first poll, it cleans up any of this user's blobs older than
-        the service startup time.
+        This method:
+        1. Starts worker tasks to process blobs in parallel
+        2. Polls for new audio files every 30 seconds
+        3. Adds discovered files to a queue for workers to process
+        4. Cleans up old blobs on first poll
         """
         logger.info(
-            f"User {self.user_email}: Starting transcription polling service "
+            f"Starting global transcription polling service with {self.num_workers} workers "
             f"(interval: {self.polling_interval_seconds}s)"
         )
 
-        while True:
-            try:
-                # On first poll, clean up old blobs for this user
-                if self._is_first_poll:
-                    await self._cleanup_old_blobs_on_startup()
-                    self._is_first_poll = False
+        # Start worker tasks
+        for worker_id in range(self.num_workers):
+            task = asyncio.create_task(self._worker(worker_id))
+            self.worker_tasks.append(task)
 
-                # Poll for new files
-                unprocessed_files = await self.poll_for_new_audio_files()
+        logger.info(f"Started {self.num_workers} worker tasks")
 
-                # Process each file
-                for blob_info in unprocessed_files:
-                    try:
-                        await self.process_discovered_audio(blob_info)
-                    except Exception as e:
-                        logger.error(
-                            f"User {self.user_email}: Error processing blob " f"{blob_info.get('name', 'unknown')}: {e}"
-                        )
-                        # Continue processing other files even if one fails
+        try:
+            while not self._shutdown:
+                try:
+                    # On first poll, clean up old blobs
+                    if self._is_first_poll:
+                        await self._cleanup_old_blobs_on_startup()
+                        self._is_first_poll = False
 
-            except Exception as e:
-                logger.error(f"User {self.user_email}: Error in polling loop: {e}")
+                    # Poll for new files
+                    unprocessed_files = await self.poll_for_new_audio_files()
 
-            # Wait before next poll
-            await asyncio.sleep(self.polling_interval_seconds)
+                    # Add discovered files to queue for workers to process
+                    for blob_info in unprocessed_files:
+                        await self.blob_queue.put(blob_info)
+                        logger.debug(f"Added blob to queue: {blob_info['name']}")
+
+                except Exception as e:
+                    logger.error(f"Error in polling loop: {e}")
+
+                # Wait before next poll
+                await asyncio.sleep(self.polling_interval_seconds)
+
+        finally:
+            # Fast shutdown: abandon queue and cancel workers immediately
+            # Any in-progress blobs will be recovered by startup cleanup
+            logger.info("Shutting down polling service (fast shutdown)...")
+            self._shutdown = True
+
+            # Cancel all worker tasks immediately
+            logger.info("Cancelling worker tasks...")
+            for task in self.worker_tasks:
+                task.cancel()
+
+            # Wait for all workers to finish cancellation
+            await asyncio.gather(*self.worker_tasks, return_exceptions=True)
+            logger.info("All workers stopped")
