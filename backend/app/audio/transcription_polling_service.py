@@ -33,7 +33,13 @@ class TranscriptionPollingService:
     """
 
     def __init__(self):
-        """Initialize the global transcription polling service."""
+        """Initialize the global transcription polling service.
+
+        Parameters
+        ----------
+        num_workers : int
+            Number of parallel worker tasks to process audio files (default: 3)
+        """
         self.settings = get_settings()
         self.azure_blob_manager = AsyncAzureBlobManager()
         self.polling_interval_seconds = 30
@@ -43,8 +49,15 @@ class TranscriptionPollingService:
         # Record startup time - only process files uploaded after this
         self.startup_time = datetime.now(UTC)
         self._is_first_poll = True
+
+        # Queue for discovered blobs to be processed
+        self.blob_queue: asyncio.Queue = asyncio.Queue()
+        self.num_workers = 20
+        self.worker_tasks: list[asyncio.Task] = []
+        self._shutdown = False
+
         logger.info(
-            f"Global polling service initialized - "
+            f"Global polling service initialized with {self.num_workers} workers - "
             f"will process files for all users uploaded after {self.startup_time.isoformat()}"
         )
 
@@ -465,38 +478,99 @@ class TranscriptionPollingService:
         except Exception as e:
             logger.error(f"Error during startup cleanup: {e}")
 
-    async def run_polling_loop(self) -> None:
+    async def _worker(self, worker_id: int) -> None:
         """
-        Run the continuous global polling loop.
+        Worker coroutine that pulls blobs from the queue and processes them.
 
-        This method runs indefinitely, polling for new audio files every
-        30 seconds and processing them for all users.
-
-        On the first poll, it cleans up any old blobs from before
-        the service startup time.
+        Parameters
+        ----------
+        worker_id : int
+            Unique identifier for this worker (for logging)
         """
-        logger.info(f"Starting global transcription polling service (interval: {self.polling_interval_seconds}s)")
+        logger.info(f"Worker {worker_id} started")
 
-        while True:
+        while not self._shutdown:
             try:
-                # On first poll, clean up old blobs
-                if self._is_first_poll:
-                    await self._cleanup_old_blobs_on_startup()
-                    self._is_first_poll = False
+                # Wait for a blob from the queue (with timeout to check shutdown flag)
+                try:
+                    blob_info = await asyncio.wait_for(self.blob_queue.get(), timeout=1.0)
+                except TimeoutError:
+                    # No item in queue, continue loop to check shutdown flag
+                    continue
 
-                # Poll for new files
-                unprocessed_files = await self.poll_for_new_audio_files()
-
-                # Process each file
-                for blob_info in unprocessed_files:
-                    try:
-                        await self.process_discovered_audio(blob_info)
-                    except Exception as e:
-                        logger.error(f"Error processing blob {blob_info.get('name', 'unknown')}: {e}")
-                        # Continue processing other files even if one fails
+                try:
+                    # Process the blob
+                    logger.info(f"Worker {worker_id} processing blob: {blob_info['name']}")
+                    await self.process_discovered_audio(blob_info)
+                except Exception as e:
+                    logger.error(f"Worker {worker_id} error processing blob {blob_info.get('name', 'unknown')}: {e}")
+                finally:
+                    # Mark task as done
+                    self.blob_queue.task_done()
 
             except Exception as e:
-                logger.error(f"Error in polling loop: {e}")
+                logger.error(f"Worker {worker_id} encountered unexpected error: {e}")
 
-            # Wait before next poll
-            await asyncio.sleep(self.polling_interval_seconds)
+        logger.info(f"Worker {worker_id} stopped")
+
+    async def run_polling_loop(self) -> None:
+        """
+        Run the continuous global polling loop with parallel workers.
+
+        This method:
+        1. Starts worker tasks to process blobs in parallel
+        2. Polls for new audio files every 30 seconds
+        3. Adds discovered files to a queue for workers to process
+        4. Cleans up old blobs on first poll
+        """
+        logger.info(
+            f"Starting global transcription polling service with {self.num_workers} workers "
+            f"(interval: {self.polling_interval_seconds}s)"
+        )
+
+        # Start worker tasks
+        for worker_id in range(self.num_workers):
+            task = asyncio.create_task(self._worker(worker_id))
+            self.worker_tasks.append(task)
+
+        logger.info(f"Started {self.num_workers} worker tasks")
+
+        try:
+            while not self._shutdown:
+                try:
+                    # On first poll, clean up old blobs
+                    if self._is_first_poll:
+                        await self._cleanup_old_blobs_on_startup()
+                        self._is_first_poll = False
+
+                    # Poll for new files
+                    unprocessed_files = await self.poll_for_new_audio_files()
+
+                    # Add discovered files to queue for workers to process
+                    for blob_info in unprocessed_files:
+                        await self.blob_queue.put(blob_info)
+                        logger.debug(f"Added blob to queue: {blob_info['name']}")
+
+                except Exception as e:
+                    logger.error(f"Error in polling loop: {e}")
+
+                # Wait before next poll
+                await asyncio.sleep(self.polling_interval_seconds)
+
+        finally:
+            # Shutdown sequence
+            logger.info("Shutting down polling service...")
+            self._shutdown = True
+
+            # Wait for queue to be processed
+            logger.info("Waiting for queue to be processed...")
+            await self.blob_queue.join()
+
+            # Cancel all worker tasks
+            logger.info("Cancelling worker tasks...")
+            for task in self.worker_tasks:
+                task.cancel()
+
+            # Wait for all workers to finish
+            await asyncio.gather(*self.worker_tasks, return_exceptions=True)
+            logger.info("All workers stopped")

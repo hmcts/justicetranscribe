@@ -28,7 +28,7 @@ async def lifespan(app_: FastAPI):  # noqa: ARG001
 
     log.info("Starting up...")
 
-    # Start the global transcription polling service
+    # Start the global transcription polling service (with 3 workers by default)
     log.info("Starting global transcription polling service for all users...")
     polling_service = TranscriptionPollingService()
     global_polling_task = asyncio.create_task(polling_service.run_polling_loop())
