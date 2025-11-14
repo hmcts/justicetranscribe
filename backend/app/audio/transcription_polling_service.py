@@ -68,6 +68,7 @@ class TranscriptionPollingService:
         Used during polling to filter out blobs that should NOT be transcribed:
         - Already successfully processed blobs
         - Permanently failed blobs (exceeded retry limit)
+        - Currently being processed blobs (in_progress status)
         - Non-audio files
         - Files not in the user-uploads prefix
 
@@ -105,6 +106,14 @@ class TranscriptionPollingService:
         if metadata.get("status") == "permanently_failed":
             logger.debug(f"Skipping permanently failed blob: {blob_name}")
             return True
+
+        # Skip if currently being processed (prevents duplicate processing)
+        if metadata.get("status") == "in_progress":
+            logger.debug(f"Skipping blob already in progress: {blob_name}")
+            return True
+
+        # Don't skip if status is "reset_from_stale" or "retrying" - these should be reprocessed
+        # Also don't skip new blobs with no metadata
 
         return False
 
@@ -220,10 +229,11 @@ class TranscriptionPollingService:
         Process a discovered audio file.
 
         This method:
-        1. Extracts user email from blob path
-        2. Looks up user in database
-        3. Triggers transcription processing
-        4. Marks blob as processed
+        1. Marks blob as in_progress to prevent duplicate processing
+        2. Extracts user email from blob path
+        3. Looks up user in database
+        4. Triggers transcription processing
+        5. Marks blob as processed
 
         Parameters
         ----------
@@ -239,6 +249,13 @@ class TranscriptionPollingService:
         logger.info(f"Processing discovered audio file: {blob_path}")
 
         try:
+            # CRITICAL: Mark as in_progress immediately to prevent race conditions
+            # If this returns False, another worker is already processing this blob
+            marked = await self._mark_blob_in_progress(blob_path)
+            if not marked:
+                logger.warning(f"Blob already being processed by another worker, skipping: {blob_path}")
+                return False
+
             # Extract user email from path
             user_email = self.extract_user_email_from_blob_path(blob_path)
             if not user_email:
@@ -279,6 +296,51 @@ class TranscriptionPollingService:
             return False
         else:
             return True
+
+    async def _mark_blob_in_progress(self, blob_path: str) -> bool:
+        """
+        Mark a blob as currently being processed to prevent duplicate processing.
+
+        This is called at the start of processing to prevent the polling loop
+        from discovering and queuing the same blob multiple times if processing
+        takes longer than the polling interval.
+
+        Parameters
+        ----------
+        blob_path : str
+            The blob path.
+
+        Returns
+        -------
+        bool
+            True if successfully marked, False otherwise.
+        """
+        try:
+            # Get current metadata to preserve retry count
+            current_metadata = await self.azure_blob_manager.get_blob_metadata(blob_path) or {}
+
+            # Check if already in progress (race condition)
+            if current_metadata.get("status") == "in_progress":
+                logger.warning(f"Blob already marked as in_progress: {blob_path}")
+                return False
+
+            metadata = {
+                "processed": "false",
+                "status": "in_progress",
+                "started_at": datetime.now(UTC).isoformat(),
+                "retry_count": current_metadata.get("retry_count", "0"),
+            }
+            success = await self.azure_blob_manager.set_blob_metadata(blob_name=blob_path, metadata=metadata)
+            if success:
+                logger.info(f"Marked blob as in_progress: {blob_path}")
+                return True
+            else:
+                logger.warning(f"Failed to mark blob as in_progress: {blob_path}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error marking blob as in_progress {blob_path}: {e}")
+            return False
 
     async def _mark_blob_as_processed_and_soft_delete(self, blob_path: str) -> None:
         """
@@ -390,7 +452,12 @@ class TranscriptionPollingService:
         if not metadata or ("processed" not in metadata and "retry_count" not in metadata and "status" not in metadata):
             return True, "legacy blob without metadata"
 
-        # Case 3: Blob with retry metadata - keep for processing/investigation
+        # Case 3: Stale in_progress blobs (worker crashed or service restarted)
+        # Reset them so they can be retried
+        if metadata.get("status") == "in_progress":
+            return False, "stale in_progress - will reset"
+
+        # Case 4: Blob with retry metadata - keep for processing/investigation
         status = metadata.get("status", "unknown")
         retry_count = metadata.get("retry_count", "0")
         return False, f"has metadata (status={status}, retry_count={retry_count})"
@@ -431,7 +498,8 @@ class TranscriptionPollingService:
 
         This runs once on the first poll to:
         1. Remove old recordings that should have been cleaned up
-        2. Ensure we only work with new uploads from this session
+        2. Reset stale in_progress blobs (from crashed workers)
+        3. Ensure we only work with new uploads from this session
         """
         try:
             logger.info("Starting cleanup of old blobs from before service startup...")
@@ -443,6 +511,8 @@ class TranscriptionPollingService:
 
             # Evaluate blobs for cleanup
             old_blobs = []
+            stale_in_progress_blobs = []
+
             for blob in all_blobs:
                 should_delete, reason = self._evaluate_blob_for_cleanup(blob)
 
@@ -453,13 +523,16 @@ class TranscriptionPollingService:
                 if should_delete:
                     old_blobs.append(blob)
                     logger.info(f"Will clean up old blob ({reason}): {blob_name}")
+                elif reason == "stale in_progress - will reset":
+                    stale_in_progress_blobs.append(blob)
+                    logger.info(f"Will reset stale in_progress blob: {blob_name}")
                 else:
                     logger.info(f"Keeping old blob ({reason}): {blob_name}")
 
+            # Delete old blobs
             if old_blobs:
                 logger.info(f"Found {len(old_blobs)} old blob(s) to clean up")
 
-                # Delete each old blob
                 for blob in old_blobs:
                     blob_name = blob["name"]
                     try:
@@ -471,9 +544,36 @@ class TranscriptionPollingService:
                     except Exception as e:
                         logger.error(f"Error deleting old blob {blob_name}: {e}")
 
-                logger.info(f"Cleanup complete - processed {len(old_blobs)} old blob(s)")
+                logger.info(f"Cleanup complete - deleted {len(old_blobs)} old blob(s)")
             else:
                 logger.info("No old blobs found to clean up")
+
+            # Reset stale in_progress blobs
+            if stale_in_progress_blobs:
+                logger.info(f"Found {len(stale_in_progress_blobs)} stale in_progress blob(s) to reset")
+
+                for blob in stale_in_progress_blobs:
+                    blob_name = blob["name"]
+                    try:
+                        # Clear the metadata to allow reprocessing
+                        metadata = {
+                            "processed": "false",
+                            "status": "reset_from_stale",
+                            "reset_at": datetime.now(UTC).isoformat(),
+                        }
+                        success = await self.azure_blob_manager.set_blob_metadata(
+                            blob_name=blob_name, metadata=metadata
+                        )
+                        if success:
+                            logger.info(f"Reset stale in_progress blob: {blob_name}")
+                        else:
+                            logger.warning(f"Failed to reset stale blob: {blob_name}")
+                    except Exception as e:
+                        logger.error(f"Error resetting stale blob {blob_name}: {e}")
+
+                logger.info(f"Reset complete - processed {len(stale_in_progress_blobs)} stale blob(s)")
+            else:
+                logger.info("No stale in_progress blobs found to reset")
 
         except Exception as e:
             logger.error(f"Error during startup cleanup: {e}")
