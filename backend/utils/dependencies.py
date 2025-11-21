@@ -185,22 +185,27 @@ async def get_allowlisted_user(
         and settings.BYPASS_ALLOWLIST_DEV
         and current_user.email == "developer@localhost.com"
     ):
-        logger.info("Allowlist bypassed for local dev user: %s", current_user.email)
+        logger.info(
+            "🔓 ALLOWLIST BYPASS (ENV VAR) | User: %s | BYPASS_ALLOWLIST_DEV=%s",
+            current_user.email,
+            settings.BYPASS_ALLOWLIST_DEV,
+        )
         return current_user
 
     # Check allowlist with fail-open approach
     try:
+        logger.debug("🔍 Checking allowlist for user: %s", current_user.email)
         allowlist_manager = get_allowlist_manager()
         is_allowlisted = allowlist_manager.is_user_allowlisted(current_user.email)
 
         if not is_allowlisted:
-            logger.warning("Access denied: User %s is not on the allowlist", current_user.email)
+            logger.warning("❌ ACCESS DENIED | User: %s | Not on allowlist", current_user.email)
             raise HTTPException(
                 status_code=403,
                 detail="Access denied. Your account is not authorized to use this service. Please contact your administrator.",
             )
 
-        logger.info("Allowlist verified for user: %s", current_user.email)
+        logger.info("✅ ALLOWLIST CHECK PASSED | User: %s", current_user.email)
         return current_user  # noqa: TRY300
 
     except HTTPException:
@@ -218,5 +223,8 @@ async def get_allowlisted_user(
                 "message": "Allowlist check failed - allowing access (fail-open mode)",
             },
         )
-        logger.warning("Allowing access for user %s due to allowlist service failure (fail-open)", current_user.email)
+        logger.warning(
+            "🔓 ALLOWLIST BYPASS (FAIL-OPEN) | User: %s | Allowing access due to system error",
+            current_user.email,
+        )
         return current_user

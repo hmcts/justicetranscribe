@@ -32,6 +32,14 @@ repos:
         types: [file]
         verbose: true
 
+      - id: allowlist-validate
+        name: Validate allowlist CSV (format, domain, duplicates)
+        entry: bash -c 'cd backend && uv run python ../scripts/allowlist/validate_allowlist.py'
+        language: system
+        pass_filenames: false
+        files: ^backend/\.allowlist/allowlist\.csv$
+        verbose: true
+
       # - id: python-tests
       #   name: Run Python tests
       #   entry: uv run pytest

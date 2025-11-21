@@ -35,6 +35,25 @@ cd frontend && npm run build  # Runs TypeScript checks
 
 # Backend Guidelines
 
+## API Design
+
+### Separation of Concerns: Endpoints vs Business Logic
+
+**Principle**: Endpoints should orchestrate and delegate, not duplicate business logic or error handling.
+
+**Endpoint Responsibilities (routes.py)**:
+- Request validation and deserialization
+- Authentication/authorization checks
+- HTTP-specific concerns (status codes, response formatting)
+- Delegating to business logic functions
+- Converting business exceptions to HTTP responses
+
+**Business Logic Responsibilities (e.g., llm_calls.py, services/)**:
+- Core application logic
+- Error handling specific to the operation
+- State management (e.g., creating error minute versions)
+- Data transformations and processing
+
 ## Code Style
 
 * **Linting**: All code must pass `ruff` checks defined in `backend/pyproject.toml`

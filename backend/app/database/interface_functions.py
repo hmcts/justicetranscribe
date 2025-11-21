@@ -39,14 +39,58 @@ def save_transcription(
         return merged
 
 
+def create_error_minute_version(
+    minute_version_id: str,
+    transcription_id: UUID,
+    error: Exception,
+    template: dict | None = None,
+    trace_id: str | None = None,
+) -> MinuteVersion:
+    """Create an error state to display in UI and end frontend polling.
+
+    Without error minute versions, failed transcriptions would remain
+    hidden indefinitely, and the frontend would poll for non-existent
+    successful versions.
+
+    Parameters
+    ----------
+    minute_version_id : str
+        Unique ID for this minute version
+    transcription_id : UUID
+        ID of the parent transcription
+    error : Exception
+        The error that occurred during processing
+    template : dict | None, optional
+        Template metadata (omit when reusing existing template from edit operations)
+    trace_id : str | None, optional
+        LangFuse trace ID for LLM operation debugging (None if error before LLM call)
+
+    Returns
+    -------
+    MinuteVersion
+        Error minute version ready to save to database
+    """
+    kwargs = {
+        "id": minute_version_id,
+        "transcription_id": transcription_id,
+        "html_content": "",
+        "is_generating": False,
+        "error_message": str(error),
+    }
+    if template is not None:
+        kwargs["template"] = template
+    if trace_id is not None:
+        kwargs["trace_id"] = trace_id
+
+    return MinuteVersion(**kwargs)
+
+
 def save_minute_version(
     minute_data: MinuteVersion,
 ) -> MinuteVersion:
     with Session(engine) as session:
         minute_data.template = (
-            minute_data.template.model_dump()
-            if hasattr(minute_data.template, "model_dump")
-            else minute_data.template
+            minute_data.template.model_dump() if hasattr(minute_data.template, "model_dump") else minute_data.template
         )
         merged = session.merge(minute_data)
         session.commit()
@@ -54,24 +98,33 @@ def save_minute_version(
         return merged
 
 
-def _is_transcription_showable(
-    transcription: Transcription, current_time: datetime
-) -> bool:
+def _is_transcription_showable(transcription: Transcription, current_time: datetime) -> bool:
     try:
-        # Has any minute versions with content or errors
+        # Any minute versions have error messages (show for user awareness of errors)
         if transcription.minute_versions and any(
-            version.html_content or version.error_message is not None
-            for version in transcription.minute_versions
+            version.error_message is not None for version in transcription.minute_versions
         ):
             return True
 
-        # Any jobs have error messages
+        # Require both General and Crissa templates to be completed before showing
+        # This ensures all LLM tasks have completed before displaying to the user
+        if transcription.minute_versions:
+            completed_templates = {
+                version.template["name"] if isinstance(version.template, dict) else version.template.name
+                for version in transcription.minute_versions
+                if version.html_content and not version.error_message and version.template is not None
+            }
+            # Only show if both General and Crissa templates are completed
+            if "General" in completed_templates and "Crissa" in completed_templates:
+                return True
+
+        # Any jobs have error messages (show for user awareness of errors)
         if transcription.transcription_jobs and any(
             job.error_message is not None for job in transcription.transcription_jobs
         ):
             return True
 
-        # Created more than 5 minutes ago
+        # Created more than 5 minutes ago (safety net to show old incomplete jobs)
         if transcription.created_datetime:
             created_dt = (
                 pytz.utc.localize(transcription.created_datetime)
@@ -125,11 +178,7 @@ def fetch_transcriptions_metadata(user_id: UUID, tz) -> list[TranscriptionMetada
                 id=t.id,
                 title=t.title or "",
                 created_datetime=pytz.utc.localize(t.created_datetime).astimezone(tz),
-                updated_datetime=(
-                    pytz.utc.localize(t.updated_datetime).astimezone(tz)
-                    if t.updated_datetime
-                    else None
-                ),
+                updated_datetime=(pytz.utc.localize(t.updated_datetime).astimezone(tz) if t.updated_datetime else None),
                 is_showable_in_ui=_is_transcription_showable(t, current_time),
                 speakers=_extract_unique_speakers(t),
             )
@@ -149,13 +198,9 @@ def get_transcription_by_id(transcription_id: UUID, user_id: UUID, tz) -> Transc
 
         # Convert the date to local timezone
         if transcription.created_datetime:
-            transcription.created_datetime = pytz.utc.localize(
-                transcription.created_datetime
-            ).astimezone(tz)
+            transcription.created_datetime = pytz.utc.localize(transcription.created_datetime).astimezone(tz)
         if transcription.updated_datetime:
-            transcription.updated_datetime = pytz.utc.localize(
-                transcription.updated_datetime
-            ).astimezone(tz)
+            transcription.updated_datetime = pytz.utc.localize(transcription.updated_datetime).astimezone(tz)
 
         return transcription
 
@@ -195,9 +240,7 @@ def get_minute_versions(
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
 
-        statement = select(MinuteVersion).where(
-            MinuteVersion.transcription_id == transcription_id
-        )
+        statement = select(MinuteVersion).where(MinuteVersion.transcription_id == transcription_id)
         results = session.exec(statement).all()
         return list(results)
 
@@ -218,8 +261,7 @@ def save_transcription_job(
 ) -> TranscriptionJob:
     with Session(engine) as session:
         job.dialogue_entries = [
-            entry.model_dump() if hasattr(entry, "model_dump") else entry
-            for entry in job.dialogue_entries
+            entry.model_dump() if hasattr(entry, "model_dump") else entry for entry in job.dialogue_entries
         ]
         merged = session.merge(job)
         session.commit()
@@ -235,15 +277,11 @@ def get_transcription_jobs(
         if not transcription:
             raise HTTPException(status_code=404, detail="Transcription not found")
 
-        statement = select(TranscriptionJob).where(
-            TranscriptionJob.transcription_id == transcription_id
-        )
+        statement = select(TranscriptionJob).where(TranscriptionJob.transcription_id == transcription_id)
         results = session.exec(statement).all()
 
         for job in results:
-            job.dialogue_entries = [
-                DialogueEntry(**entry) for entry in job.dialogue_entries
-            ]
+            job.dialogue_entries = [DialogueEntry(**entry) for entry in job.dialogue_entries]
 
         return list(results)
 

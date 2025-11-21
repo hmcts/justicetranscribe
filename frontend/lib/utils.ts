@@ -6,7 +6,12 @@ import { DialogueEntry, TranscriptionJob } from "@/src/api/generated";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-import { getMinuteVersionById, MinuteVersion } from "@/lib/database";
+import {
+  getAllTranscriptionMetadata,
+  getMinuteVersionById,
+  getMinuteVersions,
+  MinuteVersion,
+} from "@/lib/database";
 
 // Constant for fallback when no meeting title is available
 export const DEFAULT_MEETING_TITLE = "Untitled Meeting";
@@ -92,7 +97,7 @@ export const findExistingMinuteVersionForTemplate = (
   templateName: string
 ): MinuteVersion | undefined => {
   return minuteVersions
-    .filter((version) => version.template.name === templateName)
+    .filter((version) => version.template?.name === templateName)
     .sort((a, b) => {
       const dateA = new Date(a.created_datetime || "").getTime();
       const dateB = new Date(b.created_datetime || "").getTime();
@@ -111,12 +116,36 @@ export async function pollMinuteVersion(
   const maxAttempts = options.maxAttempts ?? 210; // 7 minutes total
   const interval = options.interval ?? 2000; // 2 seconds
   let attempts = 0;
+  let consecutiveNotFound = 0;
 
   while (attempts < maxAttempts) {
     const version = await getMinuteVersionById(transcriptionId, versionId);
+
     if (version && !version.is_generating) {
       return version as MinuteVersion;
     }
+
+    // If version is null (404), increment counter
+    if (version === null) {
+      consecutiveNotFound++;
+      // After 5 consecutive 404s (10 seconds), check if transcription has errors
+      if (consecutiveNotFound >= 5) {
+        const metadata = await getAllTranscriptionMetadata();
+        const transcription = metadata.find((t) => t.id === transcriptionId);
+        if (transcription && transcription.is_showable_in_ui) {
+          // Check if it's showable due to errors (no successful minute versions)
+          const versions = await getMinuteVersions(transcriptionId);
+          if (versions.length === 0) {
+            throw new Error(
+              "Transcription has errors. Minute generation failed."
+            );
+          }
+        }
+      }
+    } else {
+      consecutiveNotFound = 0; // Reset on success
+    }
+
     await new Promise((resolve) => setTimeout(resolve, interval));
     attempts++;
   }

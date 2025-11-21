@@ -8,7 +8,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # Default path to the allowlist CSV file
-DEFAULT_ALLOWLIST_PATH = Path(__file__).parent.parent.parent / ".allowlist" / "allowlist.csv"
+DEFAULT_ALLOWLIST_PATH = Path(__file__).parent.parent / ".allowlist" / "allowlist.csv"
 
 
 class AllowlistManager:
@@ -32,60 +32,69 @@ class AllowlistManager:
     def _load_allowlist(self) -> set[str]:
         """Load and parse the allowlist CSV file.
 
+        VALIDATION STRATEGY:
+        - Build time (CI/CD): Strict validation of email format and @justice.gov.uk domain
+        - Runtime: Simplified loading - just normalize and deduplicate
+
+        FAIL-OPEN: Returns empty set if file missing/unreadable (triggers fail-open).
+
         Returns
         -------
         set[str]
-            Set of lowercase email addresses.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the allowlist file doesn't exist.
-        ValueError
-            If the CSV doesn't have an 'email' column or has no valid emails.
+            Set of lowercase, normalized email addresses.
+            Returns empty set if file doesn't exist or has no entries.
         """
         if not self.csv_path.exists():
-            error_msg = f"Allowlist file not found: {self.csv_path}"
-            raise FileNotFoundError(error_msg)
+            logger.warning("Allowlist file not found: %s - returning empty set", self.csv_path)
+            return set()
 
-        # Read CSV file
-        allowlist_df = pd.read_csv(self.csv_path)
+        try:
+            # Read CSV file
+            allowlist_df = pd.read_csv(self.csv_path)
 
-        # Normalize column names to lowercase
-        allowlist_df.columns = allowlist_df.columns.str.lower().str.strip()
+            # Normalize column names to lowercase
+            allowlist_df.columns = allowlist_df.columns.str.lower().str.strip()
 
-        # Check for required email column
-        if "email" not in allowlist_df.columns:
-            error_msg = f"CSV must contain 'email' column. Found: {list(allowlist_df.columns)}"
-            raise ValueError(error_msg)
+            # Check for required email column
+            if "email" not in allowlist_df.columns:
+                logger.warning(
+                    "CSV must contain 'email' column. Found: %s - returning empty set", list(allowlist_df.columns)
+                )
+                return set()
 
-        # Extract and normalize emails
-        emails = (
-            allowlist_df["email"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-        )
+            # Extract and normalize emails
+            # Validation (format, domain) happens at build time via CI/CD
+            # Runtime just loads and normalizes
+            emails = allowlist_df["email"].astype(str).str.strip().str.lower()
 
-        # Filter out empty/invalid emails
-        emails = emails[
-            (emails.str.len() > 0) &
-            (emails != "nan") &
-            emails.str.contains("@", na=False)
-        ]
+            # Filter out only null/empty entries
+            valid_emails = emails[(emails.str.len() > 0) & (emails != "nan")]
 
-        # Remove duplicates and convert to set
-        email_set = set(emails.unique())
+            # Count how many were filtered out
+            filtered_count = len(emails) - len(valid_emails)
+            if filtered_count > 0:
+                logger.warning("Filtered out %d empty/null emails from allowlist", filtered_count)
 
-        if not email_set:
-            error_msg = "No valid emails found in allowlist"
-            raise ValueError(error_msg)
+            # Remove duplicates and convert to set
+            email_set = set(valid_emails.unique())
 
-        logger.info("Loaded %d emails from allowlist: %s", len(email_set), self.csv_path)
-        return email_set
+            if not email_set:
+                logger.warning("No valid emails found in allowlist - returning empty set")
+                return set()
 
-    def is_user_allowlisted(self, email: str | None) -> bool:  # noqa: ARG002
+            logger.info("Loaded %d valid emails from allowlist: %s", len(email_set), self.csv_path)
+        except Exception:
+            logger.exception("Failed to parse allowlist CSV - returning empty set")
+            return set()
+        else:
+            return email_set
+
+    def is_user_allowlisted(self, email: str | None) -> bool:
         """Check if an email is in the allowlist.
+
+        FAIL-OPEN: Any exception during checking returns True (allows access).
+        Empty allowlist (file missing, no valid emails) also returns True.
+        This ensures system errors don't block all users from the product.
 
         Parameters
         ----------
@@ -95,26 +104,42 @@ class AllowlistManager:
         Returns
         -------
         bool
-            True if the email is allowlisted, False otherwise.
+            True if the email is allowlisted or if there's an error checking.
+            False only if email is explicitly not in the allowlist.
         """
-        # TEMPORARY: Allowlist disabled - all users allowed
-        return True
+        if not email:
+            return False
 
-        # Original implementation (commented out)
-        # if not email:
-        #     return False
-        #
-        # # Load allowlist on first use
-        # if self._allowed_emails is None:
-        #     try:
-        #         self._allowed_emails = self._load_allowlist()
-        #     except Exception:
-        #         logger.exception("Failed to load allowlist")
-        #         return False
-        #
-        # # Normalize and check email
-        # normalized_email = email.lower().strip()
-        # return normalized_email in self._allowed_emails
+        try:
+            # Load allowlist on first use (lazy loading)
+            if self._allowed_emails is None:
+                self._allowed_emails = self._load_allowlist()
+
+            # FAIL-OPEN: If allowlist is empty (file missing, no valid emails), allow access
+            if not self._allowed_emails:
+                logger.warning(
+                    "⚠️ ALLOWLIST IS EMPTY - FAILING OPEN ⚠️ | Email: %s | "
+                    "Allowing access because allowlist has no valid entries",
+                    email,
+                )
+                return True
+
+            # Normalize and check email
+            normalized_email = email.lower().strip()
+            is_allowed = normalized_email in self._allowed_emails
+
+            if not is_allowed:
+                logger.info("User not in allowlist: %s", normalized_email)
+        except Exception:
+            # FAIL-OPEN: On any error, allow access
+            logger.exception(
+                "⚠️ ALLOWLIST CHECK FAILED - FAILING OPEN ⚠️ | Email: %s | "
+                "Allowing access to prevent blocking users due to system error",
+                email,
+            )
+            return True
+        else:
+            return is_allowed
 
     def reload(self) -> None:
         """Reload the allowlist from the CSV file."""

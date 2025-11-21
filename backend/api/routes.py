@@ -117,11 +117,22 @@ async def get_onboarding_status(
         and settings.BYPASS_ALLOWLIST_DEV
         and current_user.email == "developer@localhost.com"
     ):
+        logger.info(
+            "🔓 ALLOWLIST BYPASS (ENV VAR) | User: %s | BYPASS_ALLOWLIST_DEV=%s",
+            current_user.email,
+            settings.BYPASS_ALLOWLIST_DEV,
+        )
         is_allowlisted = True
     else:
         try:
+            logger.debug("🔍 Checking allowlist for user: %s", current_user.email)
             allowlist_manager = get_allowlist_manager()
             is_allowlisted = allowlist_manager.is_user_allowlisted(current_user.email)
+
+            if is_allowlisted:
+                logger.info("✅ ALLOWLIST CHECK PASSED | User: %s", current_user.email)
+            else:
+                logger.warning("❌ ALLOWLIST CHECK FAILED | User: %s | Not in allowlist", current_user.email)
         except Exception as e:
             # FAIL OPEN: Allowlist check failed - log and allow access
             logger.exception(
@@ -138,7 +149,7 @@ async def get_onboarding_status(
                 },
             )
             logger.warning(
-                "Allowing access for user %s due to allowlist service failure (fail-open)",
+                "🔓 ALLOWLIST BYPASS (FAIL-OPEN) | User: %s | Allowing access due to system error",
                 current_user.email,
             )
             is_allowlisted = True  # Fail open: allow access
@@ -247,70 +258,128 @@ async def get_upload_url(
     )
 
 
+def _validate_transcription_for_minutes(transcription_id: UUID, user_id: UUID) -> list:
+    """
+    Validate that a transcription has dialogue entries for minute generation.
+
+    Parameters
+    ----------
+    transcription_id : UUID
+        ID of the transcription to validate
+    user_id : UUID
+        ID of the user requesting access
+
+    Returns
+    -------
+    list
+        List of dialogue entries from all transcription jobs
+
+    Raises
+    ------
+    HTTPException
+        If transcription not found, no jobs exist, or no dialogue entries available
+    """
+    # Verify user has access to this transcription
+    get_transcription_by_id(
+        transcription_id,
+        user_id,
+        tz=pytz.UTC,
+    )
+
+    # Fetch transcription jobs
+    transcription_jobs = get_transcription_jobs(transcription_id)
+
+    if not transcription_jobs:
+        raise HTTPException(
+            status_code=404,
+            detail="No transcription jobs found. Cannot generate minutes.",
+        )
+
+    # Extract all dialogue entries
+    dialogue_entries = []
+    for job in transcription_jobs:
+        dialogue_entries.extend(job.dialogue_entries)
+
+    # Validate dialogue entries exist (catches "500: No transcription phrases" case)
+    if not dialogue_entries:
+        logger.warning(
+            f"No dialogue entries found for transcription {transcription_id}. "
+            f"Found {len(transcription_jobs)} job(s) but no dialogue entries."
+        )
+        raise HTTPException(
+            status_code=424,
+            detail="No dialogue entries found. Transcription may have failed or contained no speech.",
+        )
+
+    return dialogue_entries
+
+
 @router.post("/generate-or-edit-minutes")
 async def generate_or_edit_minutes(
     request: GenerateMinutesRequest,
     current_user: User = Depends(get_allowlisted_user),  # noqa: B008
 ):
-    new_minute_version_id = str(uuid.uuid4())
+    """
+    Initiate minute generation or editing as an async background task.
 
-    # Extract primitives from SQLAlchemy object before passing to background task
+    Validates transcription has dialogue entries before starting LLM processing.
+    Returns immediately with a minute_version_id that can be polled for completion.
+
+    Parameters
+    ----------
+    request : GenerateMinutesRequest
+        Request containing transcription_id, template, and action type
+    current_user : User
+        Authenticated user from dependency injection
+
+    Returns
+    -------
+    JSONResponse
+        Contains minute_version_id and status="initiated"
+
+    Raises
+    ------
+    HTTPException
+        404 if transcription or jobs not found
+        424 if no dialogue entries available (transcription failed)
+        400 if edit_instructions missing for edit action
+    """
     user_id = current_user.id
     user_email = current_user.email
 
+    # Validate and get dialogue entries (raises HTTPException if invalid)
+    dialogue_entries = _validate_transcription_for_minutes(request.transcription_id, user_id)
+
+    # Validate edit_instructions BEFORE creating minute_version_id
+    if request.action_type == "edit" and not request.edit_instructions:
+        raise HTTPException(
+            status_code=400,
+            detail="edit_instructions are required for edit action",
+        )
+
+    # Only create ID after ALL validation passes
+    new_minute_version_id = str(uuid.uuid4())
+
     async def process_request():
-        try:
-            # First verify the user has access to this transcription
-            get_transcription_by_id(
+        if request.action_type == "generate":
+            await generate_llm_output_task(
+                dialogue_entries,
                 request.transcription_id,
-                user_id,
-                tz=pytz.UTC,  # We don't need timezone conversion for this check
+                request.template,
+                user_email,
+                minute_version_id=new_minute_version_id,
+            )
+        elif request.action_type == "edit":
+            await ai_edit_task(
+                dialogue_entries,
+                request.current_minute_version_id,
+                new_minute_version_id,
+                request.edit_instructions,
+                request.transcription_id,
+                user_email,
             )
 
-            # Fetch transcription jobs for this transcription
-            transcription_jobs = get_transcription_jobs(request.transcription_id)
-
-            if not transcription_jobs:
-                raise HTTPException(
-                    status_code=404,
-                    detail="No transcription jobs found for this transcription",
-                )
-
-            dialogue_entries = []
-            for job in transcription_jobs:
-                dialogue_entries.extend(job.dialogue_entries)
-
-            if request.action_type == "generate":
-                await generate_llm_output_task(
-                    dialogue_entries,
-                    request.transcription_id,
-                    request.template,
-                    user_email,
-                    minute_version_id=new_minute_version_id,
-                )
-            elif request.action_type == "edit":
-                if not request.edit_instructions:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="edit_instructions are required for edit action",
-                    )
-
-                await ai_edit_task(
-                    dialogue_entries,
-                    request.current_minute_version_id,
-                    new_minute_version_id,
-                    request.edit_instructions,
-                    request.transcription_id,
-                    user_email,
-                )
-
-        except HTTPException:
-            # Re-raise HTTP exceptions (like 404s) as is
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e)) from e
-
-    asyncio.create_task(process_request())  # noqa: RUF006
+    asyncio.create_task(process_request())  # noqa: RUF006 - fire-and-forget background task
     return JSONResponse(content={"minute_version_id": new_minute_version_id, "status": "initiated"})
 
 

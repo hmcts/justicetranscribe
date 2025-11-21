@@ -8,6 +8,7 @@ from langfuse.decorators import langfuse_context, observe
 from uwotm8 import convert_american_to_british_spelling
 
 from app.database.interface_functions import (
+    create_error_minute_version,
     get_minute_version_by_id,
     save_minute_version,
 )
@@ -134,10 +135,6 @@ async def generate_llm_output_task(
 ) -> str:
     # Start a Sentry transaction for the whole function
     with sentry_sdk.start_transaction(op="task", name="Generate LLM Output Task") as transaction:  # noqa: F841
-        # if length of dialogue entries is 0, return empty string
-        if len(dialogue_entries) == 0:
-            raise HTTPException(status_code=400, detail="No dialogue entries found")
-
         # Ensure we have a consistent ID through the whole process
         if minute_version_id is None:
             minute_version_id = uuid4()  # Generate a UUID if none provided
@@ -172,14 +169,12 @@ async def generate_llm_output_task(
 
         except Exception as e:
             # Save error state
-            error_minute_version = MinuteVersion(
-                id=minute_version_id,
-                transcription_id=transcription_id,
-                html_content="",
+            error_minute_version = create_error_minute_version(
+                minute_version_id,
+                transcription_id,
+                e,
                 template=template,
                 trace_id=langfuse_context.get_current_trace_id(),
-                is_generating=False,
-                error_message=str(e),
             )
             save_minute_version(error_minute_version)
             raise
@@ -225,12 +220,14 @@ async def ai_edit_task(
             return llm_output  # noqa: TRY300
 
         except Exception as e:
-            error_minute_version = MinuteVersion(
-                id=new_minute_version_id,
-                transcription_id=transcription_id,
-                html_content="",
-                is_generating=False,
-                error_message=str(e),
+            # Pass template from current_minutes to create valid error state
+            error_minute_version = create_error_minute_version(
+                new_minute_version_id,
+                transcription_id,
+                e,
+                template=current_minutes.template
+                if isinstance(current_minutes.template, dict)
+                else current_minutes.template.model_dump(),
             )
             save_minute_version(error_minute_version)
             raise

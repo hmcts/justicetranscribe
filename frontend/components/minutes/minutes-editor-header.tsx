@@ -33,6 +33,7 @@ interface MinutesEditorHeaderProps {
   isRatingDialogOpen: boolean;
   setIsRatingDialogOpen: (open: boolean) => void;
   onAIEdit: (instructions: string) => void;
+  hasTranscriptionErrors: boolean;
 }
 
 export default function MinutesEditorHeader({
@@ -54,6 +55,7 @@ export default function MinutesEditorHeader({
   isRatingDialogOpen,
   setIsRatingDialogOpen,
   onAIEdit,
+  hasTranscriptionErrors,
 }: MinutesEditorHeaderProps) {
   const [isAIEditInlineOpen, setIsAIEditInlineOpen] = useState(false);
   const [aiEditInstructions, setAIEditInstructions] = useState("");
@@ -152,10 +154,10 @@ export default function MinutesEditorHeader({
               <Loader2 className="size-4 animate-spin" />
               <span>Generating...</span>
             </Button>
-          ) : !currentVersion && selectedTemplate ? (
+          ) : !currentVersion && selectedTemplate && !hasTranscriptionErrors ? (
             <Button
               onClick={() => generateAIMinutes(selectedTemplate)}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 text-white shadow-sm hover:bg-green-700"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#0F612D] px-4 text-white shadow-sm hover:bg-[#0A4A22]"
             >
               <Wand2 className="mr-2 size-4" />
               <span>Generate Summary</span>

@@ -1,5 +1,5 @@
 # Add this near the top of your Makefile
-.PHONY: setup-dev setup-prod setup-preprod install backend frontend database db-up db-down db-reset db-migrate db-upgrade test allowlist-dev allowlist-prod allowlist-both allowlist-update-dev allowlist-update-prod allowlist-merge-dev allowlist-merge-prod allowlist-upload-dev allowlist-upload-prod allowlist-dedupe-dev allowlist-dedupe-prod
+.PHONY: setup-dev setup-prod setup-preprod install backend frontend database db-up db-down db-reset db-migrate db-upgrade test allowlist-add allowlist-validate
 # Complete Dev Environment Setup
 setup-dev:
 	@echo "🚀 Setting up DEV environment end-to-end..."
@@ -49,99 +49,23 @@ db-upgrade: ## Apply all pending database migrations
 test: ## Run tests (when available)
 	cd backend && uv run pytest
 
-# JusticeAIUnit Allowlist Management
-# Update development allowlist
-allowlist-dev:
-	cd scripts/allowlist && python munge_allowlist.py --env dev
-# Update production allowlist  
-allowlist-prod:
-	cd scripts/allowlist && python munge_allowlist.py --env prod
-# Update both allowlists
-allowlist-both:
-	cd scripts/allowlist && python munge_allowlist.py --env both
-# Create a timestamped allowlist update CSV from clipboard input
-# Usage: make allowlist-update-dev [PROVIDER="region-name"]
-# Usage: make allowlist-update-prod [PROVIDER="region-name"]
-# PROVIDER is optional - if not specified, uses "unknown" for rows without provider
-allowlist-update-dev:
-	@if [ -z "$(PROVIDER)" ]; then \
-		cd scripts/allowlist && python create_allowlist_update.py --env dev; \
-	else \
-		cd scripts/allowlist && python create_allowlist_update.py --env dev --provider "$(PROVIDER)"; \
-	fi
-allowlist-update-prod:
-	@if [ -z "$(PROVIDER)" ]; then \
-		cd scripts/allowlist && python create_allowlist_update.py --env prod; \
-	else \
-		cd scripts/allowlist && python create_allowlist_update.py --env prod --provider "$(PROVIDER)"; \
-	fi
-# Merge a local allowlist file with Azure and upload
-# Usage: make allowlist-merge-dev FILE=data/dev-allowlist-update-2025-10-08_12-06-24.csv
-# Usage: make allowlist-merge-prod FILE=data/prod-allowlist-update-2025-10-08_12-06-24.csv
-allowlist-merge-dev:
+# Allowlist Management
+# Add users from a CSV file to the local allowlist
+# Usage: make allowlist-add FILE=path/to/users.csv
+allowlist-add: ## Add users from CSV to local allowlist
 	@if [ -z "$(FILE)" ]; then \
 		echo "❌ Error: FILE is required"; \
-		echo "Usage: make allowlist-merge-dev FILE=data/dev-allowlist-update-YYYY-MM-DD_HH-MM-SS.csv"; \
+		echo "Usage: make allowlist-add FILE=path/to/users.csv"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(FILE)" ]; then \
 		echo "❌ Error: File not found: $(FILE)"; \
 		exit 1; \
 	fi
-	cd scripts/allowlist && python merge_and_upload_allowlist.py --env dev --file ../../$(FILE)
-allowlist-merge-prod:
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Error: FILE is required"; \
-		echo "Usage: make allowlist-merge-prod FILE=data/prod-allowlist-update-YYYY-MM-DD_HH-MM-SS.csv"; \
-		exit 1; \
-	fi
-	@if [ ! -f "$(FILE)" ]; then \
-		echo "❌ Error: File not found: $(FILE)"; \
-		exit 1; \
-	fi
-	@echo "⚠️  WARNING: You are updating PRODUCTION allowlist!"
-	@read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ]
-	cd scripts/allowlist && python merge_and_upload_allowlist.py --env prod --file ../../$(FILE)
-# One-step: Create timestamped CSV from stdin and upload to Azure
-# Usage: make allowlist-upload-dev [PROVIDER="region-name"]
-# Usage: make allowlist-upload-prod [PROVIDER="region-name"]
-allowlist-upload-dev:
-	@echo "📋 Step 1/2: Creating timestamped allowlist CSV..."
-	@if [ -z "$(PROVIDER)" ]; then \
-		CREATED_FILE=$$(cd scripts/allowlist && python create_allowlist_update.py --env dev 2>&1 | grep "File:" | sed 's/.*File: //'); \
-	else \
-		CREATED_FILE=$$(cd scripts/allowlist && python create_allowlist_update.py --env dev --provider "$(PROVIDER)" 2>&1 | grep "File:" | sed 's/.*File: //'); \
-	fi; \
-	if [ -z "$$CREATED_FILE" ]; then \
-		echo "❌ Failed to create allowlist file"; \
-		exit 1; \
-	fi; \
-	echo ""; \
-	echo "📤 Step 2/2: Merging and uploading to Azure..."; \
-	cd scripts/allowlist && python merge_and_upload_allowlist.py --env dev --file "$$CREATED_FILE"
-allowlist-upload-prod:
-	@echo "⚠️  WARNING: You are updating PRODUCTION allowlist!"
-	@read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ]
-	@echo "📋 Step 1/2: Creating timestamped allowlist CSV..."
-	@if [ -z "$(PROVIDER)" ]; then \
-		CREATED_FILE=$$(cd scripts/allowlist && python create_allowlist_update.py --env prod 2>&1 | grep "File:" | sed 's/.*File: //'); \
-	else \
-		CREATED_FILE=$$(cd scripts/allowlist && python create_allowlist_update.py --env prod --provider "$(PROVIDER)" 2>&1 | grep "File:" | sed 's/.*File: //'); \
-	fi; \
-	if [ -z "$$CREATED_FILE" ]; then \
-		echo "❌ Failed to create allowlist file"; \
-		exit 1; \
-	fi; \
-	echo ""; \
-	echo "📤 Step 2/2: Merging and uploading to Azure..."; \
-	cd scripts/allowlist && python merge_and_upload_allowlist.py --env prod --file "$$CREATED_FILE"
+	cd backend && uv run python ../scripts/allowlist/add_users_to_allowlist.py --file "$(FILE)"
+	@echo ""
+	@echo "🔍 Validating final allowlist..."
+	$(MAKE) allowlist-validate
 
-# Allowlist Deduplication
-# Remove duplicate emails (case-insensitive) from allowlist in Azure storage
-allowlist-dedupe-dev: ## Deduplicate dev allowlist
-	cd scripts/allowlist && python deduplicate_allowlist.py --env dev
-
-allowlist-dedupe-prod: ## Deduplicate prod allowlist
-	@echo "⚠️  WARNING: You are deduplicating PRODUCTION allowlist!"
-	@read -p "Continue? [y/N]: " confirm && [ "$$confirm" = "y" ]
-	cd scripts/allowlist && python deduplicate_allowlist.py --env prod
+allowlist-validate: ## Validate allowlist CSV format and domain requirements
+	cd backend && uv run python ../scripts/allowlist/validate_allowlist.py

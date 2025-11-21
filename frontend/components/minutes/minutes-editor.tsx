@@ -39,12 +39,17 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
     useState<TemplateMetadata | null>(null);
   const [isRatingDialogOpen, setIsRatingDialogOpen] = useState(false);
 
-  const { currentTranscription } = useTranscripts();
+  const { currentTranscription, transcriptionJobs } = useTranscripts();
   const {
     templates,
     isLoading: templatesLoading,
     error: templatesError,
   } = useTemplates();
+
+  // Check if transcription has errors (failed processing)
+  const hasTranscriptionErrors = transcriptionJobs.some(
+    (job) => job.error_message !== null && job.error_message !== undefined
+  );
 
   const handleSaveEdit = useCallback(async () => {
     if (!currentVersion?.id || !currentTranscription?.id) return;
@@ -71,6 +76,20 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
     }
   }, [currentVersion, currentTranscription?.id]);
 
+  const logMinuteGenerationError = useCallback((errorMessage: string) => {
+    if (
+      errorMessage.includes("No transcription jobs found") ||
+      errorMessage.includes("No dialogue entries found") ||
+      errorMessage.includes("Transcription has errors")
+    ) {
+      console.error(
+        "Cannot generate minutes: Transcription failed or has no content"
+      );
+    } else {
+      console.error(errorMessage);
+    }
+  }, []);
+
   const generateAIMinutes = useCallback(
     async (template: TemplateMetadata) => {
       if (!currentTranscription?.id) {
@@ -88,7 +107,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           action_type: "generate",
         });
         if (result.error) {
-          throw new Error("Failed to initiate AI minutes generation");
+          throw new Error(result.error);
         }
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const { minute_version_id } = result.data!;
@@ -104,13 +123,14 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           error instanceof Error
             ? error.message
             : "Failed to generate AI minutes. Please try again.";
-        console.error(errorMessage);
+
+        logMinuteGenerationError(errorMessage);
         throw error;
       } finally {
         setIsGenerating(false);
       }
     },
-    [currentTranscription?.id, setIsGenerating, setCurrentVersion]
+    [currentTranscription?.id, setIsGenerating, setCurrentVersion, logMinuteGenerationError]
   );
 
   const handleAIEdit = useCallback(
@@ -139,7 +159,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
         });
 
         if (result.error) {
-          throw new Error("Failed to initiate AI edit");
+          throw new Error(result.error);
         }
 
         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -156,13 +176,14 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           error instanceof Error
             ? error.message
             : "Failed to generate AI edit. Please try again.";
-        console.error(errorMessage);
+
+        logMinuteGenerationError(errorMessage);
         throw error;
       } finally {
         setIsGenerating(false);
       }
     },
-    [currentTranscription?.id, currentVersion, selectedTemplate, handleSaveEdit]
+    [currentTranscription?.id, currentVersion, selectedTemplate, handleSaveEdit, logMinuteGenerationError]
   );
 
   const handleTemplateChange = useCallback(
@@ -215,21 +236,28 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
       try {
         const versions = await getMinuteVersions(currentTranscription.id);
         if (versions.length > 0) {
-          const completedVersions = versions.filter((version) => !version.is_generating);
-          
+          const completedVersions = versions.filter(
+            (version) => !version.is_generating
+          );
+
           // Prioritize CRISSA template if it exists
           const crissaVersion = completedVersions.find(
-            (version) => version.template.name === "Crissa"
+            (version) => version.template?.name === "Crissa"
           );
+
+          const minuteVersion =
+            crissaVersion ||
+            completedVersions.sort((a, b) => {
+              const dateA = new Date(a.created_datetime || "").getTime();
+              const dateB = new Date(b.created_datetime || "").getTime();
+              return dateB - dateA; // Sort in descending order (newest first)
+            })[0] ||
+            versions[versions.length - 1];
           
-          const minuteVersion = crissaVersion || 
-            completedVersions
-              .sort((a, b) => {
-                const dateA = new Date(a.created_datetime || "").getTime();
-                const dateB = new Date(b.created_datetime || "").getTime();
-                return dateB - dateA; // Sort in descending order (newest first)
-              })[0] || versions[versions.length - 1];
-          handleTemplateChange(minuteVersion.template.name);
+          // Only call handleTemplateChange if template exists
+          if (minuteVersion.template?.name) {
+            handleTemplateChange(minuteVersion.template.name);
+          }
         }
       } catch (error) {
         const errorMessage =
@@ -304,6 +332,7 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
           onRatingSubmit={handleRatingSubmit}
           isRatingDialogOpen={isRatingDialogOpen}
           setIsRatingDialogOpen={setIsRatingDialogOpen}
+          hasTranscriptionErrors={hasTranscriptionErrors}
         />
       </CardHeader>
 
@@ -311,20 +340,36 @@ function MinutesEditor({ onCitationClick }: MinutesEditorProps) {
         {!currentVersion && !isGenerating && (
           <div className="flex flex-col items-center justify-center space-y-6 rounded-lg border border-dashed border-gray-300 p-12 text-center text-gray-500">
             <FileText className="size-16" />
-            <div>
-              <h3 className="text-xl font-medium">No summary generated yet</h3>
-              <p className="mt-2 text-gray-500">
-                Select a template and generate summary to get started
-              </p>
+            <div className="flex w-full flex-col items-center">
+              {hasTranscriptionErrors ? (
+                <>
+                  <p className="text-xl font-semibold text-red-700">
+                    Transcription Failed
+                  </p>
+                  <p className="mt-2 text-gray-600">
+                    The audio transcription encountered errors. Please check the
+                    Transcript tab for details, or upload a new recording.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl font-semibold">
+                    No summary generated yet
+                  </p>
+                  <p className="mt-2 text-gray-500">
+                    Select a template and generate summary to get started
+                  </p>
 
-              {selectedTemplate && (
-                <Button
-                  onClick={() => generateAIMinutes(selectedTemplate)}
-                  className="mt-4 flex items-center justify-center gap-2 bg-green-600 px-6 py-2 text-white hover:bg-green-700"
-                >
-                  <Wand2 className="size-5" />
-                  <span>Generate with {selectedTemplate.name}</span>
-                </Button>
+                  {selectedTemplate && (
+                    <Button
+                      onClick={() => generateAIMinutes(selectedTemplate)}
+                      className="mt-4 flex items-center justify-center gap-2 bg-[#0F612D] px-6 py-2 text-white hover:bg-[#0A4A22]"
+                    >
+                      <Wand2 className="size-5" />
+                      <span>Generate with {selectedTemplate.name}</span>
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </div>
