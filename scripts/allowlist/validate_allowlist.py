@@ -91,8 +91,11 @@ def validate_allowlist(csv_path: Path) -> tuple[bool, list[str]]:  # noqa: C901,
         seen_emails.add(email_clean)
 
         # Check domain (allow developer@localhost.com as special case for local dev)
-        if not email_clean.endswith("@justice.gov.uk") and email_clean != "developer@localhost.com":
-            invalid_emails.append(f"Row {row_num}: '{email}' (invalid domain, must be @justice.gov.uk)")
+        allowed_domains = ("@justice.gov.uk", "@hmiprobation.gov.uk")
+        if not email_clean.endswith(allowed_domains) and email_clean != "developer@localhost.com":
+            invalid_emails.append(
+                f"Row {row_num}: '{email}' (invalid domain, must be @justice.gov.uk or @hmiprobation.gov.uk)"
+            )
 
         # Basic format check
         if "@" not in email_clean or "." not in email_clean:
