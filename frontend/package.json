@@ -85,7 +85,7 @@
     "jose": "^6.0.10",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.429.0",
-    "mammoth": "^1.8.0",
+    "mammoth": "^1.11.0",
     "markdown-it": "^14.1.0",
     "markdown-to-jsx": "^7.5.0",
     "marked": "^14.1.2",
