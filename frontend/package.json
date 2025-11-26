@@ -89,7 +89,7 @@
     "markdown-it": "^14.1.0",
     "markdown-to-jsx": "^7.5.0",
     "marked": "^14.1.2",
-    "next": "14.2.4",
+    "next": "14.2.33",
     "node-fetch": "^3.3.2",
     "nosleep.js": "^0.12.0",
     "posthog-js": "1.184.1",
